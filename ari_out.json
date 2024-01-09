@@ -1,0 +1,163 @@
+[
+    {
+        "completed_at": "2024-01-09T02:54:29Z",
+        "id": 154781,
+        "items_count": 10,
+        "items_url": "https://canvas.ucsc.edu/api/v1/courses/70916/modules/154781/items",
+        "name": "Module 1: Welcome to Slugworks",
+        "position": 2,
+        "prerequisite_module_ids": [],
+        "publish_final_grade": false,
+        "require_sequential_progress": true,
+        "state": "completed",
+        "unlock_at": null
+    },
+    {
+        "completed_at": null,
+        "id": 154783,
+        "items_count": 13,
+        "items_url": "https://canvas.ucsc.edu/api/v1/courses/70916/modules/154783/items",
+        "name": "Module 2: General Access",
+        "position": 3,
+        "prerequisite_module_ids": [
+            154781
+        ],
+        "publish_final_grade": false,
+        "require_sequential_progress": false,
+        "state": "started",
+        "unlock_at": null
+    },
+    {
+        "completed_at": null,
+        "id": 154784,
+        "items_count": 6,
+        "items_url": "https://canvas.ucsc.edu/api/v1/courses/70916/modules/154784/items",
+        "name": "Module 3: Creatorspace (BE-54)",
+        "position": 4,
+        "prerequisite_module_ids": [
+            154781,
+            154783
+        ],
+        "publish_final_grade": false,
+        "require_sequential_progress": false,
+        "state": "locked",
+        "unlock_at": null
+    },
+    {
+        "completed_at": null,
+        "id": 154785,
+        "items_count": 8,
+        "items_url": "https://canvas.ucsc.edu/api/v1/courses/70916/modules/154785/items",
+        "name": "Module 4: The Shop (BE-51)",
+        "position": 5,
+        "prerequisite_module_ids": [
+            154781,
+            154783
+        ],
+        "publish_final_grade": false,
+        "require_sequential_progress": false,
+        "state": "locked",
+        "unlock_at": null
+    },
+    {
+        "completed_at": null,
+        "id": 154786,
+        "items_count": 7,
+        "items_url": "https://canvas.ucsc.edu/api/v1/courses/70916/modules/154786/items",
+        "name": "Module 5: The Club Hub (BE-49) (Slugworks Clubs)",
+        "position": 6,
+        "prerequisite_module_ids": [
+            154781,
+            154783
+        ],
+        "publish_final_grade": false,
+        "require_sequential_progress": false,
+        "state": "locked",
+        "unlock_at": null
+    },
+    {
+        "completed_at": null,
+        "id": 154787,
+        "items_count": 5,
+        "items_url": "https://canvas.ucsc.edu/api/v1/courses/70916/modules/154787/items",
+        "name": "Module 6: Paint Booth (BE-50)",
+        "position": 7,
+        "prerequisite_module_ids": [
+            154781,
+            154783
+        ],
+        "publish_final_grade": false,
+        "require_sequential_progress": false,
+        "state": "locked",
+        "unlock_at": null
+    },
+    {
+        "completed_at": null,
+        "id": 154865,
+        "items_count": 6,
+        "items_url": "https://canvas.ucsc.edu/api/v1/courses/70916/modules/154865/items",
+        "name": "Module 7: Super User",
+        "position": 8,
+        "prerequisite_module_ids": [
+            154781,
+            154783,
+            154784,
+            154785,
+            154786,
+            154787
+        ],
+        "publish_final_grade": false,
+        "require_sequential_progress": false,
+        "state": "locked",
+        "unlock_at": null
+    },
+    {
+        "completed_at": null,
+        "id": 154940,
+        "items_count": 1,
+        "items_url": "https://canvas.ucsc.edu/api/v1/courses/70916/modules/154940/items",
+        "name": "Module 8: Lab Safety Officer (Slugworks Clubs)",
+        "position": 9,
+        "prerequisite_module_ids": [
+            154781,
+            154783,
+            154786
+        ],
+        "publish_final_grade": false,
+        "require_sequential_progress": false,
+        "state": "locked",
+        "unlock_at": null
+    },
+    {
+        "completed_at": null,
+        "id": 154941,
+        "items_count": 3,
+        "items_url": "https://canvas.ucsc.edu/api/v1/courses/70916/modules/154941/items",
+        "name": "Module 9: Slugworks Club Leadership (Slugworks Clubs)",
+        "position": 10,
+        "prerequisite_module_ids": [
+            154781,
+            154783,
+            154786
+        ],
+        "publish_final_grade": false,
+        "require_sequential_progress": false,
+        "state": "locked",
+        "unlock_at": null
+    },
+    {
+        "completed_at": null,
+        "id": 154942,
+        "items_count": 9,
+        "items_url": "https://canvas.ucsc.edu/api/v1/courses/70916/modules/154942/items",
+        "name": "Module 10: Sewing Machines (BE-54)",
+        "position": 11,
+        "prerequisite_module_ids": [
+            154784
+        ],
+        "publish_final_grade": false,
+        "require_sequential_progress": false,
+        "state": "locked",
+        "unlock_at": null
+    }
+]
