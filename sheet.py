@@ -21,7 +21,7 @@ student_data = None
 staff_data = None
 module_data = None
 module_count = 0
-limited = False
+limited_data = False
 
 statuses = ["No Access", "Access"]
 rooms = list()
@@ -54,18 +54,18 @@ except HttpError as e:
     print(e)
 
 
-def get_sheet_data(limited_in=None):
-    global student_data, staff_data, module_data, rooms, module_count, limited
+def get_sheet_data(limited=None):
+    global student_data, staff_data, module_data, rooms, module_count, limited_data
 
-    if limited_in is not None:
-        limited = limited_in
+    if limited is not None:
+        limited_data = limited
     try:
         # get the students sheet
         students = (
             g_sheets.values()
             .get(
                 spreadsheetId=SPREADSHEET_ID,
-                range=STUDENTS_SHEET + ("!E1:ZZ" if limited else ""),
+                range=STUDENTS_SHEET + ("!E1:ZZ" if limited_data else ""),
             )
             .execute()
         )
@@ -89,7 +89,7 @@ def get_sheet_data(limited_in=None):
             g_sheets.values()
             .get(
                 spreadsheetId=SPREADSHEET_ID,
-                range=STAFF_SHEET + ("!D1:D" if limited else ""),
+                range=STAFF_SHEET + ("!D1:D" if limited_data else ""),
             )
             .execute()
         )
@@ -111,12 +111,12 @@ def get_sheet_data(limited_in=None):
         )
         values = staff.get("values", [])
         values = [r + [""] * (len(values[0]) - len(r)) for r in values]
-        modules_data = pd.DataFrame(
+        module_data = pd.DataFrame(
             values[1:] if len(values) > 1 else None,
             columns=values[0],
         )
 
-        module_count = len(modules_data)
+        module_count = len(module_data)
 
     except HttpError as e:
         print(e)
@@ -124,8 +124,12 @@ def get_sheet_data(limited_in=None):
 
 def student_exists(cruzid=None, canvas_id=None, card_uid=None):
     return (
-        (not limited and cruzid and cruzid in student_data["CruzID"].values)
-        or (not limited and canvas_id and canvas_id in student_data["Canvas ID"].values)
+        (not limited_data and cruzid and cruzid in student_data["CruzID"].values)
+        or (
+            not limited_data
+            and canvas_id
+            and canvas_id in student_data["Canvas ID"].values
+        )
         or (card_uid and card_uid in student_data["Card UID"].values)
     )
 
@@ -134,7 +138,8 @@ def new_student(
     first_name, last_name, cruzid, canvas_id=None, card_uid=None, accesses=None
 ):
     if (
-        cruzid in student_data["CruzID"].values
+        limited_data
+        or (cruzid in student_data["CruzID"].values)
         or (canvas_id and canvas_id in student_data["Canvas ID"].values)
         or (card_uid and card_uid in student_data["Card UID"].values)
     ):
@@ -156,7 +161,8 @@ def new_student(
 
 def set_uid(cruzid, uid, overwrite=False):
     if (
-        cruzid not in student_data["CruzID"].values
+        limited_data
+        or (cruzid not in student_data["CruzID"].values)
         or uid in student_data["Card UID"].values
     ):
         return False
@@ -170,20 +176,27 @@ def set_uid(cruzid, uid, overwrite=False):
 def set_access(room, access, cruzid=None, uid=None):
     if (
         (not cruzid and not uid)
-        or (cruzid and student_data.index[student_data["CruzID"] == cruzid].empty)
+        or (
+            not limited_data
+            and cruzid
+            and student_data.index[student_data["CruzID"] == cruzid].empty
+        )
         or (uid and student_data.index[student_data["Card UID"] == uid].empty)
         or (
-            cruzid
-            and uid
+            not limited_data
             and (
-                student_data.index[student_data["CruzID"] == cruzid].tolist()
-                != student_data.index[student_data["Card UID"] == uid].tolist()
+                cruzid
+                and uid
+                and (
+                    student_data.index[student_data["CruzID"] == cruzid].tolist()
+                    != student_data.index[student_data["Card UID"] == uid].tolist()
+                )
             )
         )
     ):
         return None
 
-    if cruzid:
+    if not limited_data and cruzid:
         row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
     elif uid:
         row = student_data.index[student_data["Card UID"] == uid].tolist()[0]
@@ -208,20 +221,27 @@ def set_access(room, access, cruzid=None, uid=None):
 def get_access(room, cruzid=None, uid=None):
     if (
         (not cruzid and not uid)
-        or (cruzid and student_data.index[student_data["CruzID"] == cruzid].empty)
+        or (
+            not limited_data
+            and cruzid
+            and student_data.index[student_data["CruzID"] == cruzid].empty
+        )
         or (uid and student_data.index[student_data["Card UID"] == uid].empty)
         or (
-            cruzid
-            and uid
+            not limited_data
             and (
-                student_data.index[student_data["CruzID"] == cruzid].tolist()
-                != student_data.index[student_data["Card UID"] == uid].tolist()
+                cruzid
+                and uid
+                and (
+                    student_data.index[student_data["CruzID"] == cruzid].tolist()
+                    != student_data.index[student_data["Card UID"] == uid].tolist()
+                )
             )
         )
     ):
         return None
 
-    if cruzid:
+    if not limited_data and cruzid:
         row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
     elif uid:
         row = student_data.index[student_data["Card UID"] == uid].tolist()[0]
@@ -240,21 +260,28 @@ def get_access(room, cruzid=None, uid=None):
 def set_all_accesses(accesses, cruzid=None, uid=None):
     if (
         (not cruzid and not uid)
-        or (cruzid and student_data.index[student_data["CruzID"] == cruzid].empty)
+        or (
+            not limited_data
+            and cruzid
+            and student_data.index[student_data["CruzID"] == cruzid].empty
+        )
         or (uid and student_data.index[student_data["Card UID"] == uid].empty)
         or (
-            cruzid
-            and uid
+            not limited_data
             and (
-                student_data.index[student_data["CruzID"] == cruzid].tolist()
-                != student_data.index[student_data["Card UID"] == uid].tolist()
+                cruzid
+                and uid
+                and (
+                    student_data.index[student_data["CruzID"] == cruzid].tolist()
+                    != student_data.index[student_data["Card UID"] == uid].tolist()
+                )
             )
         )
         or len(accesses) != len(rooms)
     ):
         return False
 
-    if cruzid:
+    if not limited_data and cruzid:
         row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
     elif uid:
         row = student_data.index[student_data["Card UID"] == uid].tolist()[0]
@@ -280,20 +307,27 @@ def set_all_accesses(accesses, cruzid=None, uid=None):
 def get_all_accesses(cruzid=None, uid=None):
     if (
         (not cruzid and not uid)
-        or (cruzid and student_data.index[student_data["CruzID"] == cruzid].empty)
+        or (
+            not limited_data
+            and cruzid
+            and student_data.index[student_data["CruzID"] == cruzid].empty
+        )
         or (uid and student_data.index[student_data["Card UID"] == uid].empty)
         or (
-            cruzid
-            and uid
+            not limited_data
             and (
-                student_data.index[student_data["CruzID"] == cruzid].tolist()
-                != student_data.index[student_data["Card UID"] == uid].tolist()
+                cruzid
+                and uid
+                and (
+                    student_data.index[student_data["CruzID"] == cruzid].tolist()
+                    != student_data.index[student_data["Card UID"] == uid].tolist()
+                )
             )
         )
     ):
         return False
 
-    if cruzid:
+    if not limited_data and cruzid:
         row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
     elif uid:
         row = student_data.index[student_data["Card UID"] == uid].tolist()[0]
@@ -349,9 +383,9 @@ def evaluate_modules(completed_modules, cruzid=None, uid=None):
             )
             is None
         ):
-            print(module_data.loc[i, "Room"], "<" + exp + ">")
-            print(eval(exp))
-            print("fail")
+            # print(module_data.loc[i, "Room"], "<" + exp + ">")
+            # print(eval(exp))
+            # print("fail")
             return False
     return True
 

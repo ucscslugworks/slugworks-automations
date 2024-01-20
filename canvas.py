@@ -6,7 +6,8 @@ import sheet
 
 
 def main():
-    sheet.get_sheet_data(limited=False)
+    sheet.get_sheet_data(False)
+    print("Successfully retrieved sheet data")
 
     keys = json.load(open("keys.json"))
 
@@ -33,9 +34,7 @@ def main():
 
         students[cruzid] = s["id"]
 
-    # print(students)
-    # print(sheet.student_data)
-    # print()
+    print("Successfully retrieved student data from Canvas")
 
     endpoint = "modules"
 
@@ -48,11 +47,13 @@ def main():
             if m["state"] == "completed":
                 completed_modules.append(int(m["position"]))
 
-        # print(cruzid, completed_modules, sheet.evaluate_modules(completed_modules, cruzid))
+        sheet.evaluate_modules(completed_modules, cruzid)
 
-    # print(sheet.student_data)
+    print("Successfully evaluated modules")
 
     sheet.write_student_sheet()
+
+    print("Successfully wrote student sheet")
 
 
 if __name__ == "__main__":
