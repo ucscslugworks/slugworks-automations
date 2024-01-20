@@ -48,8 +48,9 @@ def main():
                 completed_modules.append(int(m["position"]))
 
         sheet.evaluate_modules(completed_modules, cruzid)
+        print(f"Successfully evaluated modules for {cruzid}")
 
-    print("Successfully evaluated modules")
+    print("\nSuccessfully evaluated modules for all students")
 
     sheet.write_student_sheet()
 
