@@ -26,7 +26,6 @@ limited_data = False
 statuses = ["No Access", "Access"]
 rooms = list()
 
-
 creds = None
 # The file token.json stores the user's access and refresh tokens, and is
 # created automatically when the authorization flow completes for the first
@@ -200,6 +199,8 @@ def set_access(room, access, cruzid=None, uid=None):
         row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
     elif uid:
         row = student_data.index[student_data["Card UID"] == uid].tolist()[0]
+    else:
+        return False
 
     if "Override" not in student_data.loc[row, room]:
         student_data.loc[row, room] = statuses[int(access)]
@@ -245,6 +246,8 @@ def get_access(room, cruzid=None, uid=None):
         row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
     elif uid:
         row = student_data.index[student_data["Card UID"] == uid].tolist()[0]
+    else:
+        return False
 
     access = student_data.loc[row, room]
 
@@ -285,6 +288,8 @@ def set_all_accesses(accesses, cruzid=None, uid=None):
         row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
     elif uid:
         row = student_data.index[student_data["Card UID"] == uid].tolist()[0]
+    else:
+        return False
 
     for i in range(len(rooms)):
         if "Override" not in student_data.loc[row, rooms[i]]:
@@ -331,6 +336,8 @@ def get_all_accesses(cruzid=None, uid=None):
         row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
     elif uid:
         row = student_data.index[student_data["Card UID"] == uid].tolist()[0]
+    else:
+        return False
 
     accesses = []
     for room in rooms:
@@ -388,6 +395,37 @@ def evaluate_modules(completed_modules, cruzid=None, uid=None):
             # print("fail")
             return False
     return True
+
+
+def is_staff(cruzid=None, uid=None):
+    if (
+        (not cruzid and not uid)
+        or (
+            not limited_data
+            and cruzid
+            and staff_data.index[staff_data["CruzID"] == cruzid].empty
+        )
+        or (uid and staff_data.index[staff_data["Card UID"] == uid].empty)
+        or (
+            not limited_data
+            and (
+                cruzid
+                and uid
+                and (
+                    staff_data.index[staff_data["CruzID"] == cruzid].tolist()
+                    != staff_data.index[staff_data["Card UID"] == uid].tolist()
+                )
+            )
+        )
+    ):
+        return False
+
+    if not limited_data and cruzid:
+        return not staff_data.index[staff_data["CruzID"] == cruzid].empty
+    elif uid:
+        return not staff_data.index[staff_data["Card UID"] == uid].empty
+    else:
+        return False
 
 
 if __name__ == "__main__":

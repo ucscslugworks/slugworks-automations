@@ -23,6 +23,7 @@ def main():
     students_json = json.loads(response.text)
     students = {}
     for s in students_json:
+        # TODO: check if student is a staff member, and if so, skip them
         if "ucsc.edu" not in s["login_id"] or s["login_id"] in students:
             continue
 
