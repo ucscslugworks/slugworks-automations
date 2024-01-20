@@ -16,12 +16,12 @@ STUDENTS_SHEET = "Students"
 STAFF_SHEET = "Staff"
 MODULES_SHEET = "Modules"  # contains a mapping from room accesses to combinations of modules ("AND(5, 6, OR(7, 8))" etc)
 READERS_SHEET = "Readers"  # contains a mapping from room accesses to reader ID numbers
-LIMITED = False
 
 student_data = None
 staff_data = None
 module_data = None
 module_count = 0
+limited = False
 
 statuses = ["No Access", "Access"]
 rooms = list()
@@ -54,7 +54,11 @@ except HttpError as e:
     print(e)
 
 
-def get_data(limited=False):
+def get_sheet_data(limited_in=None):
+    global student_data, staff_data, module_data, rooms, module_count, limited
+
+    if limited_in is not None:
+        limited = limited_in
     try:
         # get the students sheet
         students = (
@@ -73,12 +77,12 @@ def get_data(limited=False):
 
         values = [r + [""] * (len(values[0]) - len(r)) for r in values]
 
-        tmp_student_data = pd.DataFrame(
+        student_data = pd.DataFrame(
             values[1:] if len(values) > 1 else None,
             columns=values[0],
         )
 
-        tmp_rooms = tmp_student_data.columns.tolist()[5:]
+        rooms = student_data.columns.tolist()[5:]
 
         # get the staff sheet
         staff = (
@@ -91,7 +95,7 @@ def get_data(limited=False):
         )
         values = staff.get("values", [])
         values = [r + [""] * (len(values[0]) - len(r)) for r in values]
-        tmp_staff_data = pd.DataFrame(
+        staff_data = pd.DataFrame(
             values[1:] if len(values) > 1 else None,
             columns=values[0],
         )
@@ -107,33 +111,21 @@ def get_data(limited=False):
         )
         values = staff.get("values", [])
         values = [r + [""] * (len(values[0]) - len(r)) for r in values]
-        tmp_modules_data = pd.DataFrame(
+        modules_data = pd.DataFrame(
             values[1:] if len(values) > 1 else None,
             columns=values[0],
         )
 
-        tmp_module_count = len(tmp_modules_data)
-
-        return (
-            tmp_student_data,
-            tmp_staff_data,
-            tmp_modules_data,
-            tmp_rooms,
-            tmp_module_count,
-        )
+        module_count = len(modules_data)
 
     except HttpError as e:
         print(e)
-        return None, None, None
-
-
-student_data, staff_data, module_data, rooms, module_count = get_data(limited=LIMITED)
 
 
 def student_exists(cruzid=None, canvas_id=None, card_uid=None):
     return (
-        (not LIMITED and cruzid and cruzid in student_data["CruzID"].values)
-        or (not LIMITED and canvas_id and canvas_id in student_data["Canvas ID"].values)
+        (not limited and cruzid and cruzid in student_data["CruzID"].values)
+        or (not limited and canvas_id and canvas_id in student_data["Canvas ID"].values)
         or (card_uid and card_uid in student_data["Card UID"].values)
     )
 
@@ -365,6 +357,7 @@ def evaluate_modules(completed_modules, cruzid=None, uid=None):
 
 
 if __name__ == "__main__":
+    get_sheet_data(limited=False)
     print(student_data)
     print()
     print(staff_data)
