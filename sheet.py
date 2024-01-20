@@ -1,12 +1,11 @@
 import os.path
 
+import pandas as pd
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-
-import pandas as pd
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
@@ -17,9 +16,12 @@ STUDENTS_SHEET = "Students"
 STAFF_SHEET = "Staff"
 MODULES_SHEET = "Modules"  # contains a mapping from room accesses to combinations of modules ("AND(5, 6, OR(7, 8))" etc)
 READERS_SHEET = "Readers"  # contains a mapping from room accesses to reader ID numbers
+LIMITED = False
 
 student_data = None
 staff_data = None
+module_data = None
+module_count = 0
 
 statuses = ["No Access", "Access"]
 rooms = list()
@@ -46,40 +48,94 @@ try:
     service = build("sheets", "v4", credentials=creds)
 
     # Call the Sheets API
-    sheet = service.spreadsheets()
-
-    # get the students sheet
-    students = (
-        sheet.values().get(spreadsheetId=SPREADSHEET_ID, range=STUDENTS_SHEET).execute()
-    )
-    values = students.get("values", [])
-
-    if not values:
-        print("No data found.")
-        exit()
-
-    values = [r + [""] * (len(values[0]) - len(r)) for r in values]
-
-    student_data = pd.DataFrame(
-        values[1:] if len(values) > 1 else None,
-        columns=values[0],
-    )
-
-    rooms = student_data.columns.tolist()[5:]
-
-    # get the staff sheet
-    staff = (
-        sheet.values().get(spreadsheetId=SPREADSHEET_ID, range=STAFF_SHEET).execute()
-    )
-    values = staff.get("values", [])
-    values = [r + [""] * (len(values[0]) - len(r)) for r in values]
-    staff_data = pd.DataFrame(
-        values[1:] if len(values) > 1 else None,
-        columns=values[0],
-    )
+    g_sheets = service.spreadsheets()
 
 except HttpError as e:
     print(e)
+
+
+def get_data(limited=False):
+    try:
+        # get the students sheet
+        students = (
+            g_sheets.values()
+            .get(
+                spreadsheetId=SPREADSHEET_ID,
+                range=STUDENTS_SHEET + ("!E1:ZZ" if limited else ""),
+            )
+            .execute()
+        )
+        values = students.get("values", [])
+
+        if not values:
+            print("No data found.")
+            exit()
+
+        values = [r + [""] * (len(values[0]) - len(r)) for r in values]
+
+        tmp_student_data = pd.DataFrame(
+            values[1:] if len(values) > 1 else None,
+            columns=values[0],
+        )
+
+        tmp_rooms = tmp_student_data.columns.tolist()[5:]
+
+        # get the staff sheet
+        staff = (
+            g_sheets.values()
+            .get(
+                spreadsheetId=SPREADSHEET_ID,
+                range=STAFF_SHEET + ("!D1:D" if limited else ""),
+            )
+            .execute()
+        )
+        values = staff.get("values", [])
+        values = [r + [""] * (len(values[0]) - len(r)) for r in values]
+        tmp_staff_data = pd.DataFrame(
+            values[1:] if len(values) > 1 else None,
+            columns=values[0],
+        )
+
+        # get the staff sheet
+        staff = (
+            g_sheets.values()
+            .get(
+                spreadsheetId=SPREADSHEET_ID,
+                range=MODULES_SHEET,
+            )
+            .execute()
+        )
+        values = staff.get("values", [])
+        values = [r + [""] * (len(values[0]) - len(r)) for r in values]
+        tmp_modules_data = pd.DataFrame(
+            values[1:] if len(values) > 1 else None,
+            columns=values[0],
+        )
+
+        tmp_module_count = len(tmp_modules_data)
+
+        return (
+            tmp_student_data,
+            tmp_staff_data,
+            tmp_modules_data,
+            tmp_rooms,
+            tmp_module_count,
+        )
+
+    except HttpError as e:
+        print(e)
+        return None, None, None
+
+
+student_data, staff_data, module_data, rooms, module_count = get_data(limited=LIMITED)
+
+
+def student_exists(cruzid=None, canvas_id=None, card_uid=None):
+    return (
+        (not LIMITED and cruzid and cruzid in student_data["CruzID"].values)
+        or (not LIMITED and canvas_id and canvas_id in student_data["Canvas ID"].values)
+        or (card_uid and card_uid in student_data["Card UID"].values)
+    )
 
 
 def new_student(
@@ -117,10 +173,6 @@ def set_uid(cruzid, uid, overwrite=False):
     if not student_data.loc[row, "Card UID"] or overwrite:
         student_data.loc[row, "Card UID"] = uid
     return student_data.loc[row, "Card UID"]
-
-
-def change_uid(cruzid, uid):
-    pass
 
 
 def set_access(room, access, cruzid=None, uid=None):
@@ -183,8 +235,13 @@ def get_access(room, cruzid=None, uid=None):
         row = student_data.index[student_data["Card UID"] == uid].tolist()[0]
 
     access = student_data.loc[row, room]
-    return bool(
-        statuses.index(access[(len("Override ") if "Override" in access else 0) :])
+
+    return (
+        bool(
+            statuses.index(access[(len("Override ") if "Override" in access else 0) :])
+        )
+        if access
+        else False
     )
 
 
@@ -272,7 +329,7 @@ def write_student_sheet():
         vals.insert(0, student_data.columns.tolist())
 
         _ = (
-            sheet.values()
+            g_sheets.values()
             .update(
                 spreadsheetId=SPREADSHEET_ID,
                 range=STUDENTS_SHEET,
@@ -283,6 +340,28 @@ def write_student_sheet():
         )
     except HttpError as e:
         print(e)
+
+
+# given one student's list of completed modules, update their room accesses
+def evaluate_modules(completed_modules, cruzid=None, uid=None):
+    for i in range(len(module_data)):
+        exp = str(module_data.loc[i, "Modules"])
+        for m in range(1, module_count + 1):
+            exp = exp.replace(str(m), str(m in completed_modules))
+        if (
+            set_access(
+                module_data.loc[i, "Room"],
+                eval(exp) if len(exp) > 0 else False,
+                cruzid=cruzid,
+                uid=uid,
+            )
+            is None
+        ):
+            print(module_data.loc[i, "Room"], "<" + exp + ">")
+            print(eval(exp))
+            print("fail")
+            return False
+    return True
 
 
 if __name__ == "__main__":
@@ -297,11 +376,13 @@ if __name__ == "__main__":
     # print(set_uid("cchartie", "0123456789", overwrite=True))
 
     # print(set_access("BE-49", False, cruzid="tstudent"))
+    # print(get_access("BE-49", uid="0123456789"))
     # print(get_access("BE-49", cruzid="tstudent"))
     # print(set_all_accesses([True] * len(rooms), cruzid="tstudent"))
     # print(get_all_accesses(cruzid="tstudent"))
+    # print(evaluate_modules([1, 2, 5, 6, 7, 8, 9, 10], cruzid="tstudent"))
 
-    write_student_sheet()
+    # write_student_sheet()
 
     print()
     print(student_data)
