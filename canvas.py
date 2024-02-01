@@ -5,8 +5,8 @@ import requests
 import sheet
 
 
-def main():
-    sheet.get_sheet_data(False)
+def update():
+    sheet.get_sheet_data(limited=False)
     print("Successfully retrieved sheet data")
 
     keys = json.load(open("keys.json"))
@@ -24,10 +24,18 @@ def main():
     students = {}
     for s in students_json:
         # TODO: check if student is a staff member, and if so, skip them
-        if "ucsc.edu" not in s["login_id"] or s["login_id"] in students:
+        if (
+            "login_id" not in s
+            or "ucsc.edu" not in s["login_id"]
+            or s["login_id"] in students
+        ):
             continue
 
         cruzid = s["login_id"].split("@ucsc.edu")[0]
+
+        if sheet.is_staff(cruzid):
+            continue
+
         if not sheet.student_exists(cruzid):
             sn = s["sortable_name"].split(", ")
             students[cruzid] = s["id"]
@@ -59,4 +67,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    update()

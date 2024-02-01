@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>Student Card Setup</title>
+  <style>
+    #container {
+      display: flex;
+      flex-flow: row wrap;
+      justify-content: space-evenly;
+      align-items: flex-start;
+      align-content: space-around;
+    }
+  </style>
+</head>
+
+<body>
+  <p> <strong>THIS IS TO BE USED BY AUTHORIZED STAFF ONLY</strong>.</p>
+  {% for message in get_flashed_messages() %}
+  <div class="alert">{{ message }}</div>
+  {% endfor %}
+
+
+  <div>
+    <h2>Student Card Setup</h2>
+    <form method="post"> 
+      <input type="hidden" name="label" value="uidsetup">
+      <label for=" error-lab">Error: </label>
+      <div id="error-cont">
+        <input type="text" id="error" name="error" value="{{ error }}" readonly style="color:red">
+        <div>
+          <div id="cruzid-div">
+            <label for="cruzid-label">CruzID: </label> <br>
+            <input type="text" id="cruzid" name="cruzid" required>
+          </div>
+          <!-- add checkbox for overwrite -->
+          <label for="overwrite-label">Overwrite existing card?</label>
+          <input type="checkbox" id="overwrite" name="overwrite" value="overwrite">
+          <div>
+            <button type="submit" name="formatuid">Generate</button>
+            <div>
+              <div>
+    </form>
+
+
+    <div>
+</body>
+
+</html>

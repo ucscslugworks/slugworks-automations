@@ -1,3 +1,5 @@
+import datetime
+import json
 import os.path
 
 import pandas as pd
@@ -7,6 +9,10 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+# get reader id
+reader_file = json.load(open("reader.json"))
+reader_id = reader_file["id"]
+
 # If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
@@ -15,15 +21,22 @@ SPREADSHEET_ID = "1X7VJ9jRQGx0ZryXbvbmff09eOawymLg-DvTY7FYxN2E"
 STUDENTS_SHEET = "Students"
 STAFF_SHEET = "Staff"
 MODULES_SHEET = "Modules"  # contains a mapping from room accesses to combinations of modules ("AND(5, 6, OR(7, 8))" etc)
-READERS_SHEET = "Readers"  # contains a mapping from room accesses to reader ID numbers
+ACCESSES_SHEET = (
+    "Accesses"  # contains a mapping from room accesses to reader ID numbers
+)
+READERS_SHEET = "Readers"  # contains statuses of the readers
+LOG_SHEET = "Log"  # contains a log of all card reads
 
 student_data = None
 staff_data = None
 module_data = None
-module_count = 0
+access_data = None
+reader_data = None
+
 limited_data = False
 
 statuses = ["No Access", "Access"]
+module_count = 0
 rooms = list()
 
 creds = None
@@ -54,7 +67,12 @@ except HttpError as e:
 
 
 def get_sheet_data(limited=None):
-    global student_data, staff_data, module_data, rooms, module_count, limited_data
+    """
+    Get the student and staff data from the Google Sheets document.
+
+    limited: bool: if True, only the UID and accesses will be retrieved, else all data will be retrieved (Name, CruzID, Canvas ID).
+    """
+    global student_data, staff_data, module_data, access_data, reader_data, rooms, module_count, limited_data
 
     if limited is not None:
         limited_data = limited
@@ -99,8 +117,8 @@ def get_sheet_data(limited=None):
             columns=values[0],
         )
 
-        # get the staff sheet
-        staff = (
+        # get the modules sheet
+        modules = (
             g_sheets.values()
             .get(
                 spreadsheetId=SPREADSHEET_ID,
@@ -108,7 +126,7 @@ def get_sheet_data(limited=None):
             )
             .execute()
         )
-        values = staff.get("values", [])
+        values = modules.get("values", [])
         values = [r + [""] * (len(values[0]) - len(r)) for r in values]
         module_data = pd.DataFrame(
             values[1:] if len(values) > 1 else None,
@@ -117,11 +135,50 @@ def get_sheet_data(limited=None):
 
         module_count = len(module_data)
 
+        # get the accesses sheet
+        accesses = (
+            g_sheets.values()
+            .get(
+                spreadsheetId=SPREADSHEET_ID,
+                range=ACCESSES_SHEET,
+            )
+            .execute()
+        )
+        values = accesses.get("values", [])
+        values = [r + [""] * (len(values[0]) - len(r)) for r in values]
+        access_data = pd.DataFrame(
+            values[1:] if len(values) > 1 else None,
+            columns=values[0],
+        )
+
+        # get the readers sheet
+        readers = (
+            g_sheets.values()
+            .get(
+                spreadsheetId=SPREADSHEET_ID,
+                range=READERS_SHEET,
+            )
+            .execute()
+        )
+        values = readers.get("values", [])
+        values = [r + [""] * (len(values[0]) - len(r)) for r in values]
+        reader_data = pd.DataFrame(
+            values[1:] if len(values) > 1 else None,
+            columns=values[0],
+        )
+
     except HttpError as e:
         print(e)
 
 
 def student_exists(cruzid=None, canvas_id=None, card_uid=None):
+    """
+    Check if a student exists in the database.
+
+    cruzid: str: the student's CruzID if not in limited data mode.
+    canvas_id: str: the student's Canvas ID if not in limited data mode.
+    card_uid: str: the student's card UID.
+    """
     return (
         (not limited_data and cruzid and cruzid in student_data["CruzID"].values)
         or (
@@ -136,6 +193,16 @@ def student_exists(cruzid=None, canvas_id=None, card_uid=None):
 def new_student(
     first_name, last_name, cruzid, canvas_id=None, card_uid=None, accesses=None
 ):
+    """
+    Add a new student to the database (must not be in limited data mode).
+
+    first_name: str: the student's first name.
+    last_name: str: the student's last name.
+    cruzid: str: the student's CruzID.
+    canvas_id: str: the student's Canvas ID.
+    card_uid: str: the student's card UID.
+    accesses: list: the student's room accesses.
+    """
     if (
         limited_data
         or (cruzid in student_data["CruzID"].values)
@@ -159,6 +226,13 @@ def new_student(
 
 
 def set_uid(cruzid, uid, overwrite=False):
+    """
+    Set a student's card UID.
+
+    cruzid: str: the student's CruzID.
+    uid: str: the student's card UID.
+    overwrite: bool: if True, the UID will be overwritten if it already exists.
+    """
     if (
         limited_data
         or (cruzid not in student_data["CruzID"].values)
@@ -172,7 +246,31 @@ def set_uid(cruzid, uid, overwrite=False):
     return student_data.loc[row, "Card UID"]
 
 
+def get_uid(cruzid):
+    """
+    Get a student's card UID (or False if it doesn't exist).
+
+    cruzid: str: the student's CruzID.
+    """
+
+    if limited_data or (cruzid not in student_data["CruzID"].values):
+        return False
+
+    row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
+    uid = student_data.loc[row, "Card UID"]
+    return uid if uid else False
+
+
 def set_access(room, access, cruzid=None, uid=None):
+    """
+    Set a student's access to a room.
+
+    room: str: the room to set access for.
+    access: bool: the access to set.
+    cruzid: str: the student's CruzID.
+    uid: str: the student's card UID.
+    """
+
     if (
         (not cruzid and not uid)
         or (
@@ -192,6 +290,7 @@ def set_access(room, access, cruzid=None, uid=None):
                 )
             )
         )
+        or room not in rooms
     ):
         return None
 
@@ -220,6 +319,14 @@ def set_access(room, access, cruzid=None, uid=None):
 
 
 def get_access(room, cruzid=None, uid=None):
+    """
+    Get a student's access to a room.
+
+    room: str: the room to get access for.
+    cruzid: str: the student's CruzID.
+    uid: str: the student's card UID.
+    """
+
     if (
         (not cruzid and not uid)
         or (
@@ -261,6 +368,14 @@ def get_access(room, cruzid=None, uid=None):
 
 
 def set_all_accesses(accesses, cruzid=None, uid=None):
+    """
+    Set a student's access to all rooms.
+
+    accesses: list: the accesses to set.
+    cruzid: str: the student's CruzID.
+    uid: str: the student's card UID.
+    """
+
     if (
         (not cruzid and not uid)
         or (
@@ -310,6 +425,13 @@ def set_all_accesses(accesses, cruzid=None, uid=None):
 
 
 def get_all_accesses(cruzid=None, uid=None):
+    """
+    Get a student's access to all rooms.
+
+    cruzid: str: the student's CruzID.
+    uid: str: the student's card UID.
+    """
+
     if (
         (not cruzid and not uid)
         or (
@@ -356,6 +478,10 @@ def get_all_accesses(cruzid=None, uid=None):
 
 
 def write_student_sheet():
+    """
+    Write the student data to the Google Sheets document.
+    """
+
     try:
         student_data.sort_values(by=["Last Name"], inplace=True)
         vals = student_data.values.tolist()
@@ -375,8 +501,39 @@ def write_student_sheet():
         print(e)
 
 
-# given one student's list of completed modules, update their room accesses
+def write_staff_sheet():
+    """
+    Write the staff data to the Google Sheets document.
+    """
+
+    try:
+        staff_data.sort_values(by=["Last Name"], inplace=True)
+        vals = staff_data.values.tolist()
+        vals.insert(0, staff_data.columns.tolist())
+
+        _ = (
+            g_sheets.values()
+            .update(
+                spreadsheetId=SPREADSHEET_ID,
+                range=STAFF_SHEET,
+                valueInputOption="USER_ENTERED",
+                body={"values": vals},
+            )
+            .execute()
+        )
+    except HttpError as e:
+        print(e)
+
+
 def evaluate_modules(completed_modules, cruzid=None, uid=None):
+    """
+    Evaluate a student's completed modules and update their room accesses.
+
+    completed_modules: list: the student's completed modules.
+    cruzid: str: the student's CruzID.
+    uid: str: the student's card UID.
+    """
+
     for i in range(len(module_data)):
         exp = str(module_data.loc[i, "Modules"])
         for m in range(1, module_count + 1):
@@ -398,6 +555,13 @@ def evaluate_modules(completed_modules, cruzid=None, uid=None):
 
 
 def is_staff(cruzid=None, uid=None):
+    """
+    Check if a student is a staff member.
+
+    cruzid: str: the student's CruzID.
+    uid: str: the student's card UID.
+    """
+
     if (
         (not cruzid and not uid)
         or (
@@ -428,12 +592,64 @@ def is_staff(cruzid=None, uid=None):
         return False
 
 
+def log(uid, alarm_status, disarm_time):
+    """
+    Log a card read.
+
+    uid: str: the card UID.
+    alarm_status: bool: the alarm status (True if the alarm was triggered, False if it was not).
+    disarm_time: str: the amount of time the alarm was disarmed for.
+    """
+
+    try:
+        _ = (
+            g_sheets.values()
+            .append(
+                spreadsheetId=SPREADSHEET_ID,
+                range=LOG_SHEET,
+                valueInputOption="USER_ENTERED",
+                body={
+                    "values": [
+                        [
+                            str(datetime.datetime.now()),
+                            uid,
+                            reader_id,
+                            "",  # location
+                            "",  # first name
+                            "",  # last name
+                            "",  # cruzid
+                            "Triggered" if alarm_status else "Not Triggered",
+                            disarm_time,
+                        ]
+                    ]
+                },
+            )
+            .execute()
+        )
+    except HttpError as e:
+        print(e)
+
+
 if __name__ == "__main__":
     get_sheet_data(limited=False)
     print(student_data)
     print()
     print(staff_data)
     print()
+    print(access_data)
+    print()
+    # print(module_data)
+    # print()
+    print(reader_data)
+    print()
+
+    # student_exists()
+
+    # print time
+    # print(str(datetime.datetime.now()))
+
+    # print(get_uid("ewachtel"))
+    # print(get_uid("jowemorr"))
 
     # if not new_student("Cédric", "Chartier", "cchartie"):
     #     print("CruzID, Canvas ID, or Card UID already in use.")
@@ -449,7 +665,15 @@ if __name__ == "__main__":
 
     # write_student_sheet()
 
+    log("63B104FF", True, 10)
+
     print()
     print(student_data)
     print()
     print(staff_data)
+    print()
+    print(access_data)
+    # print()
+    # print(module_data)
+    print()
+    print(reader_data)
