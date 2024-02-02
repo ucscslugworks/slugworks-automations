@@ -163,3 +163,4 @@ keys.json
 .DS_Store
 token.json
 credentials.json
+reader.json
