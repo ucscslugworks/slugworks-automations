@@ -61,9 +61,19 @@ def update():
 
     print("\nSuccessfully evaluated modules for all students")
 
-    sheet.write_student_sheet()
+    if sheet.write_student_sheet():
+        print("Successfully wrote student sheet")
+    else:
+        print("Failed to write student sheet")
+        return False
 
-    print("Successfully wrote student sheet")
+    if sheet.log("Canvas Update", "", False, 0):
+        print("Successfully logged canvas update")
+    else:
+        print("Failed to log canvas update")
+        return False
+
+    return True
 
 
 if __name__ == "__main__":

@@ -30,7 +30,7 @@ app = Flask(__name__)
 app.secret_key = os.urandom(12).hex()
 sheet.get_sheet_data(limited=False)
 
-
+# TODO: this just needs canvas.update() and then sheet.check_in(alarm_status=False)
 def updateme():  # updates the pi5
     print("Updating")
     # if pi5update < datetime.now()
@@ -43,6 +43,7 @@ def updateme():  # updates the pi5
     print("Updated")
 
 
+# TODO: use sheet.update_all_readers() to set all readers to need updating
 def updatemyfriends():  # updates the pizero
     print("Updating")
     pizeroupdate = datetime.now()
@@ -50,6 +51,7 @@ def updatemyfriends():  # updates the pizero
     print("Updated")
 
 
+# TODO: just call updateme() then updatemyfriends()
 def updateall():  # updates both
     print("Updating")
     pitupdateall = datetime.now()
@@ -90,7 +92,7 @@ def uidread(cruzid, overwritecheck):  # set uid
         # set uid to cruzid
         
 
-    if sheet.student_exists(card_uid=uid):
+    if sheet.student_exists(uid=uid):
         if overwritecheck == None:
             carderror = "Card already exists would you like to overwrite?"
         else:
