@@ -9,7 +9,7 @@ def update():
     sheet.get_sheet_data(limited=False)
     print("Successfully retrieved sheet data")
 
-    keys = json.load(open("keys.json"))
+    keys = json.load(open("canvas.json"))
 
     token = keys["canvas_auth_token"]
     course_id = keys["canvas_course_id"]
