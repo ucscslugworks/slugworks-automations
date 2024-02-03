@@ -29,7 +29,7 @@ os.chdir(os.path.dirname(os.path.realpath(__file__)))
 app = Flask(__name__)
 app.secret_key = os.urandom(12).hex()
 sheet.get_sheet_data(limited=False)
-alarm1="green"
+alarm1="red"
 
 
 # TODO: this just needs canvas.update() and then sheet.check_in(alarm_status=False)
@@ -132,7 +132,7 @@ def server():
 
     except Exception as e:
         print(e)
-    return render_template("dashboard.html", pizerocolour1=alarm1)#, error=err)
+    return render_template("dashboard.html", pizerocolour1=alarm1, status_01="OK", color_01="#3CBC8D")#, error=err)
 
 if __name__ == "__main__":
     

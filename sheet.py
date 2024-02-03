@@ -212,7 +212,7 @@ def get_reader_data():
         values = [r + [""] * (len(values[0]) - len(r)) for r in values]
         reader_data = pd.DataFrame(
             values[1:] if len(values) > 1 else None,
-            columns=values[0],
+            columns=reader_headers,
         )
 
         this_reader = dict()
@@ -829,28 +829,43 @@ def need_updating():
     return this_reader["needs_update"]
 
 
-def scan_uid(uid):
+def scan_uid(uid, alarm_status=False):
     """
     Return the LED color and alarm delay time for a given card UID.
 
     uid: str: the card UID.
+    alarm_status: bool: the alarm status (True if the alarm was triggered, False if it was not).
 
     Returns the LED hex color and alarm delay time in minutes, or False if no "No Access" value is specified, or None if the uid does not exist.
     """
 
     if is_staff(uid=uid):
         if access_data["staff"]:
+            log(uid, "Staff", alarm_status, access_data["staff"][1])
             return access_data["staff"]
+        elif access_data["no_access"]:
+            log(uid, "Staff", alarm_status, access_data["no_access"][1])
+            return access_data["no_access"]
         else:
-            return False if not access_data["no_access"] else access_data["no_access"]
+            log(uid, "Staff (Not Found)", alarm_status, 0)
+            return False
+
     elif student_exists(uid=uid):
         for i in range(len(rooms)):
             if get_access(rooms[i], uid=uid) and access_data[rooms[i]]:
+                log(uid, rooms[i], alarm_status, access_data[rooms[i]][1])
                 return access_data[rooms[i]]
 
-        return False if not access_data["no_access"] else access_data["no_access"]
+        if access_data["no_access"]:
+            log(uid, "No Access", alarm_status, access_data["no_access"][1])
+            return access_data["no_access"]
+        else:
+            log(uid, "Student (Not Found)", alarm_status, 0)
+            return False
 
-    return None
+    else:
+        log(uid, "Unknown", alarm_status, 0)
+        return None
 
 
 def run_in_thread(f, args, kwargs):
@@ -883,6 +898,31 @@ def update_all_readers():
         print(e)
 
 
+def get_alarm_status(id):
+    """
+    Get the alarm status of a reader.
+
+    id: int: the reader ID.
+
+    Returns the reader's alarm status, or None if the reader does not exist.
+    """
+
+    if id < 0 or id >= len(reader_data):
+        return None
+
+    return reader_data.loc[id, "alarm_status"]
+
+
+def get_all_alarm_statuses():
+    """
+    Get the alarm status of all readers.
+
+    Returns a list of reader alarm statuses.
+    """
+
+    return reader_data["alarm_status"].tolist()
+
+
 if __name__ == "__main__":
     get_sheet_data(limited=False)
     print(student_data)
@@ -903,6 +943,8 @@ if __name__ == "__main__":
     # print(reader_need_updating())
 
     # update_all_readers()
+    print(get_alarm_status(1))
+    # print(get_all_reader_statuses())
     check_in()
 
     # log("Canvas", "", False, 0)
@@ -934,7 +976,7 @@ if __name__ == "__main__":
 
     # write_student_sheet()
 
-    # log("63B104FF", "Staff", True, 10)
+    log("63B104FF", "Staff", True, 10)
 
     # print()
     # print(student_data)

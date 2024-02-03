@@ -3,8 +3,8 @@
 
 
 <head>
-  <title>Dashboard'
-    </title>
+  <title>Dashboard
+  </title>
   <style>
     #container {
       display: flex;
@@ -13,6 +13,30 @@
       align-items: flex-start;
       align-content: space-around;
     }
+
+    table,
+    th,
+    td {
+      border: 1px solid black;
+    }
+
+    /* #status {
+      background-color: #3CBC8D;
+    } */
+
+    /* input[type=text] {
+      /* width: 100%; */
+    /* padding: 12px 20px; */
+    /* margin: 8px 0;
+      box-sizing: border-box;
+      border: none;
+      background-color: #3CBC8D;
+      color: rgb(239, 0, 0);
+    }
+
+    input {
+      width: auto;
+    } */
   </style>
 
 
@@ -22,28 +46,49 @@
   {% for message in get_flashed_messages() %}
   <div class="alert">{{ message }}</div>
   {% endfor %}
-    <div>
-        <h2>Update Buttons</h2>
-        <form method="post">
-            <input type="hidden" name="label" value="update-all-devices">
-            <button type="submit" name="update-all-devices">Update All Devices</button>
-        </form>
-        <br>
-        <br>
-        <form method="post">
-            <input type="hidden" name="label" value="update scanners from sheet">
-            <button type="submit" name="update-from-sheet">Update from Sheet</button>
-        </form>
-    </div>
-    {% if(pizerocolour1 == "red") %}
-      <div id="alarms" style="background-color: red">
-        <input type="text" id="alarm" name="01" value="{{ status_01 }}" readonly>
-    {% else %}
-      <div id="alarms" style="background-color: green">
-        <input type="text" id="alarm" name="01" value="{{ status_01 }}" readonly>
-    {% endif %}
-    
+  <div>
+    <h2>Update Buttons</h2>
+    <form method="post">
+      <input type="hidden" name="label" value="update-all-devices">
+      <button type="submit" name="update-all-devices">Update All Devices</button>
+    </form>
+    <br>
+    <br>
+    <form method="post">
+      <input type="hidden" name="label" value="update scanners from sheet">
+      <button type="submit" name="update-from-sheet">Update from Sheet</button>
+    </form>
   </div>
-  
-   
-    
+  <!-- {% if(pizerocolour1 == "red") %}
+  <div id="alarms">
+    <input type="text" id="alarm" name="01" value="{{ status_01 }}" readonly, textarea{ background-color: red; }>
+    <div>
+      {% else %}
+      <div id="alarms">
+        <input type="text" id="alarm" name="01" value="{{ status_01 }}" readonly, textarea{ background-color: green; }>
+        {% endif %}
+
+      </div> -->
+  <table>
+    <tr>
+      <th>Device</th>
+      <th>Status</th>
+      <th>Update</th>
+    </tr>
+<!-- wrap this tr in a for loop: -->
+    <tr>
+      <td>Device 1</td>
+      <td style="background-color: {{ color_01 }};">
+        <!-- <input type="text" id="alarm" name="01" value="{{ status_01 }}" readonly> -->
+        {{ status_01 }}
+      </td>
+      <td>
+        <form method="post">
+          <input type="hidden" name="label" value="update-device-01">
+          <button type="submit" name="update-device-01">Update</button>
+        </form>
+      </td>
+    </tr>
+<!-- for loop ends here -->
+  </table>
+</body>
