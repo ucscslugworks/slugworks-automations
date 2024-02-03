@@ -63,7 +63,10 @@ creds = None
 # time.
 if os.path.exists("token.json"):
     creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-# If there are no (valid) credentials available, let the user log in.
+elif not os.path.exists("credentials.json"):
+    print("No credentials.json file found.")
+    exit(1)
+# If there are no (valid) credentials available, let the user log in (assuming credentials.json exists).
 if not creds or not creds.valid:
     if creds and creds.expired and creds.refresh_token:
         creds.refresh(Request())
