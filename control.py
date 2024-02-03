@@ -30,6 +30,7 @@ app = Flask(__name__)
 app.secret_key = os.urandom(12).hex()
 sheet.get_sheet_data(limited=False)
 
+
 # TODO: this just needs canvas.update() and then sheet.check_in(alarm_status=False)
 def updateme():  # updates the pi5
     print("Updating")
@@ -90,7 +91,6 @@ def uidread(cruzid, overwritecheck):  # set uid
             # another student already has this uid
     # else
         # set uid to cruzid
-        
 
     if sheet.student_exists(uid=uid):
         if overwritecheck == None:
@@ -112,7 +112,6 @@ def uidread(cruzid, overwritecheck):  # set uid
             sheet.set_uid(cruzid, uid, overwritecheck)
             success = "Card added to database"
 
-        
     return carderror
 
 
@@ -129,7 +128,6 @@ def server():
                 print(cruzid, overwritecheck)
 
                 err = formatid(cruzid, overwritecheck)
-                
 
     except Exception as e:
         print(e)
