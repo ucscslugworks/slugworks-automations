@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+
+
+<head>
+  <title>Dashboard'
+    </title>
+  <style>
+    #container {
+      display: flex;
+      flex-flow: row wrap;
+      justify-content: space-evenly;
+      align-items: flex-start;
+      align-content: space-around;
+    }
+  </style>
+
+
+
+<body>
+  <p> <strong>THIS IS TO BE USED BY AUTHORIZED STAFF ONLY</strong>.</p>
+  {% for message in get_flashed_messages() %}
+  <div class="alert">{{ message }}</div>
+  {% endfor %}
+    <div>
+        <h2>Update Buttons</h2>
+        <form method="post">
+            <input type="hidden" name="label" value="update-all-devices">
+            <button type="submit" name="update-all-devices">Update All Devices</button>
+        </form>
+        <br>
+        <br>
+        <form method="post">
+            <input type="hidden" name="label" value="update scanners from sheet">
+            <button type="submit" name="update-from-sheet">Update from Sheet</button>
+        </form>
+    </div>
+    {% if(pizerocolour1 == "red") %}
+      <div id="alarms" style="background-color: red">
+        <input type="text" id="alarm" name="01" value="{{ status_01 }}" readonly>
+    {% else %}
+      <div id="alarms" style="background-color: green">
+        <input type="text" id="alarm" name="01" value="{{ status_01 }}" readonly>
+    {% endif %}
+    
+  </div>
+  
+   
+    
