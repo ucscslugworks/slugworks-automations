@@ -28,7 +28,7 @@ from flask import Flask, flash, render_template, request
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
 app = Flask(__name__)
 app.secret_key = os.urandom(12).hex()
-#heet.get_sheet_data(limited=False)
+sheet.get_sheet_data(limited=False)
 alarm1="red"
 
 
