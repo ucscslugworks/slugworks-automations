@@ -17,8 +17,8 @@
 from datetime import datetime
 from threading import Thread
 import os
-# import canvas
-# import sheet
+import canvas
+import sheet
 import random
 
 
