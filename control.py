@@ -32,6 +32,7 @@ sheet.get_sheet_data(limited=False)
 alarm1="red"
 
 
+
 # TODO: this just needs canvas.update() and then sheet.check_in(alarm_status=False)
 def updateme():  # updates the pi5
     print("Updating")
@@ -177,7 +178,31 @@ def server():
 
     return render_template("dashboard.html", pizerocolour1=alarm1, status_01="OK", color_01="#3CBC8D", devices=device_info)  # Pass devices to the template
 
+
+
+@app.route("/student", methods=("GET", "POST"))
+def student():
+    err = ""
+
+    try:
+        if request.method == "POST":
+            flash("You are using POST")
+            if request.form["label"] == "uidsetup":
+                print("reading UID")
+                cruzid = request.form.get("cruzid")
+                overwritecheck = request.form.get("overwrite")
+                print(cruzid, overwritecheck)
+
+                err = formatid(cruzid, overwritecheck)
+
+    except Exception as e:
+        print(e)
+
+        
+            
+    return render_template("Student.html", err=err)
+
+
 if __name__ == "__main__":
-    
-    app.run(host="0.0.0.0", port=5001)
+        app.run(host="0.0.0.0", port=5001)
     
