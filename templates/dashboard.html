@@ -53,7 +53,6 @@
       <button type="submit" name="update-all-devices">Update All Devices</button>
     </form>
     <br>
-    <br>
     <form method="post">
       <input type="hidden" name="label" value="update scanners from sheet">
       <button type="submit" name="update-from-sheet">Update from Sheet</button>
@@ -72,16 +71,28 @@
   <table>
     <tr>
       <th>Device</th>
+      <th>Location</th>
       <th>Status</th>
+      <th>Alarm ON</th>
+      <th>Alarm Status</th>
       <th>Update</th>
+
+
+      
     </tr>
 <!-- wrap this tr in a for loop: -->
 {% for device in devices %}
     <tr>
       <td>{{ device.name }}</td>
-      <td style="background-color: {{ device.colour }};">
+      <td>{{ device.location }}</td>
+      <td style="background-color: {{ device.status_color }};">
         {{ device.status }}
       </td>
+      <td style="background-color: {{ device.alarm_power_color }};">
+        {{ device.alarm_power }}
+      </td>
+      <td style="background-color: {{ device.alarm_color }};">
+        {{ device.alarm_status }}
       <td>
         <form method="post">
           <input type="hidden" name="label" value="update-device-{{ device.id }}">

@@ -119,11 +119,7 @@ def uidread(cruzid, overwritecheck):  # set uid
 @app.route("/", methods=("GET", "POST"))
 def server():
     err = ""
-    devices = [
-        {"name": "Device 1", "colour": "red", "status": "Offline"},
-        {"name": "Device 2", "colour": "red", "status": "Online"},
-        {"name": "Device 3", "colour": "green", "status": "Online"}
-    ]  # Example device data
+    devices = sheet.reader_data.loc[:, ["id", "location", "alarm", "status", "alarm_status"]]  # Pull device data from sheet.py
 
     try:
         if request.method == "POST":
@@ -139,8 +135,49 @@ def server():
     except Exception as e:
         print(e)
     
-    return render_template("dashboard.html", pizerocolour1=alarm1, status_01="OK", color_01="#3CBC8D", devices=devices)  # Pass devices to the template
+    # Extract name, colour, and status attributes from devices
+    device_info = []
+    for _, device in devices.iterrows():
+        alarm_power = device["alarm"]
+        if alarm_power == "ENABLE":
+            alarm_color = "#3CBC8D"
+        elif alarm_power == "DISABLE":
+            alarm_color = "red"
+        else:
+            alarm_color = ""
+        device_status = device["status"]
+        if device_status == "ONLINE":
+            status_color = "#3CBC8D"
+        elif device_status == "OFFLINE":
+            status_color = "red"
+        else:
+            status_color = ""
+        alarm_warning = device["alarm_status"]
+        if alarm_warning == "OK":
+            warning_color = "#3CBC8D"
+        elif alarm_warning == "ALARM":
+            warning_color= "red"
+        elif alarm_warning == "TAGGED OUT":
+            warning_color= "yellow"
+        elif alarm_warning == "DISABLED":
+            warning_color= "pink"
+        else:
+            warning_color= ""
+        device_info.append({
+            "name": device["id"],
+            "status": device["status"],
+            "alarm_power": device["alarm"],
+            "alarm_power_color": alarm_color,
+            "status_color": status_color,
+            "alarm_color": warning_color,
+            "alarm_status": device["alarm_status"],
+            "location": device["location"]
+            
+        })
+
+    return render_template("dashboard.html", pizerocolour1=alarm1, status_01="OK", color_01="#3CBC8D", devices=device_info)  # Pass devices to the template
 
 if __name__ == "__main__":
     
     app.run(host="0.0.0.0", port=5001)
+    

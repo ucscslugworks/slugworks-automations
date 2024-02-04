@@ -925,17 +925,17 @@ def get_all_alarm_statuses():
 
 if __name__ == "__main__":
     get_sheet_data(limited=False)
-    print(student_data)
-    print()
-    print(staff_data)
-    print()
-    print(access_data)
-    print()
-    # print(module_data)
+    # print(student_data)
     # print()
+    # print(staff_data)
+    # print()
+    # print(access_data)
+    # print()
+    # # print(module_data)
+    # # print()
     print(reader_data)
-    print()
-    print(this_reader)
+    # print()
+    # print(this_reader)
     print()
 
     # print(alarm_enabled, alarm_delay)
@@ -943,9 +943,9 @@ if __name__ == "__main__":
     # print(reader_need_updating())
 
     # update_all_readers()
-    print(get_alarm_status(1))
-    # print(get_all_reader_statuses())
-    check_in()
+    # print(get_alarm_status(1))
+    # # print(get_all_reader_statuses())
+    # check_in()
 
     # log("Canvas", "", False, 0)
 
@@ -976,7 +976,7 @@ if __name__ == "__main__":
 
     # write_student_sheet()
 
-    log("63B104FF", "Staff", True, 10)
+    # log("63B104FF", "Staff", True, 10)
 
     # print()
     # print(student_data)
