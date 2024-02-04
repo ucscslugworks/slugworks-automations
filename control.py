@@ -17,8 +17,8 @@
 from datetime import datetime
 from threading import Thread
 import os
-import canvas
-import sheet
+# import canvas
+# import sheet
 import random
 
 
@@ -28,7 +28,7 @@ from flask import Flask, flash, render_template, request
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
 app = Flask(__name__)
 app.secret_key = os.urandom(12).hex()
-sheet.get_sheet_data(limited=False)
+#heet.get_sheet_data(limited=False)
 alarm1="red"
 
 
@@ -119,6 +119,12 @@ def uidread(cruzid, overwritecheck):  # set uid
 @app.route("/", methods=("GET", "POST"))
 def server():
     err = ""
+    devices = [
+        {"name": "Device 1", "colour": "red", "status": "Offline"},
+        {"name": "Device 2", "colour": "red", "status": "Online"},
+        {"name": "Device 3", "colour": "green", "status": "Online"}
+    ]  # Example device data
+
     try:
         if request.method == "POST":
             flash("You are using POST")
@@ -132,7 +138,8 @@ def server():
 
     except Exception as e:
         print(e)
-    return render_template("dashboard.html", pizerocolour1=alarm1, status_01="OK", color_01="#3CBC8D")#, error=err)
+    
+    return render_template("dashboard.html", pizerocolour1=alarm1, status_01="OK", color_01="#3CBC8D", devices=devices)  # Pass devices to the template
 
 if __name__ == "__main__":
     

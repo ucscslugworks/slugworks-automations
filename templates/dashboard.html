@@ -76,19 +76,20 @@
       <th>Update</th>
     </tr>
 <!-- wrap this tr in a for loop: -->
+{% for device in devices %}
     <tr>
-      <td>Device 1</td>
-      <td style="background-color: {{ color_01 }};">
-        <!-- <input type="text" id="alarm" name="01" value="{{ status_01 }}" readonly> -->
-        {{ status_01 }}
+      <td>{{ device.name }}</td>
+      <td style="background-color: {{ device.colour }};">
+        {{ device.status }}
       </td>
       <td>
         <form method="post">
-          <input type="hidden" name="label" value="update-device-01">
-          <button type="submit" name="update-device-01">Update</button>
+          <input type="hidden" name="label" value="update-device-{{ device.id }}">
+          <button type="submit" name="update-device-{{ device.id }}">Update</button>
         </form>
       </td>
     </tr>
+{% endfor %}
 <!-- for loop ends here -->
   </table>
 </body>
