@@ -71,18 +71,21 @@
   <h2>Device Control</h2>
   <table>
     <tr>
+      <!-- TODO: make location, alarm delay -->
       <th>Device</th>
       <th>Location</th>
       <th>Status</th>
       <th>Alarm ON</th>
       <th>Alarm Status</th>
+      <th>Alarm Delay</th>
+      <th>Last Checked In</th>
       <th>Update</th>
 
 
-      
+
     </tr>
-<!-- wrap this tr in a for loop: -->
-{% for device in devices %}
+    <!-- wrap this tr in a for loop: -->
+    {% for device in devices %}
     <tr>
       <td>{{ device.name }}</td>
       <td>{{ device.location }}</td>
@@ -90,7 +93,14 @@
         {{ device.status }}
       </td>
       <td style="background-color: {{ device.alarm_power_color }};">
-        {{ device.alarm_power }}
+        <!-- <label for="alarm_power">Alarm Power: </label> -->
+        <select name="alarm_power" id="alarm_power" style="border: 0; background: transparent;">
+          <option disabled selected hidden value="">{{ device.alarm_power }}</option> <!-- this is the default value -->
+          {% for option in device.alarm_enable_names %}
+          <option value="{{ option }}">{{ option }}</option>
+          {% endfor %}
+        </select>
+        <!-- {{ device.alarm_power }} -->
       </td>
       <td style="background-color: {{ device.alarm_color }};">
         {{ device.alarm_status }}
@@ -101,23 +111,23 @@
         </form>
       </td>
     </tr>
-{% endfor %}
-<!-- for loop ends here -->
+    {% endfor %}
+    <!-- for loop ends here -->
   </table>
 
 
 
-    <h2>LINKME</h2>
-    <!-- create buttons to link to different sites -->
-    <div id="container">
-      <a href="student">
-        <button>Setup Student Card</button>
-      </a>
-      <a href="staff">
-        <button>Setup Staff Card</button>
-      </a>
-      <a href="log">
-        <button>Log Files</button>
-      </a>
-    </div>
-  </body>
+  <h2>LINKME</h2>
+  <!-- create buttons to link to different sites -->
+  <div id="container">
+    <a href="student">
+      <button>Setup Student Card</button>
+    </a>
+    <a href="staff">
+      <button>Setup Staff Card</button>
+    </a>
+    <a href="log">
+      <button>Log Files</button>
+    </a>
+  </div>
+</body>

@@ -29,7 +29,12 @@ os.chdir(os.path.dirname(os.path.realpath(__file__)))
 app = Flask(__name__)
 app.secret_key = os.urandom(12).hex()
 sheet.get_sheet_data(limited=False)
-alarm1="red"
+alarm_enable_names = ['ENABLE', 'DISABLE']
+device_status_names = ['ONLINE', 'OFFLINE']
+status_colors = ['#3CBC8D', 'red', '']
+alarm_status_names = ['OK', 'ALARM', 'TAGGED OUT', 'DISABLED']
+alarm_status_colors = ['#3CBC8D', 'red', 'yellow', 'gray']
+
 
 
 
@@ -136,38 +141,20 @@ def server():
     except Exception as e:
         print(e)
     
+   
     # Extract name, colour, and status attributes from devices
     device_info = []
     for _, device in devices.iterrows():
-        alarm_power = device["alarm"]
-        if alarm_power == "ENABLE":
-            alarm_color = "#3CBC8D"
-        elif alarm_power == "DISABLE":
-            alarm_color = "red"
-        else:
-            alarm_color = ""
-        device_status = device["status"]
-        if device_status == "ONLINE":
-            status_color = "#3CBC8D"
-        elif device_status == "OFFLINE":
-            status_color = "red"
-        else:
-            status_color = ""
-        alarm_warning = device["alarm_status"]
-        if alarm_warning == "OK":
-            warning_color = "#3CBC8D"
-        elif alarm_warning == "ALARM":
-            warning_color= "red"
-        elif alarm_warning == "TAGGED OUT":
-            warning_color= "yellow"
-        elif alarm_warning == "DISABLED":
-            warning_color= "pink"
-        else:
-            warning_color= ""
+
+        alarm_color = status_colors[-1 if device['alarm'] not in alarm_enable_names else alarm_enable_names.index(device['alarm'])]
+        status_color = status_colors[-1 if device["status"] not in device_status_names else device_status_names.index(device["status"])]
+        warning_color = alarm_status_colors[-1 if device['alarm_status'] not in alarm_status_names else alarm_status_names.index(device['alarm_status'])]
+    
         device_info.append({
             "name": device["id"],
             "status": device["status"],
             "alarm_power": device["alarm"],
+            "alarm_enable_names": alarm_enable_names,
             "alarm_power_color": alarm_color,
             "status_color": status_color,
             "alarm_color": warning_color,
@@ -176,7 +163,7 @@ def server():
             
         })
 
-    return render_template("dashboard.html", pizerocolour1=alarm1, status_01="OK", color_01="#3CBC8D", devices=device_info)  # Pass devices to the template
+    return render_template("dashboard.html", devices=device_info)  # Pass devices to the template
 
 
 
@@ -200,7 +187,7 @@ def student():
 
         
             
-    return render_template("Student.html", err=err)
+    return render_template("student.html", err=err)
 
 
 if __name__ == "__main__":

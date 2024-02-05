@@ -12,9 +12,9 @@ from googleapiclient.errors import HttpError
 
 # get reader id (0 is the control pi, any other number is a reader pi zero)
 try:
-    reader_file = json.load(open("reader.json"))
+    reader_file = json.load(open("ID.json"))
 except FileNotFoundError:
-    print("No reader.json file found.")
+    print("No ID.json file found.")
     exit(1)
 reader_id = reader_file["id"]
 
