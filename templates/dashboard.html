@@ -13,7 +13,12 @@
       align-items: flex-start;
       align-content: space-around;
     }
-
+    #container2 {
+      display: flex;
+      justify-content: right;
+      align-items: right;
+      height: 30vh;
+    }
     table,
     th,
     td {
@@ -41,10 +46,12 @@
 
 
 
+
 <body>
-  <p> <strong>THIS IS TO BE USED BY AUTHORIZED STAFF ONLY</strong>.</p>
+  <div id = "container2">
+  <!-- <p> <strong>THIS IS TO BE USED BY AUTHORIZED STAFF ONLY</strong>.</p>
   {% for message in get_flashed_messages() %}
-  <div class="alert">{{ message }}</div>
+  <div class="alert">{{ message }}</div> -->
   {% endfor %}
   <div>
     <h2>Update Buttons</h2>
@@ -58,17 +65,11 @@
       <button type="submit" name="update-from-sheet">Update from Sheet</button>
     </form>
   </div>
-  <!-- {% if(pizerocolour1 == "red") %}
-  <div id="alarms">
-    <input type="text" id="alarm" name="01" value="{{ status_01 }}" readonly, textarea{ background-color: red; }>
-    <div>
-      {% else %}
-      <div id="alarms">
-        <input type="text" id="alarm" name="01" value="{{ status_01 }}" readonly, textarea{ background-color: green; }>
-        {% endif %}
+</div>
 
-      </div> -->
+  <div id="container">
   <h2>Device Control</h2>
+  
   <table>
     <tr>
       <!-- TODO: make location, alarm delay -->
@@ -136,22 +137,26 @@
     {% endfor %}
     <!-- for loop ends here -->
     </table>
+  </div>
 
 
 
-  <h2>LINKME</h2>
+  <h2>Tools</h2>
   <!-- create buttons to link to different sites -->
   <div>
     <a href="student">
       <button>Setup Student Card</button>
     </a>
     <br>
+    <br>
     <a href="staff">
       <button>Setup Staff Card</button>
     </a>
+    <br>
     <br>
     <a href="log">
       <button>Log Files</button>
     </a>
   </div>
 </body>
+</html>
