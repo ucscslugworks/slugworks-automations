@@ -125,18 +125,22 @@ def uidread(cruzid, overwritecheck):  # set uid
 @app.route("/", methods=("GET", "POST"))
 def server():
     err = ""
-    devices = sheet.reader_data.loc[:, ["id", "location", "alarm", "status", "alarm_status"]]  # Pull device data from sheet.py
+    devices = sheet.reader_data.loc[:, ["id", "location", "alarm", "status", "alarm_status", "alarm_delay_min", "last_checked_in"]]  # Pull device data from sheet.py
 
     try:
         if request.method == "POST":
             flash("You are using POST")
-            if request.form["label"] == "uidsetup":
-                print("reading UID")
-                cruzid = request.form.get("cruzid")
-                overwritecheck = request.form.get("overwrite")
-                print(cruzid, overwritecheck)
+            if request.form["label"] == "update-device":
+                request_data = request.form.get("device.name")
+                
 
-                err = formatid(cruzid, overwritecheck)
+
+                print("update this data")
+                location = request.form.get("location")
+                alarm = request.form.get("alarm_power")
+                delay = request.form.get("delay")
+                print(location, alarm, delay, "hi")
+
 
     except Exception as e:
         print(e)
@@ -159,7 +163,9 @@ def server():
             "status_color": status_color,
             "alarm_color": warning_color,
             "alarm_status": device["alarm_status"],
-            "location": device["location"]
+            "location": device["location"],
+            "alarm_delay_min": device["alarm_delay_min"],
+            "last_checked_in": device["last_checked_in"]
             
         })
 

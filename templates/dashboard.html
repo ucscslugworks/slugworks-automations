@@ -88,7 +88,13 @@
     {% for device in devices %}
     <tr>
       <td>{{ device.name }}</td>
-      <td>{{ device.location }}</td>
+      <!-- make the device location editable -->
+      <td>
+        <form method="post">
+          <input type="hidden" name="label" value="update-location-{{ device.id }}">
+          <input type="text" name="location" value="{{ device.location }}">
+        </form>
+      </td>
       <td style="background-color: {{ device.status_color }};">
         {{ device.status }}
       </td>
@@ -104,28 +110,36 @@
       </td>
       <td style="background-color: {{ device.alarm_color }};">
         {{ device.alarm_status }}
+      </td>
       <td>
         <form method="post">
-          <input type="hidden" name="label" value="update-device-{{ device.id }}">
+        <form method="post">
+          <input type="hidden" name="label" value="update-device">
+          <input type="hidden" name="device_id" value="{{ device.id }}">
+          <input type="hidden" name="location" value="{{ device.location }}">
+          <input type="hidden" name="alarm_power" value="{{ device.alarm_power }}">
+          <input type="hidden" name="delay" value="{{ device.alarm_delay_min }}">
           <button type="submit" name="update-device-{{ device.id }}">Update</button>
         </form>
       </td>
     </tr>
     {% endfor %}
     <!-- for loop ends here -->
-  </table>
+    </table>
 
 
 
   <h2>LINKME</h2>
   <!-- create buttons to link to different sites -->
-  <div id="container">
+  <div>
     <a href="student">
       <button>Setup Student Card</button>
     </a>
+    <br>
     <a href="staff">
       <button>Setup Staff Card</button>
     </a>
+    <br>
     <a href="log">
       <button>Log Files</button>
     </a>
