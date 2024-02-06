@@ -73,11 +73,11 @@
     <tr>
       <!-- TODO: make location, alarm delay -->
       <th>Device</th>
-      <th>Location</th>
       <th>Status</th>
+      <th>Location</th>
       <th>Alarm ON</th>
-      <th>Alarm Status</th>
       <th>Alarm Delay</th>
+      <th>Alarm Status</th>
       <th>Last Checked In</th>
       <th>Update</th>
 
@@ -89,15 +89,16 @@
     <tr>
       <td>{{ device.name }}</td>
       <!-- make the device location editable -->
+    </td>
+    <td style="background-color: {{ device.status_color }};">
+      {{ device.status }}
+    </td>
       <td>
         <form method="post">
           <input type="hidden" name="label" value="update-location-{{ device.id }}">
           <input type="text" name="location" value="{{ device.location }}">
         </form>
-      </td>
-      <td style="background-color: {{ device.status_color }};">
-        {{ device.status }}
-      </td>
+     
       <td style="background-color: {{ device.alarm_power_color }};">
         <!-- <label for="alarm_power">Alarm Power: </label> -->
         <select name="alarm_power" id="alarm_power" style="border: 0; background: transparent;">
@@ -108,9 +109,18 @@
         </select>
         <!-- {{ device.alarm_power }} -->
       </td>
+      <td>
+        <form method="post">
+          <input type="hidden" name="label" value="update-delay-{{ device.id }}">
+          <input type="text" name="delay" value="{{ device.alarm_delay_min }}" style="max-width: 10;">
+        </form>
+      </td>
       <td style="background-color: {{ device.alarm_color }};">
         {{ device.alarm_status }}
       </td>
+      
+
+      <td>{{device.last_checked_in}}</td>
       <td>
         <form method="post">
         <form method="post">
