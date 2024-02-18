@@ -14,28 +14,26 @@
 # show a message that the card has been written and added to sheet funkcheck
 
 
+import os
+import random
 from datetime import datetime
 from threading import Thread
-import os
-import canvas
-import sheet
-import random
-
 
 from flask import Flask, flash, render_template, request
+
+import canvas
+import sheet
 
 # initialize flask app
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
 app = Flask(__name__)
 app.secret_key = os.urandom(12).hex()
 sheet.get_sheet_data(limited=False)
-alarm_enable_names = ['ENABLE', 'DISABLE']
-device_status_names = ['ONLINE', 'OFFLINE']
-status_colors = ['#3CBC8D', 'red', '']
-alarm_status_names = ['OK', 'ALARM', 'TAGGED OUT', 'DISABLED']
-alarm_status_colors = ['#3CBC8D', 'red', 'yellow', 'gray']
-
-
+alarm_enable_names = ["ENABLE", "DISABLE"]
+device_status_names = ["ONLINE", "OFFLINE"]
+status_colors = ["#3CBC8D", "red", ""]
+alarm_status_names = ["OK", "ALARM", "TAGGED OUT", "DISABLED"]
+alarm_status_colors = ["#3CBC8D", "red", "yellow", "gray"]
 
 
 # TODO: this just needs canvas.update() and then sheet.check_in(alarm_status=False)
@@ -90,14 +88,14 @@ def uidread(cruzid, overwritecheck):  # set uid
     uid = "73B104FF"
 
     # if cruzid does not exist
-        # add student to canvas
+    # add student to canvas
     # elif uid exists
-        # if uid belongs to this cruzid
-            # do you want to overwrite?
-        # else
-            # another student already has this uid
+    # if uid belongs to this cruzid
+    # do you want to overwrite?
     # else
-        # set uid to cruzid
+    # another student already has this uid
+    # else
+    # set uid to cruzid
 
     if sheet.student_exists(uid=uid):
         if overwritecheck == None:
@@ -125,15 +123,24 @@ def uidread(cruzid, overwritecheck):  # set uid
 @app.route("/", methods=("GET", "POST"))
 def server():
     err = ""
-    devices = sheet.reader_data.loc[:, ["id", "location", "alarm", "status", "alarm_status", "alarm_delay_min", "last_checked_in"]]  # Pull device data from sheet.py
+    devices = sheet.reader_data.loc[
+        :,
+        [
+            "id",
+            "location",
+            "alarm",
+            "status",
+            "alarm_status",
+            "alarm_delay_min",
+            "last_checked_in",
+        ],
+    ]  # Pull device data from sheet.py
 
     try:
         if request.method == "POST":
             flash("You are using POST")
             if request.form["label"] == "update-device":
                 request_data = request.form.get("device.name")
-                
-
 
                 print("update this data")
                 location = request.form.get("location")
@@ -141,36 +148,54 @@ def server():
                 delay = request.form.get("delay")
                 print(location, alarm, delay, "hi")
 
-
     except Exception as e:
         print(e)
-    
-   
+
     # Extract name, colour, and status attributes from devices
     device_info = []
     for _, device in devices.iterrows():
 
-        alarm_color = status_colors[-1 if device['alarm'] not in alarm_enable_names else alarm_enable_names.index(device['alarm'])]
-        status_color = status_colors[-1 if device["status"] not in device_status_names else device_status_names.index(device["status"])]
-        warning_color = alarm_status_colors[-1 if device['alarm_status'] not in alarm_status_names else alarm_status_names.index(device['alarm_status'])]
-    
-        device_info.append({
-            "name": device["id"],
-            "status": device["status"],
-            "alarm_power": device["alarm"],
-            "alarm_enable_names": alarm_enable_names,
-            "alarm_power_color": alarm_color,
-            "status_color": status_color,
-            "alarm_color": warning_color,
-            "alarm_status": device["alarm_status"],
-            "location": device["location"],
-            "alarm_delay_min": device["alarm_delay_min"],
-            "last_checked_in": device["last_checked_in"]
-            
-        })
+        alarm_color = status_colors[
+            (
+                -1
+                if device["alarm"] not in alarm_enable_names
+                else alarm_enable_names.index(device["alarm"])
+            )
+        ]
+        status_color = status_colors[
+            (
+                -1
+                if device["status"] not in device_status_names
+                else device_status_names.index(device["status"])
+            )
+        ]
+        warning_color = alarm_status_colors[
+            (
+                -1
+                if device["alarm_status"] not in alarm_status_names
+                else alarm_status_names.index(device["alarm_status"])
+            )
+        ]
 
-    return render_template("dashboard.html", devices=device_info)  # Pass devices to the template
+        device_info.append(
+            {
+                "name": device["id"],
+                "status": device["status"],
+                "alarm_power": device["alarm"],
+                "alarm_enable_names": alarm_enable_names,
+                "alarm_power_color": alarm_color,
+                "status_color": status_color,
+                "alarm_color": warning_color,
+                "alarm_status": device["alarm_status"],
+                "location": device["location"],
+                "alarm_delay_min": device["alarm_delay_min"],
+                "last_checked_in": device["last_checked_in"],
+            }
+        )
 
+    return render_template(
+        "dashboard.html", devices=device_info
+    )  # Pass devices to the template
 
 
 @app.route("/student", methods=("GET", "POST"))
@@ -191,11 +216,8 @@ def student():
     except Exception as e:
         print(e)
 
-        
-            
     return render_template("student.html", err=err)
 
 
 if __name__ == "__main__":
-        app.run(host="0.0.0.0", port=5001)
-    
+    app.run(host="0.0.0.0", port=5001)
