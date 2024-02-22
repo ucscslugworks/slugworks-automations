@@ -46,6 +46,7 @@ static const uint16_t CCITTCRCTable[256] = {
     0x8fd9, 0x9ff8, 0x6e17, 0x7e36, 0x4e55, 0x5e74,
     0x2e93, 0x3eb2, 0x0ed1, 0x1ef0};
 
+// copied from B1 user manual
 static uint16_t GetCCITTCRC(const uint8_t *Data, uint32_t Size)
 {
     uint16_t CRC;
@@ -64,91 +65,52 @@ static uint16_t GetCCITTCRC(const uint8_t *Data, uint32_t Size)
     return CRC;
 }
 
-void dummy()
+void print_command(uint8_t *data, uint16_t len)
 {
-    uint8_t header[] = {0x02, 0x03, 0x00};
-    for (int i = 0; i < sizeof(header); i++)
-    {
-        printf("%02X ", header[i]);
-    }
-    uint16_t crc = GetCCITTCRC(header, sizeof(header));
-    printf("%02X %02X ", crc & 0xFF, (crc >> 8) & 0xFF);
-    uint8_t data[] = {0x00};
-    for (int i = 0; i < sizeof(data); i++)
-    {
-        printf("%02X ", data[i]);
-    }
-    crc = GetCCITTCRC(data, sizeof(data));
-    printf("%02X %02X\n", crc & 0xFF, (crc >> 8) & 0xFF);
-}
+    // calculate the CRC for the data
+    uint16_t data_crc = GetCCITTCRC(data, len);
 
-void read_uid()
-{
-    // 01 for uart write, 0x01 00 for command register (LSB first), 0x01 00 for 1 byte data, 0x00 00 00 01 for data (read uid command, MSB first presumably)
-    uint8_t data[] = {0x01, 0x01, 0x00, 0x01, 0x00, 0x01};
-    uint16_t data_crc = GetCCITTCRC(data, sizeof(data));
-    // printf("CRC: 0x%04X\n", data_crc);
-    // printf("02 ");
-    uint16_t len = sizeof(data) + 2;
+    // calculate the length of the data and crc together
+    uint16_t data_crc_len = len + 2;
 
-    uint8_t header[] = {0x02, len & 0xFF, (len >> 8) & 0xFF};
+    // create the header for the command - 02 indicates the start of any message, followed by the length of the data and data crc
+    uint8_t header[] = {0x02, data_crc_len & 0xFF, (data_crc_len >> 8) & 0xFF};
+
+    // calculate the CRC for the header
     uint16_t header_crc = GetCCITTCRC(header, sizeof(header));
 
-    // printf("%02X %02X ", len & 0xFF, (len>>8) & 0xFF);
+    // print the header
     for (int i = 0; i < sizeof(header); i++)
     {
         printf("%02X ", header[i]);
     }
+    // print the header CRC
     printf("%02X %02X ", header_crc & 0xFF, (header_crc >> 8) & 0xFF);
 
-    for (int i = 0; i < sizeof(data); i++)
+    // print the data
+    for (int i = 0; i < len; i++)
     {
         printf("%02X ", data[i]);
     }
-    printf("%02X %02X\n", data_crc & 0xFF, (data_crc >> 8) & 0xFF);
-}
-
-void read_uid_reg()
-{
-    // 02 for uart read, 0x14 00 for command register (LSB first), 0x0A 00 for 10 byte data
-    uint8_t data[] = {0x02, 0x14, 0x00, 0x0A, 0x00};
-    uint16_t data_crc = GetCCITTCRC(data, sizeof(data));
-    // printf("CRC: 0x%04X\n", data_crc);
-    // printf("02 ");
-    uint16_t len = sizeof(data) + 2;
-
-    uint8_t header[] = {0x02, len & 0xFF, (len >> 8) & 0xFF};
-    uint16_t header_crc = GetCCITTCRC(header, sizeof(header));
-
-    // printf("%02X %02X ", len & 0xFF, (len>>8) & 0xFF);
-    for (int i = 0; i < sizeof(header); i++)
-    {
-        printf("%02X ", header[i]);
-    }
-    printf("%02X %02X ", header_crc & 0xFF, (header_crc >> 8) & 0xFF);
-
-    for (int i = 0; i < sizeof(data); i++)
-    {
-        printf("%02X ", data[i]);
-    }
+    // print the data CRC
     printf("%02X %02X\n", data_crc & 0xFF, (data_crc >> 8) & 0xFF);
 }
 
 int main()
 {
-    // dummy/ack
-    // uint8_t header[] = {0x02, 0x03, 0x00};
-    // uint16_t crc = GetCCITTCRC(header, sizeof(header));
-    // printf("CRC: 0x%04X\n", crc);
-    // uint8_t data[] = {0x00};
-    // crc = GetCCITTCRC(data, sizeof(data));
-    // printf("CRC: 0x%04X\n", crc);
-
     printf("Dummy:\n");
-    dummy();
+    // send 0x00 as uart dummy command - just to get an ack response
+    uint8_t dummy_data[] = {0x00};
+    print_command(dummy_data, sizeof(dummy_data));
+
     printf("\nRead UID into Memory:\n");
-    read_uid();
+    // 0x01 for uart write, 0x0001 for command register address (flipped to 01 00 for LSB first), 0x0001 for 1 byte data (flipped to 01 00 for LSB first), 0x01 for RFID "Get UID and Type" camera
+    uint8_t uid_data[] = {0x01, 0x01, 0x00, 0x01, 0x00, 0x01};
+    print_command(uid_data, sizeof(uid_data));
+
     printf("\nOutput UID from Memory:\n");
-    read_uid_reg();
+    // 0x02 for uart read, 0x0014 for Tag UID register address (flipped to 14 00 for LSB first), 0x000A for 10 bytes of data (flipped to 0A 00 for LSB first)
+    uint8_t uid_reg_data[] = {0x02, 0x14, 0x00, 0x0A, 0x00};
+    print_command(uid_reg_data, sizeof(uid_reg_data));
     return 0;
 }
