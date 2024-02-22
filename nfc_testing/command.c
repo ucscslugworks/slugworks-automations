@@ -99,7 +99,7 @@ void print_command(uint8_t *data, uint16_t len)
 
 int main(int argc, char *argv[])
 {
-    printf("Dummy:\n");
+    /* printf("Dummy:\n");
     // send 0x00 as uart dummy command - just to get an ack response
     uint8_t dummy_data[] = {0x00};
     print_command(dummy_data, sizeof(dummy_data));
@@ -112,19 +112,19 @@ int main(int argc, char *argv[])
     printf("\nOutput UID from Memory:\n");
     // 0x02 for uart read, 0x0014 for Tag UID register address (flipped to 14 00 for LSB first), 0x000A for 10 bytes of data (flipped to 0A 00 for LSB first)
     uint8_t uid_reg_data[] = {0x02, 0x14, 0x00, 0x0A, 0x00};
-    print_command(uid_reg_data, sizeof(uid_reg_data));
+    print_command(uid_reg_data, sizeof(uid_reg_data)); */
 
     if (argc < 2)
     {
         printf("Usage: %s <command> <data>\n", argv[0]);
         return 1;
     } else {
-        printf("\nCustom Command:\n");
+        // printf("\nCustom Command:\n");
         uint8_t custom_data[argc - 1];
         for (int i = 1; i < argc; i++)
         {
             custom_data[i-1] = strtol(argv[i], NULL, 16);
-            printf("custom_data[%d] = %02x\n", i-1, custom_data[i-1]);
+            // printf("custom_data[%d] = %02x\n", i-1, custom_data[i-1]);
         }
         print_command(custom_data, sizeof(custom_data));
     }
