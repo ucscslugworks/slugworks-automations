@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 static const uint16_t CCITTCRCTable[256] = {
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50a5,
@@ -96,7 +97,7 @@ void print_command(uint8_t *data, uint16_t len)
     printf("%02X %02X\n", data_crc & 0xFF, (data_crc >> 8) & 0xFF);
 }
 
-int main()
+int main(int argc, char *argv[])
 {
     printf("Dummy:\n");
     // send 0x00 as uart dummy command - just to get an ack response
@@ -112,5 +113,26 @@ int main()
     // 0x02 for uart read, 0x0014 for Tag UID register address (flipped to 14 00 for LSB first), 0x000A for 10 bytes of data (flipped to 0A 00 for LSB first)
     uint8_t uid_reg_data[] = {0x02, 0x14, 0x00, 0x0A, 0x00};
     print_command(uid_reg_data, sizeof(uid_reg_data));
+
+    if (argc < 2)
+    {
+        printf("Usage: %s <command> <data>\n", argv[0]);
+        return 1;
+    } else {
+        printf("\nCustom Command:\n");
+        uint8_t custom_data[argc - 1];
+        for (int i = 1; i < argc; i++)
+        {
+            custom_data[i-1] = strtol(argv[i], NULL, 16);
+            printf("custom_data[%d] = %02x\n", i-1, custom_data[i-1]);
+        }
+        print_command(custom_data, sizeof(custom_data));
+    }
+    // for (int i = 1; i < argc; i++)
+    // {
+    //     printf("%s ", argv[i]);
+    // }
+    // printf("\n");
+
     return 0;
 }
