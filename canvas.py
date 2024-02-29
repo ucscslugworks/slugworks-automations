@@ -20,6 +20,8 @@ def update():
 
     response = requests.request("GET", url + endpoint, headers=headers)
 
+    print("Successfully retrieved student list from Canvas")
+
     students_json = json.loads(response.text)
     students = {}
     for s in students_json:
