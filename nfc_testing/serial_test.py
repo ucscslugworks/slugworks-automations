@@ -4,7 +4,7 @@ import time
 import serial
 
 # open the serial port w/ 9600 baud rate and 0.1 second timeout
-ser = serial.Serial("/dev/ttyAMA10", 9600, timeout=0.1)
+ser = serial.Serial("/dev/ttyUSB0", 9600, timeout=0.1)
 
 
 def get_command(data):
@@ -20,7 +20,6 @@ def get_command(data):
 
 def get_response():
     response_str = ser.read(1000).hex()
-    print(response_str)
     if len(response_str) < 2:
         return []
     response_split = []
@@ -141,51 +140,9 @@ def read_card():
 
 
 if __name__ == "__main__":
-    # dummy command to check if the device is connected - should return ACK
-    dummy = ["00"]
-    # check if the response is the expected ACK
-    r = send_command(dummy)
-    if len(r) == 1 and r[0][0] == "00" and len(r[0][1]) == 0:
-        print("ACK received")
-    else:
-        print("ACK not received")
-
-    # command to read card data
-    read_card_data = ["01", "01", "00", "01", "00", "01"]
-    responses = send_command(read_card_data)
-    if len(responses) == 1 and responses[0][0] != "00":
-        print("Error Code:", responses[0][0])
-        print("Error Data:", responses[0][1])
-    elif len(responses) == 1:
-        responses += get_response()
-
-    if (
-        len(responses) < 2
-        or responses[1][0] != "08"
-        or len(responses[1][1]) < 1
-        or responses[1][1][0] != "20"
-    ):
-        print("RFID Command did not end?", responses)
-
-    # command to read the card type
-    read_type_data = ["02", "1E", "00", "01", "00"]
-    responses = send_command(read_type_data)
-    # print(responses)
-    # print(get_type(responses[0]))
-
-    if len(responses) > 0 and responses[0][0] == "00":
-        print("Card Type:", get_type(responses[0]))
-        if get_type(responses[0]) == "06":
-            # command to output UID of the scanned card
-            read_uid_data = ["02", "14", "00", "0A", "00"]
-            responses = send_command(read_uid_data)
-            while len(responses) < 1:
-                responses += get_response()
-
-            if responses[0][0] == "00":
-                print("UID:", get_mifare_1k_uid(responses[0]))
-            else:
-                print("Error Code:", responses[0][0])
-                print("Error Data:", responses[0][1])
-
-    ser.close()
+    while True:
+        try:
+            print(read_card())
+        except KeyboardInterrupt:
+            ser.close()
+            exit(0)
