@@ -4,7 +4,7 @@ import time
 import serial
 
 # open the serial port w/ 9600 baud rate and 0.1 second timeout
-ser = serial.Serial("/dev/tty.usbserial-DK0FCC7C", 9600, timeout=0.1)
+ser = serial.Serial("/dev/ttyAMA10", 9600, timeout=0.1)
 
 
 def get_command(data):
