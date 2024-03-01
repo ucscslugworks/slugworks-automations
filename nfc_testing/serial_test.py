@@ -20,6 +20,9 @@ def get_command(data):
 
 def get_response():
     response_str = ser.read(1000).hex()
+    print(response_str)
+    if len(response_str) < 2:
+        return []
     response_split = []
     for i in range(0, len(response_str), 2):
         response_split.append(response_str[i : i + 2])
