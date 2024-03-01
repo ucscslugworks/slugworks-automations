@@ -76,15 +76,18 @@ def send_command(data):
     return get_response()
 
 
-def read_card():
+def check_connection():
     # dummy command to check if the device is connected - should return ACK
     dummy = ["00"]
     # check if the response is the expected ACK
     r = send_command(dummy)
     if len(r) != 1 or r[0][0] != "00" or len(r[0][1]) != 0:
         # TODO: log NFC device not connected
-        return None
+        return False
+    return True
 
+
+def read_card():
     read_card_data = ["01", "01", "00", "01", "00", "01"]
     responses = send_command(read_card_data)
     if len(responses) == 1 and responses[0][0] != "00":
@@ -140,6 +143,9 @@ def read_card():
 
 
 if __name__ == "__main__":
+    if not check_connection():
+        print("NFC device not connected")
+        exit(1)
     while True:
         try:
             print(read_card())
