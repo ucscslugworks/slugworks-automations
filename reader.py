@@ -10,6 +10,8 @@ def read_card():
     try:
         id, _ = reader.read()
         return hex(id)[2:]
+    except KeyboardInterrupt:
+        raise
     except:
         return None
 
