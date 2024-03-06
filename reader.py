@@ -6,6 +6,8 @@ from mfrc522 import SimpleMFRC522
 
 reader = SimpleMFRC522()
 
+# TODO: when refreshing the database from the sheet, clear the timestamps (otherwise this will fill up & take a lot of memory)
+# maintain the last scanned time for each card id so that we can prevent multiple scans within a short time
 timestamps = {}
 
 
@@ -16,6 +18,7 @@ def read_card():
         if id in timestamps and time() - timestamps[id] < 5:
             return False
         timestamps[id] = time()
+        return id
     except KeyboardInterrupt:
         raise
     except:
