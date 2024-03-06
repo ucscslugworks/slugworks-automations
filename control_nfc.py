@@ -126,6 +126,7 @@ def read_card():
 
             if responses[0][0] == "00":
                 # print("UID:", get_mifare_1k_uid(responses[0]))
+                print(responses[0])
                 return get_mifare_1k_uid(responses[0])
             else:
                 # TODO log error
