@@ -1,8 +1,7 @@
-import sys
 from time import sleep, time
 
-import RPi.GPIO as GPIO
-from mfrc522 import SimpleMFRC522
+import RPi.GPIO as GPIO  # type: ignore
+from mfrc522 import SimpleMFRC522  # type: ignore
 
 # delay between reads for the same card
 DELAY = 1
@@ -28,13 +27,15 @@ def read_card():
         return None
 
 
-try:
-    while True:
-        print("Hold a tag near the reader")
-        # id, text = reader.read()
-        # print("ID: %s\nText: %s" % (id, text))
-        # sleep(5)
-        print(read_card())
-except KeyboardInterrupt:
+def close():
     GPIO.cleanup()
-    raise
+
+
+if __name__ == "__main__":
+    try:
+        while True:
+            print("Hold a tag near the reader")
+            print(read_card())
+    except KeyboardInterrupt:
+        close()
+        raise

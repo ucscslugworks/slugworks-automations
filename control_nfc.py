@@ -1,7 +1,7 @@
 import subprocess
 import time
 
-import serial
+import serial  # type: ignore
 
 # delay between reads for the same card
 DELAY = 1
@@ -152,6 +152,10 @@ def read_card():
         return None
 
 
+def close():
+    ser.close()
+
+
 if __name__ == "__main__":
     if not check_connection():
         print("NFC device not connected")
@@ -160,5 +164,5 @@ if __name__ == "__main__":
         try:
             print(read_card())
         except KeyboardInterrupt:
-            ser.close()
-            exit(0)
+            close()
+            raise
