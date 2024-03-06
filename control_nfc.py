@@ -3,8 +3,15 @@ import time
 
 import serial
 
+# delay between reads for the same card
+DELAY = 1
+
 # open the serial port w/ 9600 baud rate and 0.1 second timeout
 ser = serial.Serial("/dev/ttyUSB0", 9600, timeout=0.1)
+
+# TODO: when refreshing the database from the sheet, clear the timestamps (otherwise this will fill up & take a lot of memory)
+# maintain the last scanned time for each card id so that we can prevent multiple scans within a short time
+timestamps = {}
 
 
 def get_command(data):
@@ -64,7 +71,11 @@ def get_response():
 
 
 def get_mifare_1k_uid(response):
-    return "".join(response[1][0:4])
+    response = "".join(response[1][0:4])
+    if response in timestamps and time.time() - timestamps[response] < DELAY:
+        return False
+    timestamps[response] = time.time()
+    return response
 
 
 def get_type(response):
