@@ -22,8 +22,9 @@ from threading import Thread
 from flask import Flask, flash, render_template, request
 
 import canvas
+# import control_nfc as nfc
+import fake_nfc as nfc
 import sheet
-import control_nfc as nfc
 
 # initialize flask app
 os.chdir(os.path.dirname(os.path.realpath(__file__)))

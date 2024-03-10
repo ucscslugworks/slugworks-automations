@@ -1,5 +1,6 @@
 import subprocess
 import time
+from multiprocessing import Process, Queue
 
 import serial  # type: ignore
 
@@ -150,6 +151,29 @@ def read_card():
     else:
         # TODO log error
         return None
+
+
+def read_card_queue(q):
+    q.put(read_card())
+
+
+def read_card_queue_timeout(time):
+    """
+    Call read_card() with a timeout
+
+    time: float: the time limit in seconds
+
+    Returns None if there was an error, or passes through the return value of read_card()
+    """
+    q = Queue()
+    p = Process(target=read_card_queue, args=(q,))
+    p.start()
+    p.join(time)
+    if p.is_alive():
+        p.terminate()
+        return None
+
+    return q.get().upper()
 
 
 def close():

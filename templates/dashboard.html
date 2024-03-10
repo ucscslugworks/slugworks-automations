@@ -13,6 +13,7 @@
       align-items: flex-start;
       align-content: space-around;
     }
+
     #container2 {
       display: flex;
       justify-content: right;
@@ -46,12 +47,10 @@
 
 
 
-
 <body>
-  <div id = "container2">
-  <!-- <p> <strong>THIS IS TO BE USED BY AUTHORIZED STAFF ONLY</strong>.</p>
+  <p> <strong>THIS IS TO BE USED BY AUTHORIZED STAFF ONLY</strong>.</p>
   {% for message in get_flashed_messages() %}
-  <div class="alert">{{ message }}</div> -->
+  <div class="alert">{{ message }}</div>
   {% endfor %}
   <div>
     <h2>Update Buttons</h2>
@@ -65,11 +64,17 @@
       <button type="submit" name="update-from-sheet">Update from Sheet</button>
     </form>
   </div>
-</div>
+  <!-- {% if(pizerocolour1 == "red") %}
+  <div id="alarms">
+    <input type="text" id="alarm" name="01" value="{{ status_01 }}" readonly, textarea{ background-color: red; }>
+    <div>
+      {% else %}
+      <div id="alarms">
+        <input type="text" id="alarm" name="01" value="{{ status_01 }}" readonly, textarea{ background-color: green; }>
+        {% endif %}
 
-  <div id="container">
+      </div> -->
   <h2>Device Control</h2>
-  
   <table>
     <tr>
       <!-- TODO: make location, alarm delay -->
@@ -90,16 +95,16 @@
     <tr>
       <td>{{ device.name }}</td>
       <!-- make the device location editable -->
-    </td>
-    <td style="background-color: {{ device.status_color }};">
-      {{ device.status }}
-    </td>
+      </td>
+      <td style="background-color: {{ device.status_color }};">
+        {{ device.status }}
+      </td>
       <td>
         <form method="post">
           <input type="hidden" name="label" value="update-location-{{ device.id }}">
           <input type="text" name="location" value="{{ device.location }}">
         </form>
-     
+
       <td style="background-color: {{ device.alarm_power_color }};">
         <!-- <label for="alarm_power">Alarm Power: </label> -->
         <select name="alarm_power" id="alarm_power" style="border: 0; background: transparent;">
@@ -119,44 +124,40 @@
       <td style="background-color: {{ device.alarm_color }};">
         {{ device.alarm_status }}
       </td>
-      
+
 
       <td>{{device.last_checked_in}}</td>
       <td>
         <form method="post">
-        <form method="post">
-          <input type="hidden" name="label" value="update-device">
-          <input type="hidden" name="device_id" value="{{ device.id }}">
-          <input type="hidden" name="location" value="{{ device.location }}">
-          <input type="hidden" name="alarm_power" value="{{ device.alarm_power }}">
-          <input type="hidden" name="delay" value="{{ device.alarm_delay_min }}">
-          <button type="submit" name="update-device-{{ device.id }}">Update</button>
-        </form>
+          <form method="post">
+            <input type="hidden" name="label" value="update-device">
+            <input type="hidden" name="device_id" value="{{ device.id }}">
+            <input type="hidden" name="location" value="{{ device.location }}">
+            <input type="hidden" name="alarm_power" value="{{ device.alarm_power }}">
+            <input type="hidden" name="delay" value="{{ device.alarm_delay_min }}">
+            <button type="submit" name="update-device-{{ device.id }}">Update</button>
+          </form>
       </td>
     </tr>
     {% endfor %}
     <!-- for loop ends here -->
-    </table>
-  </div>
+  </table>
 
 
 
-  <h2>Tools</h2>
+  <h2>LINKME</h2>
   <!-- create buttons to link to different sites -->
   <div>
     <a href="student">
       <button>Setup Student Card</button>
     </a>
     <br>
-    <br>
     <a href="staff">
       <button>Setup Staff Card</button>
     </a>
-    <br>
     <br>
     <a href="log">
       <button>Log Files</button>
     </a>
   </div>
 </body>
-</html>

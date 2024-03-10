@@ -1,4 +1,5 @@
 from time import sleep, time
+from multiprocessing import Queue, Process
 
 import RPi.GPIO as GPIO  # type: ignore
 from mfrc522 import SimpleMFRC522  # type: ignore
@@ -14,6 +15,10 @@ timestamps = {}
 
 
 def read_card():
+    """
+    read a card and return its id, or None if there was an error, or False if the card was scanned too soon
+    """
+
     try:
         id, _ = reader.read()
         id = hex(id)[2:-2]
@@ -27,7 +32,31 @@ def read_card():
         return None
 
 
+def read_card_queue(q):
+    q.put(read_card())
+
+
+def read_card_queue_timeout(time):
+    """
+    Call read_card() with a timeout
+
+    time: float: the time limit in seconds
+
+    Returns None if there was an error, or passes through the return value of read_card()
+    """
+    q = Queue()
+    p = Process(target=read_card_queue, args=(q,))
+    p.start()
+    p.join(time)
+    if p.is_alive():
+        p.terminate()
+        return None
+
+    return q.get().upper()
+
+
 def close():
+    """clean up the GPIO pins"""
     GPIO.cleanup()
 
 
