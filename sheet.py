@@ -57,6 +57,9 @@ this_reader = None
 module_count = 0
 rooms = list()
 
+last_update_date = None
+last_checkin_time = None
+
 creds = None
 # The file token.json stores the user's access and refresh tokens, and is
 # created automatically when the authorization flow completes for the first
@@ -96,7 +99,7 @@ def get_sheet_data(limited=None):
 
     Returns True if the data was retrieved, or False if it was not.
     """
-    global student_data, staff_data, module_data, access_data, rooms, module_count, limited_data
+    global student_data, staff_data, module_data, access_data, rooms, module_count, limited_data, last_update_date
 
     if limited is not None:
         limited_data = limited
@@ -123,7 +126,7 @@ def get_sheet_data(limited=None):
             columns=values[0],
         )
 
-        rooms = student_data.columns.tolist()[5:]
+        rooms = student_data.columns.tolist()[(1 if limited_data else 5) :]
 
         # get the staff sheet
         staff = (
@@ -185,6 +188,8 @@ def get_sheet_data(limited=None):
                         r[1] = int(r[1])
                     access_data[access_headers[i]] = tuple(r)
 
+        last_update_date = datetime.datetime.now().date()
+
         return True and get_reader_data()
     except HttpError as e:
         print(e)
@@ -237,6 +242,7 @@ def get_reader_data():
 
 
 def check_in(alarm_status=False):
+    global last_checkin_time, this_reader
     """
     Update the reader's last checked in time and needs update status.
 
@@ -254,7 +260,8 @@ def check_in(alarm_status=False):
         else:
             this_reader["alarm_status"] = "OK"
 
-    this_reader["last_checked_in"] = str(datetime.datetime.now())
+    last_checkin_time = datetime.datetime.now()
+    this_reader["last_checked_in"] = str(last_checkin_time)
     this_reader["needs_update"] = "DONE"
 
     try:

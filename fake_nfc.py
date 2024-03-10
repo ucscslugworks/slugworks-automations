@@ -1,9 +1,11 @@
 import random
 import string
+import time
 from multiprocessing import Process, Queue
 
 
 def read_card():
+    time.sleep(random.randint(0, 20))
     return "".join(
         random.choice(string.ascii_lowercase + string.digits) for _ in range(8)
     )
@@ -30,3 +32,7 @@ def read_card_queue_timeout(time):
         return None
 
     return q.get().upper()
+
+
+def close():
+    pass
