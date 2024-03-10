@@ -5,10 +5,15 @@ from multiprocessing import Process, Queue
 
 
 def read_card():
-    time.sleep(random.randint(0, 20))
-    return "".join(
-        random.choice(string.ascii_lowercase + string.digits) for _ in range(8)
-    )
+    delay = random.randint(0, 20)
+    print('delay', delay)
+    time.sleep(delay)
+    if (random.random() > 0.5):
+        return "".join(
+            random.choice(string.ascii_lowercase + string.digits) for _ in range(8)
+        )
+    else:
+        return random.choice(["63B104FF", "73B104FF", "83B104FF"])
 
 
 def read_card_queue(q):

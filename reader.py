@@ -17,22 +17,20 @@ if __name__ == "__main__":
                 not sheet.last_update_date
                 or datetime.datetime.now().date() > sheet.last_update_date
             ) and datetime.datetime.now().hour == 4:
-                # print("updating...")
+                print("Updating sheets...")
                 sheet.get_sheet_data()
                 sheet.check_in(alarm_status=alarm_status)
             elif (
                 not sheet.last_checkin_time
                 or datetime.datetime.now() - sheet.last_checkin_time
                 > datetime.timedelta(0, 0, 0, 0, 10, 0, 0)
-                # > datetime.timedelta(0, 10, 0, 0, 0, 0, 0)
             ):
-                print("checking...")
+                print("Checking in...")
                 sheet.check_in(alarm_status=alarm_status)
 
             print("Hold a tag near the reader")
             # print(nfc.read_card())
             card_id = nfc.read_card_queue_timeout(10)
-            # card_id = random.choice(["63B104FF", "73B104FF", "83B104FF"])
             print(card_id)
             if card_id:
                 response = sheet.scan_uid(card_id)
