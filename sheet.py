@@ -250,6 +250,7 @@ def check_in(alarm_status=False):
 
     Returns True if the data was updated, or False if it was not.
     """
+    get_reader_data()
     if this_reader["alarm"] == "DISABLE":
         this_reader["alarm_status"] = "DISABLED"
     else:
@@ -262,6 +263,9 @@ def check_in(alarm_status=False):
 
     last_checkin_time = datetime.datetime.now()
     this_reader["last_checked_in"] = str(last_checkin_time)
+    if this_reader["needs_update"]:
+        print("Update needed...")
+        get_sheet_data()
     this_reader["needs_update"] = "DONE"
 
     try:
@@ -277,8 +281,6 @@ def check_in(alarm_status=False):
         )
     except HttpError as e:
         print(e)
-
-    get_reader_data()
 
 
 def student_exists(cruzid=None, canvas_id=None, uid=None):
@@ -833,7 +835,9 @@ def need_updating():
     Returns True if update needed, or False if not.
     """
 
-    return this_reader["needs_update"]
+    return this_reader and (
+        this_reader["needs_update"] == "PENDING" or this_reader["needs_update"] == True
+    )
 
 
 def scan_uid(uid, alarm_status=False):

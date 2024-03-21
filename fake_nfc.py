@@ -5,9 +5,9 @@ from multiprocessing import Process, Queue
 
 
 def read_card():
-    delay = random.randint(0, 20)
-    print('delay', delay)
-    time.sleep(delay)
+    # delay = random.randint(0, 20)
+    # print('delay', delay)
+    # time.sleep(delay)
     if (random.random() > 0.5):
         return "".join(
             random.choice(string.ascii_lowercase + string.digits) for _ in range(8)
