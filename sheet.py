@@ -2,6 +2,7 @@ import datetime
 import json
 import os.path
 from threading import Thread
+from typing import Any, Callable, Iterable, Mapping
 
 import pandas as pd
 from google.auth.transport.requests import Request
@@ -879,7 +880,9 @@ def scan_uid(uid, alarm_status=False):
         return None
 
 
-def run_in_thread(f, args, kwargs):
+def run_in_thread(
+    f: Callable, args: Iterable[Any] = (), kwargs: Mapping[str, Any] = None
+):
     """
     Run a function in a separate thread.
 
@@ -932,6 +935,43 @@ def get_all_alarm_statuses():
     """
 
     return reader_data["alarm_status"].tolist()
+
+
+def set_reader_properties(id, location=None, alarm=None, alarm_delay=None):
+    """
+    Set the properties of a reader.
+
+    id: int: the reader ID.
+    location: str: the reader's location.
+    alarm: bool: the alarm status.
+    alarm_delay: int: the alarm delay time in minutes.
+    """
+
+    if id < 0 or id >= len(reader_data):
+        return False
+
+    if location:
+        reader_data.loc[id, "location"] = location
+    if alarm:
+        reader_data.loc[id, "alarm"] = alarm
+    if alarm_delay:
+        reader_data.loc[id, "alarm_delay_min"] = alarm_delay
+
+    try:
+        _ = (
+            g_sheets.values()
+            .update(
+                spreadsheetId=SPREADSHEET_ID,
+                range=READERS_SHEET + f"!C{id+2}:E{id+2}",
+                valueInputOption="USER_ENTERED",
+                body={"values": [[location, alarm, alarm_delay]]},
+            )
+            .execute()
+        )
+        return True
+    except HttpError as e:
+        print(e)
+        return False
 
 
 if __name__ == "__main__":

@@ -137,21 +137,7 @@ def server():
             "last_checked_in",
         ],
     ]  # Pull device data from sheet.py
-
-    try:
-        if request.method == "POST":
-            flash("You are using POST")
-            if request.form["label"] == "update-device":
-                request_data = request.form.get("device.name")
-
-                print("update this data")
-                location = request.form.get("location")
-                alarm = request.form.get("alarm_power")
-                delay = request.form.get("delay")
-                print(location, alarm, delay, "hi")
-
-    except Exception as e:
-        print(e)
+    # print(devices, sheet.this_reader)
 
     # Extract name, colour, and status attributes from devices
     device_info = []
@@ -181,7 +167,7 @@ def server():
 
         device_info.append(
             {
-                "name": device["id"],
+                "id": device["id"],
                 "status": device["status"],
                 "alarm_power": device["alarm"],
                 "alarm_enable_names": alarm_enable_names,
@@ -194,6 +180,49 @@ def server():
                 "last_checked_in": device["last_checked_in"],
             }
         )
+
+    try:
+        if request.method == "POST":
+            flash("You are using POST")
+            if request.form["label"] == "update-device":
+                # print(request.form)
+                # request_data = request.form.get("device.name")
+
+                req_id = int(request.form.get("id"))
+                req_location = request.form.get("location")
+                req_alarm = request.form.get("alarm_power")
+                req_delay = request.form.get("delay")
+
+                # print("update this data")
+                # location = request.form.get("location")
+                # alarm = request.form.get("alarm_power")
+                # delay = request.form.get("delay")
+                # print(location, alarm, delay, "hi")
+
+                if req_alarm:
+                    device_info[req_id]["alarm_power"] = req_alarm
+                    device_info[req_id]["alarm_power_color"] = status_colors[
+                        (
+                            -1
+                            if req_alarm not in alarm_enable_names
+                            else alarm_enable_names.index(req_alarm)
+                        )
+                    ]
+                device_info[req_id]["location"] = req_location
+                device_info[req_id]["alarm_delay_min"] = req_delay
+
+                sheet.run_in_thread(
+                    f=sheet.set_reader_properties,
+                    kwargs={
+                        "id": req_id,
+                        "location": req_location,
+                        "alarm": req_alarm,
+                        "alarm_delay": req_delay,
+                    },
+                )
+
+    except Exception as e:
+        print(e)
 
     return render_template(
         "dashboard.html", devices=device_info

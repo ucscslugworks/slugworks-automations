@@ -20,6 +20,7 @@
       align-items: right;
       height: 30vh;
     }
+
     table,
     th,
     td {
@@ -93,51 +94,54 @@
     <!-- wrap this tr in a for loop: -->
     {% for device in devices %}
     <tr>
-      <td>{{ device.name }}</td>
-      <!-- make the device location editable -->
-      </td>
-      <td style="background-color: {{ device.status_color }};">
-        {{ device.status }}
-      </td>
-      <td>
-        <form method="post">
-          <input type="hidden" name="label" value="update-location-{{ device.id }}">
+      <form method="post">
+        <td>{{ device.id }}</td>
+        <input type="hidden" name="id" value="{{ device.id }}">
+        <!-- make the device location editable -->
+        </td>
+        <td style="background-color: {{ device.status_color }};">
+          {{ device.status }}
+        </td>
+        <td>
+          <!-- <form method="post"> -->
+          <!-- <input type="hidden" name="label" value="update-location-{{ device.id }}"> -->
           <input type="text" name="location" value="{{ device.location }}">
-        </form>
+          <!-- </form> -->
+        </td>
 
-      <td style="background-color: {{ device.alarm_power_color }};">
-        <!-- <label for="alarm_power">Alarm Power: </label> -->
-        <select name="alarm_power" id="alarm_power" style="border: 0; background: transparent;">
-          <option disabled selected hidden value="">{{ device.alarm_power }}</option> <!-- this is the default value -->
-          {% for option in device.alarm_enable_names %}
-          <option value="{{ option }}">{{ option }}</option>
-          {% endfor %}
-        </select>
-        <!-- {{ device.alarm_power }} -->
-      </td>
-      <td>
-        <form method="post">
-          <input type="hidden" name="label" value="update-delay-{{ device.id }}">
+        <td style="background-color: {{ device.alarm_power_color }};">
+          <!-- <label for="alarm_power">Alarm Power: </label> -->
+          {% if (device.alarm_power != "") %}
+          <select name="alarm_power" id="alarm_power" style="border: 0; background: transparent;">
+            <option disabled selected hidden value="">{{ device.alarm_power }}</option>
+            <!-- this is the default value -->
+            {% for option in device.alarm_enable_names %}
+            <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+          {% endif %}
+          <!-- {{ device.alarm_power }} -->
+        </td>
+        <td>
+          <!-- <form method="post">
+            <input type="hidden" name="label" value="update-delay-{{ device.id }}"> -->
           <input type="text" name="delay" value="{{ device.alarm_delay_min }}" style="max-width: 10;">
-        </form>
-      </td>
-      <td style="background-color: {{ device.alarm_color }};">
-        {{ device.alarm_status }}
-      </td>
+          <!-- </form> -->
+        </td>
+        <td style="background-color: {{ device.alarm_color }};">
+          {{ device.alarm_status }}
+        </td>
 
 
-      <td>{{device.last_checked_in}}</td>
-      <td>
-        <form method="post">
-          <form method="post">
-            <input type="hidden" name="label" value="update-device">
-            <input type="hidden" name="device_id" value="{{ device.id }}">
-            <input type="hidden" name="location" value="{{ device.location }}">
-            <input type="hidden" name="alarm_power" value="{{ device.alarm_power }}">
-            <input type="hidden" name="delay" value="{{ device.alarm_delay_min }}">
-            <button type="submit" name="update-device-{{ device.id }}">Update</button>
-          </form>
-      </td>
+        <td>{{device.last_checked_in}}</td>
+        <td>
+          <!-- <form method="post"> -->
+          <input type="hidden" name="label" value="update-device">
+          <!-- <input type="hidden" name="alarm_power" value="{{ device.alarm_power }}">
+          <input type="hidden" name="delay" value="{{ device.alarm_delay_min }}"> -->
+          <button type="submit" name="update-device-{{ device.id }}">Update</button>
+        </td>
+      </form>
     </tr>
     {% endfor %}
     <!-- for loop ends here -->
