@@ -15,13 +15,14 @@
 
 
 import os
-import random
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 from threading import Thread
 
 from flask import Flask, flash, render_template, request
 
 import canvas
+
 # import control_nfc as nfc
 import fake_nfc as nfc
 import sheet
@@ -185,19 +186,11 @@ def server():
         if request.method == "POST":
             flash("You are using POST")
             if request.form["label"] == "update-device":
-                # print(request.form)
-                # request_data = request.form.get("device.name")
 
                 req_id = int(request.form.get("id"))
                 req_location = request.form.get("location")
                 req_alarm = request.form.get("alarm_power")
                 req_delay = request.form.get("delay")
-
-                # print("update this data")
-                # location = request.form.get("location")
-                # alarm = request.form.get("alarm_power")
-                # delay = request.form.get("delay")
-                # print(location, alarm, delay, "hi")
 
                 if req_alarm:
                     device_info[req_id]["alarm_power"] = req_alarm
@@ -212,7 +205,7 @@ def server():
                 device_info[req_id]["alarm_delay_min"] = req_delay
 
                 sheet.run_in_thread(
-                    f=sheet.set_reader_properties,
+                    f=sheet.update_reader,
                     kwargs={
                         "id": req_id,
                         "location": req_location,
@@ -220,6 +213,7 @@ def server():
                         "alarm_delay": req_delay,
                     },
                 )
+                # sheet.run_in_thread(f=sheet.update_reader, kwargs={"id": req_id})
 
     except Exception as e:
         print(e)
@@ -250,5 +244,45 @@ def student():
     return render_template("student.html", err=err)
 
 
+CANVAS_UPDATE_HOUR = 20  # 3am
+CHECKIN_TIMEOUT = 30  # 30 seconds
+
+card_id = None
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001)
+    # sheet.get_sheet_data(limited=False)
+    # sheet.check_in()
+    # t = Thread(target=app.run, kwargs={"host": "0.0.0.0", "port": 5001})
+    # print(sheet.access_data)
+    while True:
+        continue
+        if (
+            not sheet.last_update_date or datetime.now().date() > sheet.last_update_date
+        ) and datetime.now().hour >= CANVAS_UPDATE_HOUR:
+            print("Canvas update...")
+            # canvas.update()
+            sheet.get_sheet_data()
+            sheet.check_in()
+        elif (
+            not sheet.last_checkin_time
+            or datetime.now() - sheet.last_checkin_time
+            > timedelta(0, CHECKIN_TIMEOUT, 0, 0, 0, 0, 0)
+        ):
+            print("Checking in...")
+            sheet.check_in()
+        # time.sleep(60)
+        print("Hold a tag near the reader")
+        card_id = nfc.read_card()
+        print(card_id)
+        if card_id:
+            response = sheet.scan_uid(card_id)
+            if not response:
+                print("error - card not in database or something else")
+                pass
+            else:
+                color, timeout = response
+                print(color, timeout)
+        else:
+            print("error - scanned too soon or not scanned")
+

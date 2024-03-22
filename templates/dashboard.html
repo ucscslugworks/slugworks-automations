@@ -27,23 +27,10 @@
       border: 1px solid black;
     }
 
-    /* #status {
-      background-color: #3CBC8D;
-    } */
-
-    /* input[type=text] {
-      /* width: 100%; */
-    /* padding: 12px 20px; */
-    /* margin: 8px 0;
-      box-sizing: border-box;
-      border: none;
-      background-color: #3CBC8D;
-      color: rgb(239, 0, 0);
+    th,
+    td {
+      padding: 5px;
     }
-
-    input {
-      width: auto;
-    } */
   </style>
 
 
@@ -103,14 +90,10 @@
           {{ device.status }}
         </td>
         <td>
-          <!-- <form method="post"> -->
-          <!-- <input type="hidden" name="label" value="update-location-{{ device.id }}"> -->
           <input type="text" name="location" value="{{ device.location }}">
-          <!-- </form> -->
         </td>
 
         <td style="background-color: {{ device.alarm_power_color }};">
-          <!-- <label for="alarm_power">Alarm Power: </label> -->
           {% if (device.alarm_power != "") %}
           <select name="alarm_power" id="alarm_power" style="border: 0; background: transparent;">
             <option disabled selected hidden value="">{{ device.alarm_power }}</option>
@@ -120,13 +103,9 @@
             {% endfor %}
           </select>
           {% endif %}
-          <!-- {{ device.alarm_power }} -->
         </td>
         <td>
-          <!-- <form method="post">
-            <input type="hidden" name="label" value="update-delay-{{ device.id }}"> -->
           <input type="text" name="delay" value="{{ device.alarm_delay_min }}" style="max-width: 10;">
-          <!-- </form> -->
         </td>
         <td style="background-color: {{ device.alarm_color }};">
           {{ device.alarm_status }}
@@ -135,10 +114,7 @@
 
         <td>{{device.last_checked_in}}</td>
         <td>
-          <!-- <form method="post"> -->
           <input type="hidden" name="label" value="update-device">
-          <!-- <input type="hidden" name="alarm_power" value="{{ device.alarm_power }}">
-          <input type="hidden" name="delay" value="{{ device.alarm_delay_min }}"> -->
           <button type="submit" name="update-device-{{ device.id }}">Update</button>
         </td>
       </form>

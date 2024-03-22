@@ -251,7 +251,8 @@ def check_in(alarm_status=False):
 
     Returns True if the data was updated, or False if it was not.
     """
-    get_reader_data()
+    if not get_reader_data():
+        return False
     if this_reader["alarm"] == "DISABLE":
         this_reader["alarm_status"] = "DISABLED"
     else:
@@ -282,6 +283,8 @@ def check_in(alarm_status=False):
         )
     except HttpError as e:
         print(e)
+        return False
+    return True
 
 
 def student_exists(cruzid=None, canvas_id=None, uid=None):
@@ -864,6 +867,7 @@ def scan_uid(uid, alarm_status=False):
 
     elif student_exists(uid=uid):
         for i in range(len(rooms)):
+            print(rooms[i])
             if get_access(rooms[i], uid=uid) and access_data[rooms[i]]:
                 log(uid, rooms[i], alarm_status, access_data[rooms[i]][1])
                 return access_data[rooms[i]]
@@ -910,6 +914,37 @@ def update_all_readers():
         )
     except HttpError as e:
         print(e)
+
+
+def update_reader(id, location=None, alarm=None, alarm_delay=None):
+    """
+    Set a reader to need updating.
+
+    id: int: the reader ID.
+    """
+
+    if id < 0 or id >= len(reader_data):
+        return False
+
+    if not set_reader_properties(id, location, alarm, alarm_delay):
+        return False
+
+    try:
+        _ = (
+            g_sheets.values()
+            .update(
+                spreadsheetId=SPREADSHEET_ID,
+                range=READERS_SHEET + f"!G{id+2}",
+                valueInputOption="USER_ENTERED",
+                body={"values": [["PENDING"]]},
+            )
+            .execute()
+        )
+    except HttpError as e:
+        print(e)
+        return False
+
+    return True
 
 
 def get_alarm_status(id):
