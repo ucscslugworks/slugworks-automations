@@ -2,7 +2,7 @@
 <html>
 
 <head>
-  <title>Student Card Setup</title>
+  <title>Staff Card Setup</title>
   <style>
     #container {
       display: flex;
@@ -22,21 +22,34 @@
 
 
   <div>
-    <h2>Student Card Setup</h2>
+    <h2>Staff Card Setup</h2>
     <form method="post">
       <input type="hidden" name="label" value="uidsetup">
       {% if (err != "") %}
       <label for="error-lab">Error: </label>
       <div id="error-cont">
-        <p id="error" name="error" style="color:{% if added %}green{% else %}red{% endif %}">{{ err }}</p>
+        <!-- <input type="text" id="error" name="error" value="{{ err }}" readonly style="color:red"> -->
+        <p id="error" name="error" style="color:{{color}}">{{ err }}</p>
       </div>
       {% endif %}
       <div id="cruzid-div">
         <label for="cruzid-label">CruzID: </label> <br>
         <input type="text" id="cruzid" name="cruzid">
       </div>
+      <div id="first-div">
+        <label for="first-label">First Name: </label> <br>
+        <input type="text" id="first" name="first">
+      </div>
+      <div id="last-div">
+        <label for="last-label">Last Name: </label> <br>
+        <input type="text" id="last" name="last">
+      </div>
+      
+      </div>
       <label for="overwrite-label">Overwrite existing card?</label>
       <input type="checkbox" id="overwrite" name="overwrite" value="overwrite">
+      <div>
+      <br>
       <div>
         <button type="submit" name="formatuid">Generate</button>
       </div>
@@ -44,7 +57,7 @@
   </div>
 
   <div>
-    <br>
+    
     <a href="/">
       <button>Return to Dashboard</button>
     </a>

@@ -8,12 +8,14 @@ def read_card():
     # delay = random.randint(0, 20)
     # print('delay', delay)
     # time.sleep(delay)
-    if (random.random() > 0.5):
+    if (random.random() > 2/3):
         return "".join(
             random.choice(string.ascii_lowercase + string.digits) for _ in range(8)
         )
-    else:
+    elif (random.random() > 1/3):
         return random.choice(["63B104FF", "73B104FF", "83B104FF"])
+    else:
+        return random.choice([None, False])
 
 
 def read_card_queue(q):

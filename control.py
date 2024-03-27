@@ -19,7 +19,7 @@ import time
 from datetime import datetime, timedelta
 from threading import Thread
 
-from flask import Flask, flash, render_template, request
+from flask import Flask, flash, redirect, render_template, request, url_for
 
 import canvas
 
@@ -74,53 +74,97 @@ def status():  # status of reader
     # status of reader
 
 
-def formatid(cruzid, overwritecheck):  # format student id
-    print("Formatting")
-    carderror = uidread(cruzid, overwritecheck)
-    sheet.write_student_sheet()
-
-    return carderror
-
-    # format student id
-
-
-def uidread(cruzid, overwritecheck):  # set uid
-    print("reading UID", cruzid, overwritecheck)
-    # read uid function
-
-    uid = "73B104FF"
-
-    # if cruzid does not exist
-    # add student to canvas
-    # elif uid exists
-    # if uid belongs to this cruzid
-    # do you want to overwrite?
-    # else
-    # another student already has this uid
-    # else
-    # set uid to cruzid
-
-    if sheet.student_exists(uid=uid):
-        if overwritecheck == None:
-            carderror = "Card already exists would you like to overwrite?"
-        else:
-            sheet.set_uid(cruzid, uid, overwritecheck)
-            success = "Card added to database"
+def assign_student_uid(cruzid, overwritecheck, uid):  # set uid
+    added = False
+    carderror = ""
+    if sheet.is_staff(cruzid=cruzid):
+        carderror = f"{cruzid} is a staff member, please use a student CruzID"
     elif not sheet.student_exists(cruzid=cruzid):
-        carderror = "Cruzid not in database please add student to canvas first, and update database"
-        print(cruzid)
-    elif not sheet.get_uid(cruzid):
-        # carderror = "success"
-        sheet.set_uid(cruzid, uid, overwritecheck)
-        success = "Card added to database"
+        carderror = f"CruzID {cruzid} not in database, please add student to Canvas first, then update database"
+    elif sheet.get_uid(cruzid) == uid:
+        carderror = f"Card is already assigned to {cruzid}"
+    elif sheet.get_uid(cruzid) and not overwritecheck:
+        carderror = (
+            f"{cruzid} already has a card, please overwrite to replace with this card"
+        )
+    elif sheet.get_cruzid(uid) and not overwritecheck:
+        carderror = f"Card is already assigned to {sheet.get_cruzid(uid)}. If you would like to reassign the card to {cruzid}, please overwrite."
     else:
-        if overwritecheck == None:
-            carderror = "Student already has an id would you like to overwrite?"
-        else:
-            sheet.set_uid(cruzid, uid, overwritecheck)
-            success = "Card added to database"
+        sheet.set_uid(cruzid, uid, overwritecheck)
+        sheet.run_in_thread(f=sheet.write_student_staff_sheets)
+        carderror = f"Card added to database for {cruzid}"
+        added = True
 
-    return carderror
+    return carderror, added
+
+
+# If they are not staff, but they are a student complain
+# if they are not staff && not student check if Firstname Lastname is provided if not complain
+# ELSE: (at this point either cruzid is alrdy staff or they are neither staff nor student and have provided a name)
+# do standard cruzid && uid checks
+# if all checks pass, add to staff sheet
+# IDEAS:
+# add a list of staff with a remove button
+def assign_staff_uid(cruzid, first, last, uid, overwrite):  # set
+    print("assigning staff UID", cruzid, overwrite, uid)
+    added = False
+    carderror = ""
+    if not sheet.is_staff(cruzid=cruzid) and sheet.student_exists(cruzid=cruzid):
+        carderror = "CruzID is a student, please mark as a staff member in Canvas and perform a Canvas update"
+    elif (
+        not sheet.is_staff(cruzid=cruzid)
+        and not sheet.student_exists(cruzid=cruzid)
+        and (not first or not last)
+    ):
+        carderror = "Please provide a first and last name"
+    elif (
+        not sheet.is_staff(cruzid=cruzid)
+        and not sheet.student_exists(cruzid=cruzid)
+        and first
+        and last
+    ) or sheet.is_staff(cruzid=cruzid):
+        if sheet.get_uid(cruzid) == uid:
+            carderror = f"Card is already assigned to {cruzid}"
+        elif sheet.get_uid(cruzid) and not overwrite:
+            carderror = f"{cruzid} already has a card, please overwrite to replace with this card"
+        elif sheet.get_cruzid(uid) and not overwrite:
+            carderror = f"Card is already assigned to {sheet.get_cruzid(uid)}. If you would like to reassign the card to {cruzid}, please overwrite."
+        else:
+            if not sheet.is_staff(cruzid):
+                sheet.new_staff(first, last, cruzid, uid)
+                carderror = f"New staff member {first} {last} added to database with CruzID {cruzid}"
+            else:
+                sheet.set_uid(cruzid, uid, overwrite)
+                carderror = f"Card added to database for {cruzid}"
+            added = True
+            sheet.run_in_thread(f=sheet.write_student_staff_sheets)
+    return carderror, added
+
+    # print(0)
+    # if sheet.is_staff(cruzid=cruzid):
+    #     print(1)
+    #     carderror = "Staff member, please use a student CruzID"
+    # elif not sheet.student_exists(cruzid=cruzid):
+    #     print(2)
+    #     carderror = "CruzID not in database, please add student to Canvas first, then update database"
+    # elif sheet.get_uid(cruzid) == uid:
+    #     print(3)
+    #     carderror = f"Card is already assigned to {cruzid}"
+    # elif sheet.get_uid(cruzid) is not None and not overwritecheck:
+    #     print(4)
+    #     carderror = (
+    #         f"{cruzid} already has a card, please overwrite to replace with this card"
+    #     )
+    # elif sheet.get_cruzid(uid) is not None and not overwritecheck:
+    #     print(5)
+    #     carderror = f"Card is already assigned to {sheet.get_cruzid(uid)}. If you would like to reassign the card to {cruzid}, please overwrite."
+    # else:
+    #     print(6)
+    #     sheet.set_uid(cruzid, uid, overwritecheck)
+    #     print(7)
+    #     # sheet.run_in_thread(f=sheet.write_student_sheet)
+    #     sheet.write_student_sheet()
+    #     carderror = "Card added to database"
 
 
 @app.route("/", methods=("GET", "POST"))
@@ -213,7 +257,7 @@ def server():
                         "alarm_delay": req_delay,
                     },
                 )
-                # sheet.run_in_thread(f=sheet.update_reader, kwargs={"id": req_id})
+                return redirect("/")
 
     except Exception as e:
         print(e)
@@ -226,22 +270,85 @@ def server():
 @app.route("/student", methods=("GET", "POST"))
 def student():
     err = ""
+    added = False
 
     try:
         if request.method == "POST":
             flash("You are using POST")
+            print(request.form)
             if request.form["label"] == "uidsetup":
                 print("reading UID")
                 cruzid = request.form.get("cruzid")
-                overwritecheck = request.form.get("overwrite")
-                print(cruzid, overwritecheck)
-
-                err = formatid(cruzid, overwritecheck)
+                overwritecheck = (
+                    True if request.form.get("overwrite") == "overwrite" else False
+                )
+                uid = nfc.read_card()
+                print(cruzid, overwritecheck, uid)
+                if not cruzid:
+                    err = "Please enter a CruzID"
+                elif not uid:
+                    err = "Card not detected, please try again"
+                else:
+                    err, added = assign_student_uid(cruzid, overwritecheck, uid)
+                    # err = "temp"
 
     except Exception as e:
         print(e)
 
-    return render_template("student.html", err=err)
+    return render_template(
+        "student.html",
+        err=err,
+        added=added,
+    )
+
+
+@app.route("/staff", methods=("GET", "POST"))
+
+# TODO:
+# If they are not staff, but they are a student complain
+# if they are not staff && not student check if Firstname Lastname is provided if not complain
+# ELSE: (at this point either cruzid is alrdy staff or they are neither staff nor student and have provided a name)
+# do standard cruzid && uid checks
+# if all checks pass, add to staff sheet
+# IDEAS:
+# add a list of staff with a remove button
+
+
+def staff():
+    err = ""
+    added = False
+
+    try:
+        if request.method == "POST":
+            flash("You are using POST")
+            print(request.form)
+            if request.form["label"] == "uidsetup":
+                print("reading UID")
+                cruzid = request.form.get("cruzid")
+                overwritecheck = (
+                    True if request.form.get("overwrite") == "overwrite" else False
+                )
+                uid = nfc.read_card()
+                print(cruzid, overwritecheck, uid)
+                if not cruzid:
+                    err = "Please enter a CruzID"
+                elif not uid:
+                    err = "Card not detected, please try again"
+                else:
+                    # err = assign_uid(cruzid, overwritecheck, uid)
+                    # err = "temp"
+                    err, added = assign_staff_uid(
+                        cruzid,
+                        request.form.get("first"),
+                        request.form.get("last"),
+                        uid,
+                        overwritecheck,
+                    )
+
+    except Exception as e:
+        print(e)
+
+    return render_template("staff.html", err=err, added=added)
 
 
 CANVAS_UPDATE_HOUR = 20  # 3am
@@ -255,34 +362,33 @@ if __name__ == "__main__":
     # sheet.check_in()
     # t = Thread(target=app.run, kwargs={"host": "0.0.0.0", "port": 5001})
     # print(sheet.access_data)
-    while True:
-        continue
-        if (
-            not sheet.last_update_date or datetime.now().date() > sheet.last_update_date
-        ) and datetime.now().hour >= CANVAS_UPDATE_HOUR:
-            print("Canvas update...")
-            # canvas.update()
-            sheet.get_sheet_data()
-            sheet.check_in()
-        elif (
-            not sheet.last_checkin_time
-            or datetime.now() - sheet.last_checkin_time
-            > timedelta(0, CHECKIN_TIMEOUT, 0, 0, 0, 0, 0)
-        ):
-            print("Checking in...")
-            sheet.check_in()
-        # time.sleep(60)
-        print("Hold a tag near the reader")
-        card_id = nfc.read_card()
-        print(card_id)
-        if card_id:
-            response = sheet.scan_uid(card_id)
-            if not response:
-                print("error - card not in database or something else")
-                pass
-            else:
-                color, timeout = response
-                print(color, timeout)
-        else:
-            print("error - scanned too soon or not scanned")
-
+    # while True:
+    #     continue
+    #     if (
+    #         not sheet.last_update_date or datetime.now().date() > sheet.last_update_date
+    #     ) and datetime.now().hour >= CANVAS_UPDATE_HOUR:
+    #         print("Canvas update...")
+    #         # canvas.update()
+    #         sheet.get_sheet_data()
+    #         sheet.check_in()
+    #     elif (
+    #         not sheet.last_checkin_time
+    #         or datetime.now() - sheet.last_checkin_time
+    #         > timedelta(0, CHECKIN_TIMEOUT, 0, 0, 0, 0, 0)
+    #     ):
+    #         print("Checking in...")
+    #         sheet.check_in()
+    #     # time.sleep(60)
+    #     print("Hold a tag near the reader")
+    #     card_id = nfc.read_card()
+    #     print(card_id)
+    #     if card_id:
+    #         response = sheet.scan_uid(card_id)
+    #         if not response:
+    #             print("error - card not in database or something else")
+    #             pass
+    #         else:
+    #             color, timeout = response
+    #             print(color, timeout)
+    #     else:
+    #         print("error - scanned too soon or not scanned")

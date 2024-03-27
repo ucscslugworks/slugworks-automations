@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timedelta
 
 import requests
 
@@ -76,5 +77,23 @@ def update():
     return True
 
 
+CANVAS_UPDATE_HOUR = 0  # 12am
+CHECKIN_TIMEOUT = 5  # 5 minutes
+
 if __name__ == "__main__":
-    update()
+    # update()
+    while True:
+        if (
+            not sheet.last_update_date or datetime.now().date() > sheet.last_update_date
+        ) and datetime.now().hour >= CANVAS_UPDATE_HOUR:
+            print("Canvas update...")
+            # update()
+            sheet.get_sheet_data()
+            sheet.check_in()
+        elif (
+            not sheet.last_checkin_time
+            or datetime.now() - sheet.last_checkin_time
+            > timedelta(0, 0, 0, 0, CHECKIN_TIMEOUT, 0, 0)
+        ):
+            print("Checking in...")
+            sheet.check_in()

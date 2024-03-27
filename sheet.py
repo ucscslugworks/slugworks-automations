@@ -297,6 +297,7 @@ def student_exists(cruzid=None, canvas_id=None, uid=None):
 
     Returns True if the student exists, or False if they do not.
     """
+    print("student")
     return (
         (not limited_data and cruzid and cruzid in student_data["CruzID"].values)
         or (
@@ -399,17 +400,36 @@ def set_uid(cruzid, uid, overwrite=False):
     Returns the UID if it was set, or the existing UID if it was not set.
     """
     if (
-        limited_data
+        not cruzid
+        or limited_data
         or (
             cruzid not in student_data["CruzID"].values
             and cruzid not in staff_data["CruzID"].values
         )
         or (
-            uid in student_data["Card UID"].values
-            or uid in staff_data["Card UID"].values
+            (
+                uid in student_data["Card UID"].values
+                or uid in staff_data["Card UID"].values
+            )
+            and not overwrite
         )
     ):
         return False
+
+    print("set")
+
+    if overwrite:
+        if uid in student_data["Card UID"].values:
+            row = student_data.index[student_data["Card UID"] == uid].tolist()[0]
+            student_data.loc[row, "Card UID"] = ""
+            print(row)
+            print(student_data.loc[row])
+        if uid in staff_data["Card UID"].values:
+            row = staff_data.index[staff_data["Card UID"] == uid].tolist()[0]
+            staff_data.loc[row, "Card UID"] = ""
+
+    if not uid:
+        uid = None
 
     if cruzid in staff_data["CruzID"].values:
         row = staff_data.index[staff_data["CruzID"] == cruzid].tolist()[0]
@@ -433,12 +453,64 @@ def get_uid(cruzid):
     Returns the student's card UID if it exists, or False if it does not.
     """
 
-    if limited_data or (cruzid not in student_data["CruzID"].values):
+    # print("uid")
+    # print(cruzid in student_data["CruzID"].values)
+    if limited_data or (
+        cruzid not in student_data["CruzID"].values
+        and cruzid not in staff_data["CruzID"].values
+    ):
         return False
 
-    row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
-    uid = student_data.loc[row, "Card UID"]
+    row = student_data.index[student_data["CruzID"] == cruzid].tolist()
+    uid = None
+    if row:
+        row = row[0]
+        uid = student_data.loc[row, "Card UID"]
+
+    if not uid:
+        row = staff_data.index[staff_data["CruzID"] == cruzid].tolist()
+        # print(row)
+        if row:
+            row = row[0]
+            uid = staff_data.loc[row, "Card UID"]
+
+    print("uid", "'" + uid + "'", uid if uid else False)
+
     return uid if uid else False
+
+
+def get_cruzid(uid):
+    """
+    Get a student's CruzID from their card UID.
+
+    uid: str: the student's card UID.
+
+    Returns the student's CruzID if it exists, or False if it does not.
+    """
+
+    print("cruzid")
+    if limited_data or (
+        uid not in student_data["Card UID"].values
+        and uid not in staff_data["Card UID"].values
+    ):
+        return False
+
+    row = student_data.index[student_data["Card UID"] == uid].tolist()
+    cruzid = None
+    print("row1", row)
+    if row:
+        row = row[0]
+        cruzid = student_data.loc[row, "CruzID"]
+
+    if not cruzid:
+        row = staff_data.index[staff_data["Card UID"] == uid].tolist()
+        print("row2", row)
+        if row:
+            row = row[0]
+            cruzid = staff_data.loc[row, "CruzID"]
+
+    print("cruzid", cruzid)
+    return cruzid if cruzid else False
 
 
 def set_access(room, access, cruzid=None, uid=None):
@@ -710,6 +782,14 @@ def write_staff_sheet():
     except HttpError as e:
         print(e)
 
+def write_student_staff_sheets():
+    """
+    Write the student and staff data to the Google Sheets document.
+
+    Returns True if the data was written, or False if it was not.
+    """
+
+    return write_student_sheet() and write_staff_sheet()
 
 def evaluate_modules(completed_modules, cruzid=None, uid=None):
     """
@@ -748,6 +828,37 @@ def is_staff(cruzid=None, uid=None):
     uid: str: the student's card UID.
     """
 
+    # print(cruzid)
+    # print(uid)
+    # print(staff_data)
+    # print(staff_data.index[staff_data["CruzID"] == cruzid])
+    # print(staff_data.index[staff_data["Card UID"] == uid])
+    # print(staff_data.index[staff_data["CruzID"] == cruzid].empty)
+    # print(staff_data.index[staff_data["Card UID"] == uid].empty)
+    # print(staff_data.index[staff_data["CruzID"] == cruzid].tolist())
+    # print(staff_data.index[staff_data["Card UID"] == uid].tolist())
+    # print(
+    #     staff_data.index[staff_data["CruzID"] == cruzid].tolist()
+    #     != staff_data.index[staff_data["Card UID"] == uid].tolist()
+    # )
+
+    # print(not cruzid and not uid)
+    # print(
+    #     not limited_data
+    #     and cruzid
+    #     and staff_data.index[staff_data["CruzID"] == cruzid].empty
+    # )
+    # print(uid and staff_data.index[staff_data["Card UID"] == uid].empty)
+    # print(
+    #     not limited_data
+    #     and cruzid
+    #     and uid
+    #     and (
+    #         staff_data.index[staff_data["CruzID"] == cruzid].tolist()
+    #         != staff_data.index[staff_data["Card UID"] == uid].tolist()
+    #     )
+    # )
+
     if (
         (not cruzid and not uid)
         or (
@@ -758,17 +869,18 @@ def is_staff(cruzid=None, uid=None):
         or (uid and staff_data.index[staff_data["Card UID"] == uid].empty)
         or (
             not limited_data
+            and cruzid
+            and uid
             and (
-                cruzid
-                and uid
-                and (
-                    staff_data.index[staff_data["CruzID"] == cruzid].tolist()
-                    != staff_data.index[staff_data["Card UID"] == uid].tolist()
-                )
+                staff_data.index[staff_data["CruzID"] == cruzid].tolist()
+                != staff_data.index[staff_data["Card UID"] == uid].tolist()
             )
         )
     ):
+        # print("fail")
         return False
+
+    # print("help")
 
     if not limited_data and cruzid:
         return not staff_data.index[staff_data["CruzID"] == cruzid].empty
