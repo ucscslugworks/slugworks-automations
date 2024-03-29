@@ -34,6 +34,8 @@ READERS_SHEET = "Readers"  # contains statuses of the readers
 LOG_SHEET = "Log"  # contains a log of all card reads
 CANVAS_STATUS_SHEET = "Canvas Status"  # contains the last update time of the Canvas data & the current status of the update
 
+SEND_BLOCK = 100
+
 student_data = None
 staff_data = None
 module_data = None
@@ -64,6 +66,9 @@ last_checkin_time = None
 
 last_canvas_update_time = None
 canvas_is_updating = None
+
+student_sheet_read_len = 0
+staff_sheet_read_len = 0
 
 creds = None
 # The file token.json stores the user's access and refresh tokens, and is
@@ -104,7 +109,7 @@ def get_sheet_data(limited=None):
 
     Returns True if the data was retrieved, or False if it was not.
     """
-    global student_data, staff_data, module_data, access_data, rooms, module_count, limited_data, last_update_date
+    global student_data, staff_data, module_data, access_data, rooms, module_count, limited_data, last_update_date, student_sheet_read_len, staff_sheet_read_len
 
     if limited is not None:
         limited_data = limited
@@ -125,6 +130,7 @@ def get_sheet_data(limited=None):
             exit()
 
         values = [r + [""] * (len(values[0]) - len(r)) for r in values]
+        staff_sheet_read_len = len(values)
 
         student_data = pd.DataFrame(
             values[1:] if len(values) > 1 else None,
@@ -144,6 +150,8 @@ def get_sheet_data(limited=None):
         )
         values = staff.get("values", [])
         values = [r + [""] * (len(values[0]) - len(r)) for r in values]
+        staff_sheet_read_len = len(values)
+
         staff_data = pd.DataFrame(
             values[1:] if len(values) > 1 else None,
             columns=values[0],
@@ -340,7 +348,11 @@ def set_canvas_status_sheet(updating_now):
                     "values": [
                         [
                             "UPDATING" if updating_now else "DONE",
-                            str(datetime.datetime.now()) if updating_now else str(last_canvas_update_time),
+                            (
+                                str(datetime.datetime.now())
+                                if updating_now
+                                else str(last_canvas_update_time)
+                            ),
                         ]
                     ]
                 },
@@ -445,10 +457,10 @@ def new_staff(first_name, last_name, cruzid, uid=None):
     ):
         return False
     staff_data.loc[len(staff_data)] = [
+        uid if uid else "",
         first_name,
         last_name,
         cruzid,
-        uid if uid else "",
     ]
 
     return True
@@ -518,8 +530,6 @@ def get_uid(cruzid):
     Returns the student's card UID if it exists, or False if it does not.
     """
 
-    # print("uid")
-    # print(cruzid in student_data["CruzID"].values)
     if limited_data or (
         cruzid not in student_data["CruzID"].values
         and cruzid not in staff_data["CruzID"].values
@@ -534,12 +544,9 @@ def get_uid(cruzid):
 
     if not uid:
         row = staff_data.index[staff_data["CruzID"] == cruzid].tolist()
-        # print(row)
         if row:
             row = row[0]
             uid = staff_data.loc[row, "Card UID"]
-
-    print("uid", "'" + uid + "'", uid if uid else False)
 
     return uid if uid else False
 
@@ -553,7 +560,6 @@ def get_cruzid(uid):
     Returns the student's CruzID if it exists, or False if it does not.
     """
 
-    print("cruzid")
     if limited_data or (
         uid not in student_data["Card UID"].values
         and uid not in staff_data["Card UID"].values
@@ -562,19 +568,16 @@ def get_cruzid(uid):
 
     row = student_data.index[student_data["Card UID"] == uid].tolist()
     cruzid = None
-    print("row1", row)
     if row:
         row = row[0]
         cruzid = student_data.loc[row, "CruzID"]
 
     if not cruzid:
         row = staff_data.index[staff_data["Card UID"] == uid].tolist()
-        print("row2", row)
         if row:
             row = row[0]
             cruzid = staff_data.loc[row, "CruzID"]
 
-    print("cruzid", cruzid)
     return cruzid if cruzid else False
 
 
@@ -797,27 +800,38 @@ def get_all_accesses(cruzid=None, uid=None):
 
 
 def write_student_sheet():
+    global student_sheet_read_len, SEND_BLOCK
     """
     Write the student data to the Google Sheets document.
 
     Returns True if the data was written, or False if it was not.
     """
 
+
     try:
         student_data.sort_values(by=["Last Name"], inplace=True)
         vals = student_data.values.tolist()
         vals.insert(0, student_data.columns.tolist())
+        length = len(vals)
 
-        _ = (
-            g_sheets.values()
-            .update(
-                spreadsheetId=SPREADSHEET_ID,
-                range=STUDENTS_SHEET,
-                valueInputOption="USER_ENTERED",
-                body={"values": vals},
+        if student_sheet_read_len > length:
+            vals = vals + [[""] * len(student_data.columns)] * (
+                student_sheet_read_len - length
             )
-            .execute()
-        )
+
+        for i in range(0, student_sheet_read_len, SEND_BLOCK):
+            _ = (
+                g_sheets.values()
+                .update(
+                    spreadsheetId=SPREADSHEET_ID,
+                    range=STUDENTS_SHEET
+                    + f"!A{i+1}:{str(chr(ord('A') + len(student_data.columns) - 1))}{min(i + SEND_BLOCK, student_sheet_read_len)}",
+                    valueInputOption="USER_ENTERED",
+                    body={"values": vals[i : min(i + SEND_BLOCK, student_sheet_read_len)]},
+                )
+                .execute()
+            )
+        student_sheet_read_len = length
         return True
     except HttpError as e:
         print(e)
@@ -825,6 +839,7 @@ def write_student_sheet():
 
 
 def write_staff_sheet():
+    global staff_sheet_read_len, SEND_BLOCK
     """
     Write the staff data to the Google Sheets document.
     """
@@ -833,19 +848,34 @@ def write_staff_sheet():
         staff_data.sort_values(by=["Last Name"], inplace=True)
         vals = staff_data.values.tolist()
         vals.insert(0, staff_data.columns.tolist())
+        length = len(vals)
 
-        _ = (
-            g_sheets.values()
-            .update(
-                spreadsheetId=SPREADSHEET_ID,
-                range=STAFF_SHEET,
-                valueInputOption="USER_ENTERED",
-                body={"values": vals},
+        print(vals, staff_sheet_read_len, length)
+        if staff_sheet_read_len > length:
+            vals = vals + [[""] * len(staff_data.columns)] * (
+                staff_sheet_read_len - length
             )
-            .execute()
-        )
+
+        print(vals, staff_sheet_read_len, length)
+
+        for i in range(0, staff_sheet_read_len, SEND_BLOCK):
+            _ = (
+                g_sheets.values()
+                .update(
+                    spreadsheetId=SPREADSHEET_ID,
+                    range=STAFF_SHEET
+                    + f"!A{i+1}:{str(chr(ord('A') + len(staff_data.columns) - 1))}{min(i + SEND_BLOCK, max(staff_sheet_read_len, length))}",
+                    valueInputOption="USER_ENTERED",
+                    body={"values": vals[i : min(i + SEND_BLOCK, max(staff_sheet_read_len, length))]},
+                )
+                .execute()
+            )
+
+        staff_sheet_read_len = length
+        return True
     except HttpError as e:
         print(e)
+        return False
 
 
 def write_student_staff_sheets():
@@ -873,7 +903,7 @@ def evaluate_modules(completed_modules, cruzid=None, uid=None):
             exp = exp.replace(str(m), str(m in completed_modules))
         if (
             set_access(
-                module_data.loc[i, "Room"],
+                module_data.loc[i, "Access Levels"],
                 eval(exp) if len(exp) > 0 else False,
                 cruzid=cruzid,
                 uid=uid,
@@ -894,33 +924,6 @@ def is_staff(cruzid=None, uid=None):
     cruzid: str: the student's CruzID.
     uid: str: the student's card UID.
     """
-
-    # if (
-    #     (not cruzid and not uid)
-    #     or (
-    #         not limited_data
-    #         and cruzid
-    #         and staff_data.index[staff_data["CruzID"] == cruzid].empty
-    #     )
-    #     or (uid and staff_data.index[staff_data["Card UID"] == uid].empty)
-    #     or (
-    #         not limited_data
-    #         and cruzid
-    #         and uid
-    #         and (
-    #             staff_data.index[staff_data["CruzID"] == cruzid].tolist()
-    #             != staff_data.index[staff_data["Card UID"] == uid].tolist()
-    #         )
-    #     )
-    # ):
-    #     return False
-
-    # if not limited_data and cruzid:
-    #     return not staff_data.index[staff_data["CruzID"] == cruzid].empty
-    # elif uid:
-    #     return not staff_data.index[staff_data["Card UID"] == uid].empty
-    # else:
-    #     return False
 
     return bool(
         (not limited_data and cruzid and cruzid in staff_data["CruzID"].values)
@@ -980,6 +983,83 @@ def get_user_data(cruzid=None, uid=None):
         ].values.tolist()[0]
     else:
         return (None, None)
+
+
+def remove_student(cruzid):
+    """
+    Remove a student from the database.
+
+    cruzid: str: the student's CruzID.
+
+    Returns True if the student was removed, or False if they do not exist.
+    """
+
+    if not student_exists(cruzid=cruzid):
+        return False
+
+    row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
+    student_data.drop(row, inplace=True)  # TODO: move to archive sheet instead
+    student_data.reset_index(drop=True, inplace=True)
+
+    return True
+
+
+def remove_staff(cruzid):
+    """
+    Remove a staff member from the database.
+
+    cruzid: str: the staff member's CruzID.
+
+    Returns True if the staff member was removed, or False if they do not exist.
+    """
+
+    if not is_staff(cruzid=cruzid):
+        return False
+
+    row = staff_data.index[staff_data["CruzID"] == cruzid].tolist()[0]
+    staff_data.drop(row, inplace=True)  # TODO: move to archive sheet instead
+    staff_data.reset_index(drop=True, inplace=True)
+
+    return True
+
+
+def clamp_staff(staff_list):
+    """
+    Clamp the staff list to the staff sheet.
+
+    staff_list: list: the list of staff members to clamp.
+
+    Returns the clamped staff list.
+    """
+
+    # return [
+    #     staff_list[i]
+    #     for i in range(len(staff_list))
+    #     if staff_list[i] in staff_data["CruzID"].values
+    # ]
+
+    for i in range(staff_data.shape[0]):
+        if staff_data.loc[i, "CruzID"] not in staff_list:
+            staff_data.drop(i, inplace=True)  # TODO: move to archive sheet instead
+
+
+def clamp_students(student_list):
+    """
+    Clamp the student list to the student sheet.
+
+    student_list: list: the list of students to clamp.
+
+    Returns the clamped student list.
+    """
+
+    # with pd.option_context("display.max_rows", None, "display.max_columns", None):
+    #     print(student_data, student_data.shape)
+    for i in range(student_data.shape[0]):
+        # print(i)
+        # print(student_data.loc[i, "CruzID"])
+        # print(student_data.loc[i])
+        if student_data.loc[i, "CruzID"] not in student_list:
+            student_data.drop(i, inplace=True)  # TODO: move to archive sheet instead
 
 
 def log(uid, access, alarm_status, disarm_time):
@@ -1255,7 +1335,17 @@ if __name__ == "__main__":
     # if not new_student("Cédric", "Chartier", "cchartie"):
     #     print("CruzID, Canvas ID, or Card UID already in use.")
 
-    # print(set_uid("cchartie", "0123456789", overwrite=True))
+    # print(set_uid("cchartie", "01234567", overwrite=True))
+
+    # print(staff_data)
+    # remove_staff("imadan0")
+    # new_staff("Ethan", "Wachtel", "asdf", "63B104FF")
+    # new_staff("Cédric", "Chartier", "fdsa", "01234567")
+    # new_staff("Cédric", "Chartier", "nobody")
+    # remove_staff("asdf")
+    # remove_staff("fdsa")
+    # remove_staff("nobody")
+    # print(staff_data)
 
     # print(set_access("BE-49", False, cruzid="tstudent"))
     # print(get_access("BE-49", uid="0123456789"))
@@ -1265,14 +1355,15 @@ if __name__ == "__main__":
     # print(evaluate_modules([1, 2, 5, 6, 7, 8, 9, 10], cruzid="tstudent"))
 
     # write_student_sheet()
+    # write_staff_sheet()
 
     # log("63B104FF", "Staff", True, 10)
 
-    print(get_user_data(uid="63B104FF"))
-    print(get_user_data(uid="73B104FF"))
-    print(get_user_data(uid="83B104FF"))
-    print(get_user_data(cruzid="ewachtel"))
-    print(get_user_data(cruzid="cchartie"))
+    # print(get_user_data(uid="63B104FF"))
+    # print(get_user_data(uid="73B104FF"))
+    # print(get_user_data(uid="83B104FF"))
+    # print(get_user_data(cruzid="ewachtel"))
+    # print(get_user_data(cruzid="cchartie"))
 
     # print()
     # print(student_data)
