@@ -244,7 +244,7 @@ def server():
     try:
         if request.method == "POST":
             flash("You are using POST")
-            print(device_info)
+            
 
             if request.form["label"] == "update-device":
 
@@ -276,6 +276,10 @@ def server():
                         "alarm_delay": req_delay,
                     },
                 )
+                return redirect("/")
+            elif request.form["label"] == "update-canvas":
+                print("im updating canvas")
+                canvas.update()
                 return redirect("/")
 
     except Exception as e:
