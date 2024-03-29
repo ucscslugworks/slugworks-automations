@@ -297,8 +297,7 @@ def student_exists(cruzid=None, canvas_id=None, uid=None):
 
     Returns True if the student exists, or False if they do not.
     """
-    print("student")
-    return (
+    return bool(
         (not limited_data and cruzid and cruzid in student_data["CruzID"].values)
         or (
             not limited_data
@@ -782,6 +781,7 @@ def write_staff_sheet():
     except HttpError as e:
         print(e)
 
+
 def write_student_staff_sheets():
     """
     Write the student and staff data to the Google Sheets document.
@@ -790,6 +790,7 @@ def write_student_staff_sheets():
     """
 
     return write_student_sheet() and write_staff_sheet()
+
 
 def evaluate_modules(completed_modules, cruzid=None, uid=None):
     """
@@ -828,66 +829,91 @@ def is_staff(cruzid=None, uid=None):
     uid: str: the student's card UID.
     """
 
-    # print(cruzid)
-    # print(uid)
-    # print(staff_data)
-    # print(staff_data.index[staff_data["CruzID"] == cruzid])
-    # print(staff_data.index[staff_data["Card UID"] == uid])
-    # print(staff_data.index[staff_data["CruzID"] == cruzid].empty)
-    # print(staff_data.index[staff_data["Card UID"] == uid].empty)
-    # print(staff_data.index[staff_data["CruzID"] == cruzid].tolist())
-    # print(staff_data.index[staff_data["Card UID"] == uid].tolist())
-    # print(
-    #     staff_data.index[staff_data["CruzID"] == cruzid].tolist()
-    #     != staff_data.index[staff_data["Card UID"] == uid].tolist()
-    # )
-
-    # print(not cruzid and not uid)
-    # print(
-    #     not limited_data
-    #     and cruzid
-    #     and staff_data.index[staff_data["CruzID"] == cruzid].empty
-    # )
-    # print(uid and staff_data.index[staff_data["Card UID"] == uid].empty)
-    # print(
-    #     not limited_data
-    #     and cruzid
-    #     and uid
-    #     and (
-    #         staff_data.index[staff_data["CruzID"] == cruzid].tolist()
-    #         != staff_data.index[staff_data["Card UID"] == uid].tolist()
+    # if (
+    #     (not cruzid and not uid)
+    #     or (
+    #         not limited_data
+    #         and cruzid
+    #         and staff_data.index[staff_data["CruzID"] == cruzid].empty
     #     )
-    # )
+    #     or (uid and staff_data.index[staff_data["Card UID"] == uid].empty)
+    #     or (
+    #         not limited_data
+    #         and cruzid
+    #         and uid
+    #         and (
+    #             staff_data.index[staff_data["CruzID"] == cruzid].tolist()
+    #             != staff_data.index[staff_data["Card UID"] == uid].tolist()
+    #         )
+    #     )
+    # ):
+    #     return False
 
-    if (
-        (not cruzid and not uid)
-        or (
-            not limited_data
-            and cruzid
-            and staff_data.index[staff_data["CruzID"] == cruzid].empty
+    # if not limited_data and cruzid:
+    #     return not staff_data.index[staff_data["CruzID"] == cruzid].empty
+    # elif uid:
+    #     return not staff_data.index[staff_data["Card UID"] == uid].empty
+    # else:
+    #     return False
+
+    return bool(
+        (not limited_data and cruzid and cruzid in staff_data["CruzID"].values)
+        or (uid and uid in staff_data["Card UID"].values)
+    )
+
+
+def get_user_data(cruzid=None, uid=None):
+    """
+    Get a user's data.
+
+    cruzid: str: the user's CruzID.
+    uid: str: the user's card UID.
+
+    Returns an array with the user's data if they exist, or None if they do not. The array is as follows:
+    [is_staff, cruzid, uid, first_name, last_name, access1, access2, ..., accessN]
+    Where access1, access2, ..., accessN are the user's room accesses, corresponding to the rooms list.
+    """
+    if student_exists(cruzid=cruzid, uid=uid):
+        if cruzid:
+            uid = student_data.loc[student_data["CruzID"] == cruzid, "Card UID"].values[
+                0
+            ]
+        elif uid:
+            cruzid = student_data.loc[student_data["Card UID"] == uid, "CruzID"].values[
+                0
+            ]
+        return (
+            [False, cruzid, uid]
+            + student_data.loc[
+                (
+                    student_data["CruzID"] == cruzid
+                    if cruzid
+                    else student_data["Card UID"] == uid
+                ),
+                "First Name":"Last Name",
+            ].values.tolist()[0]
+            + get_all_accesses(cruzid=cruzid, uid=uid)
         )
-        or (uid and staff_data.index[staff_data["Card UID"] == uid].empty)
-        or (
-            not limited_data
-            and cruzid
-            and uid
-            and (
-                staff_data.index[staff_data["CruzID"] == cruzid].tolist()
-                != staff_data.index[staff_data["Card UID"] == uid].tolist()
-            )
-        )
-    ):
-        # print("fail")
-        return False
+    elif is_staff(cruzid=cruzid, uid=uid):
+        if cruzid:
+            uid = staff_data.loc[
+                staff_data["CruzID"] == cruzid, "Card UID"
+            ].values.tolist()[0]
+        elif uid:
+            cruzid = staff_data.loc[
+                staff_data["Card UID"] == uid, "CruzID"
+            ].values.tolist()[0]
 
-    # print("help")
-
-    if not limited_data and cruzid:
-        return not staff_data.index[staff_data["CruzID"] == cruzid].empty
-    elif uid:
-        return not staff_data.index[staff_data["Card UID"] == uid].empty
+        return [True, cruzid, uid] + staff_data.loc[
+            (
+                staff_data["CruzID"] == cruzid
+                if cruzid
+                else staff_data["Card UID"] == uid
+            ),
+            "First Name":"Last Name",
+        ].values.tolist()[0]
     else:
-        return False
+        return (None, None)
 
 
 def log(uid, access, alarm_status, disarm_time):
@@ -1131,10 +1157,10 @@ if __name__ == "__main__":
     # print()
     # # print(module_data)
     # # print()
-    print(reader_data)
+    # print(reader_data)
     # print()
     # print(this_reader)
-    print()
+    # print()
 
     # print(alarm_enabled, alarm_delay)
     # print(alarm_setting())
@@ -1175,6 +1201,12 @@ if __name__ == "__main__":
     # write_student_sheet()
 
     # log("63B104FF", "Staff", True, 10)
+
+    print(get_user_data(uid="63B104FF"))
+    print(get_user_data(uid="73B104FF"))
+    print(get_user_data(uid="83B104FF"))
+    print(get_user_data(cruzid="ewachtel"))
+    print(get_user_data(cruzid="cchartie"))
 
     # print()
     # print(student_data)
