@@ -279,7 +279,7 @@ def server():
                 return redirect("/")
             elif request.form["label"] == "update-canvas":
                 print("im updating canvas")
-                canvas.update()
+                # canvas.update()
                 return redirect("/")
 
     except Exception as e:
