@@ -42,18 +42,33 @@
   {% endfor %}
   <div>
     <h2><strong>Canvas Last Updated: </strong></h2>
-    <h2 style="color: red; animation: blink 1s infinite;">{{ canvas_update }}</h2>
+    <h2 style="animation: rainbow 5s infinite;">{{ canvas_update }}</h2>
 
     <style>
-      @keyframes blink {
+      @keyframes rainbow {
         0% {
-          opacity: 1;
+          color: red;
         }
-        50% {
-          opacity: 0;
+        14% {
+          color: orange;
+        }
+        28% {
+          color: rgb(177, 177, 9);
+        }
+        42% {
+          color: green;
+        }
+        57% {
+          color: blue;
+        }
+        71% {
+          color: indigo;
+        }
+        85% {
+          color: violet;
         }
         100% {
-          opacity: 1;
+          color: red;
         }
       }
     </style>
