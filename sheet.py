@@ -32,6 +32,7 @@ ACCESSES_SHEET = (
 )
 READERS_SHEET = "Readers"  # contains statuses of the readers
 LOG_SHEET = "Log"  # contains a log of all card reads
+CANVAS_STATUS_SHEET = "Canvas Status"  # contains the last update time of the Canvas data & the current status of the update
 
 student_data = None
 staff_data = None
@@ -60,6 +61,9 @@ rooms = list()
 
 last_update_date = None
 last_checkin_time = None
+
+last_canvas_update_time = None
+canvas_is_updating = None
 
 creds = None
 # The file token.json stores the user's access and refresh tokens, and is
@@ -236,6 +240,8 @@ def get_reader_data():
         )
         this_reader["needs_update"] = this_reader["needs_update"] == "PENDING"
 
+        get_canvas_status_sheet()
+
         return True
     except HttpError as e:
         print(e)
@@ -285,6 +291,66 @@ def check_in(alarm_status=False):
         print(e)
         return False
     return True
+
+
+def get_canvas_status_sheet():
+    global last_canvas_update_time, canvas_is_updating
+    """
+    Get the time of the last Canvas update.
+
+    Returns the time of the last Canvas update.
+    """
+
+    try:
+        values = (
+            g_sheets.values()
+            .get(
+                spreadsheetId=SPREADSHEET_ID,
+                range=CANVAS_STATUS_SHEET + "!A2:B2",
+            )
+            .execute()
+        ).get("values", [])
+
+        canvas_is_updating = True if values[0][0] == "UPDATING" else False
+        last_canvas_update_time = datetime.datetime.strptime(
+            values[0][1], "%Y-%m-%d %H:%M:%S"
+        )
+    except HttpError as e:
+        print(e)
+        return None
+
+
+def set_canvas_status_sheet(updating_now):
+    """
+    Set the time of the last Canvas update.
+
+    updating_now: bool: True if Canvas is currently updating, False if it is not.
+
+    Returns True if the data was set, or False if it was not.
+    """
+
+    try:
+        _ = (
+            g_sheets.values()
+            .update(
+                spreadsheetId=SPREADSHEET_ID,
+                range=CANVAS_STATUS_SHEET + "!A2:B2",
+                valueInputOption="USER_ENTERED",
+                body={
+                    "values": [
+                        [
+                            "UPDATING" if updating_now else "DONE",
+                            str(datetime.datetime.now()) if updating_now else str(last_canvas_update_time),
+                        ]
+                    ]
+                },
+            )
+            .execute()
+        )
+        return True
+    except HttpError as e:
+        print(e)
+        return False
 
 
 def student_exists(cruzid=None, canvas_id=None, uid=None):
