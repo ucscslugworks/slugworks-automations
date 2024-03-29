@@ -807,7 +807,6 @@ def write_student_sheet():
     Returns True if the data was written, or False if it was not.
     """
 
-
     try:
         student_data.sort_values(by=["Last Name"], inplace=True)
         vals = student_data.values.tolist()
@@ -827,7 +826,9 @@ def write_student_sheet():
                     range=STUDENTS_SHEET
                     + f"!A{i+1}:{str(chr(ord('A') + len(student_data.columns) - 1))}{min(i + SEND_BLOCK, student_sheet_read_len)}",
                     valueInputOption="USER_ENTERED",
-                    body={"values": vals[i : min(i + SEND_BLOCK, student_sheet_read_len)]},
+                    body={
+                        "values": vals[i : min(i + SEND_BLOCK, student_sheet_read_len)]
+                    },
                 )
                 .execute()
             )
@@ -850,13 +851,10 @@ def write_staff_sheet():
         vals.insert(0, staff_data.columns.tolist())
         length = len(vals)
 
-        print(vals, staff_sheet_read_len, length)
         if staff_sheet_read_len > length:
             vals = vals + [[""] * len(staff_data.columns)] * (
                 staff_sheet_read_len - length
             )
-
-        print(vals, staff_sheet_read_len, length)
 
         for i in range(0, staff_sheet_read_len, SEND_BLOCK):
             _ = (
@@ -866,7 +864,11 @@ def write_staff_sheet():
                     range=STAFF_SHEET
                     + f"!A{i+1}:{str(chr(ord('A') + len(staff_data.columns) - 1))}{min(i + SEND_BLOCK, max(staff_sheet_read_len, length))}",
                     valueInputOption="USER_ENTERED",
-                    body={"values": vals[i : min(i + SEND_BLOCK, max(staff_sheet_read_len, length))]},
+                    body={
+                        "values": vals[
+                            i : min(i + SEND_BLOCK, max(staff_sheet_read_len, length))
+                        ]
+                    },
                 )
                 .execute()
             )
