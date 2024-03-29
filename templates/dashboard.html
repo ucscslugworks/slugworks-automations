@@ -41,6 +41,22 @@
   <div class="alert">{{ message }}</div>
   {% endfor %}
   <div>
+    <h2><strong>Canvas Last Updated: </strong></h2>
+    <h2 style="color: red; animation: blink 1s infinite;">{{ canvas_update }}</h2>
+
+    <style>
+      @keyframes blink {
+        0% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+    </style>
     <h2>Update Buttons</h2>
     <form method="post">
       <input type="hidden" name="label" value="update-all-devices">
@@ -132,9 +148,9 @@
       <button>Setup Card</button>
     </a>
     <br>
-    <!-- <a href="staff">
-      <button>Setup Staff Card</button>
-    </a> -->
+    <a href="identify">
+      <button>Indentify Card</button>
+    </a>
     <br>
     <a href="log">
       <button>Log Files</button>

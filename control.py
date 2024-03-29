@@ -184,6 +184,7 @@ def find_owner(uid):
 def server():
     err = ""
     wait = False
+    canvas_update = sheet.last_canvas_update_time 
     devices = sheet.reader_data.loc[
         :,
         [
@@ -244,12 +245,14 @@ def server():
         if request.method == "POST":
             flash("You are using POST")
             print(device_info)
+
             if request.form["label"] == "update-device":
 
                 req_id = int(request.form.get("id"))
                 req_location = request.form.get("location")
                 req_alarm = request.form.get("alarm_power")
                 req_delay = request.form.get("delay")
+                canvas_update = sheet.last_canvas_update_time
 
                 if req_alarm:
                     device_info[req_id]["alarm_power"] = req_alarm
@@ -262,6 +265,7 @@ def server():
                     ]
                 device_info[req_id]["location"] = req_location
                 device_info[req_id]["alarm_delay_min"] = req_delay
+
 
                 sheet.run_in_thread(
                     f=sheet.update_reader,
@@ -278,7 +282,7 @@ def server():
         print(e)
 
     return render_template(
-        "dashboard.html", devices=device_info, wait=wait,
+        "dashboard.html", devices=device_info, canvas_update=canvas_update,
     )  # Pass devices to the template
 
 
@@ -291,9 +295,13 @@ def card():
         if request.method == "POST":
             flash("You are using POST")
             print(request.form)
-            if request.form["label"] == "uidsetup":
+            sheet.get_canvas_status_sheet()
+            print("status")
+            print(sheet.canvas_is_updating)
+            if request.form["label"] == "uidsetup" and sheet.canvas_is_updating == False:
                 print("reading UID")
                 cruzid = request.form.get("cruzid")
+                #sheet.last_canvas_update_time
              
                 overwritecheck = (
                     True if request.form.get("overwrite") == "overwrite" else False
@@ -307,6 +315,8 @@ def card():
                 else:
                     err, added = staff_or_student(cruzid, overwritecheck, uid)
                     # err = "temp"
+            else:
+                err = "Canvas is updating, please wait"
 
     except Exception as e:
         print(e)
@@ -350,8 +360,8 @@ def identify():
         "identify.html",
         # cruzid=cruzid,
         # uid=uid,
-        # err=err,
-        # user_data=user_data,
+        err=err,
+        user_data=user_data,
 
     )
 
