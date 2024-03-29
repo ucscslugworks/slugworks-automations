@@ -16,7 +16,7 @@ def update():
     course_id = keys["canvas_course_id"]
 
     url = f"https://canvas.ucsc.edu/api/v1/courses/{course_id}/"
-    endpoint = "students"
+    endpoint = "students" # TODO: replace with https://canvas.instructure.com/doc/api/all_resources.html#method.courses.users this endpoint, and get both students and staff to populate both sheets & check for duplicates
     headers = {"Authorization": f"Bearer {token}"}
 
     response = requests.request("GET", url + endpoint, headers=headers)
@@ -25,6 +25,7 @@ def update():
     students = {}
     for s in students_json:
         # TODO: check if student is a staff member, and if so, skip them
+        
         if (
             "login_id" not in s
             or "ucsc.edu" not in s["login_id"]
