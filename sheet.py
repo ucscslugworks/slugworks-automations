@@ -62,7 +62,7 @@ rooms = list()
 last_update_date = None
 last_checkin_time = None
 
-last_canvas_update = None
+last_canvas_update_time = None
 canvas_is_updating = None
 
 creds = None
@@ -294,7 +294,7 @@ def check_in(alarm_status=False):
 
 
 def get_canvas_status_sheet():
-    global last_canvas_update, canvas_is_updating
+    global last_canvas_update_time, canvas_is_updating
     """
     Get the time of the last Canvas update.
 
@@ -312,7 +312,7 @@ def get_canvas_status_sheet():
         ).get("values", [])
 
         canvas_is_updating = True if values[0][0] == "UPDATING" else False
-        last_canvas_update = datetime.datetime.strptime(
+        last_canvas_update_time = datetime.datetime.strptime(
             values[0][1], "%Y-%m-%d %H:%M:%S"
         )
     except HttpError as e:
@@ -340,7 +340,7 @@ def set_canvas_status_sheet(updating_now):
                     "values": [
                         [
                             "UPDATING" if updating_now else "DONE",
-                            str(datetime.datetime.now()) if updating_now else str(last_canvas_update),
+                            str(datetime.datetime.now()) if updating_now else str(last_canvas_update_time),
                         ]
                     ]
                 },
