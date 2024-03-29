@@ -88,9 +88,11 @@ if __name__ == "__main__":
             not sheet.last_update_date or datetime.now().date() > sheet.last_update_date
         ) and datetime.now().hour >= CANVAS_UPDATE_HOUR:
             print("Canvas update...")
+            sheet.set_canvas_status_sheet(True)
             # update()
             sheet.get_sheet_data()
             sheet.check_in()
+            sheet.set_canvas_status_sheet(False)
         elif (
             not sheet.last_checkin_time
             or datetime.now() - sheet.last_checkin_time
