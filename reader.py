@@ -2,10 +2,10 @@ from datetime import datetime, timedelta
 from multiprocessing import Process, Queue
 from time import sleep
 
-import fake_nfc as nfc
+# import fake_nfc as nfc
 from threading import Thread
 
-# import reader_nfc as nfc
+import reader_nfc as nfc
 import sheet
 import board
 import neopixel
