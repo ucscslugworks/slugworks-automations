@@ -1166,7 +1166,7 @@ def scan_uid(uid, alarm_status=False):
 
     else:
         log(uid, "Unknown", alarm_status, 0)
-        return None
+        return access_data["no_access"]
 
 
 def run_in_thread(

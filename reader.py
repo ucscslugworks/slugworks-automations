@@ -25,10 +25,10 @@ pixels = neopixel.NeoPixel(
 breathe = True
 scan_time = None
 SCAN_COLOR_HOLD = 2  # seconds
+BREATHE_DELAY = 0.02  # seconds
 
 
 def breathe_leds():
-    global breathe, scan_time, pixels
     while True:
         if breathe:
             for i in range(0, 255, 5):
@@ -36,13 +36,13 @@ def breathe_leds():
                     break
                 pixels.fill((i, i, i))
                 pixels.show()
-                sleep(0.01)
+                sleep(BREATHE_DELAY)
             for i in range(255, 0, -5):
                 if not breathe:
                     break
                 pixels.fill((i, i, i))
                 pixels.show()
-                sleep(0.01)
+                sleep(BREATHE_DELAY)
         elif scan_time and datetime.now() - scan_time > timedelta(0, SCAN_COLOR_HOLD, 0, 0, 0, 0, 0):
             breathe = True
             scan_time = None
@@ -88,7 +88,7 @@ if __name__ == "__main__":
                     print(colors)
                     breathe = False
                     scan_time = datetime.now()
-                    sleep(0.01)
+                    sleep(BREATHE_DELAY)
                     pixels.brightness = 0.5
                     pixels.fill(colors)
                     pixels.show()
