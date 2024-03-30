@@ -46,6 +46,7 @@ def breathe_leds():
         elif scan_time and datetime.now() - scan_time > timedelta(0, SCAN_COLOR_HOLD, 0, 0, 0, 0, 0):
             breathe = True
             scan_time = None
+            pixels.brightness = 0.2
 
 
 if __name__ == "__main__":
@@ -88,6 +89,7 @@ if __name__ == "__main__":
                     breathe = False
                     scan_time = datetime.now()
                     sleep(0.01)
+                    pixels.brightness = 0.5
                     pixels.fill(colors)
                     pixels.show()
             else:
