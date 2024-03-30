@@ -27,7 +27,7 @@ scan_time = None
 
 
 def breathe_leds():
-    global breathe
+    global breathe, pixels
     while True:
         if breathe:
             for i in range(0, 255, 5):
@@ -80,7 +80,9 @@ if __name__ == "__main__":
                     print(colors)
                     breathe = False
                     scan_time = datetime.now()
+                    sleep(0.01)
                     pixels.fill(colors)
+                    pixels.show()
             else:
                 print("error - scanned too soon or not scanned")
                 if scan_time and datetime.now() - scan_time > timedelta(0, 5, 0, 0, 0, 0, 0):
