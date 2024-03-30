@@ -27,7 +27,7 @@ scan_time = None
 
 
 def breathe_leds():
-    global breathe, pixels
+    global breathe, scan_time, pixels
     while True:
         if breathe:
             for i in range(0, 255, 5):
@@ -42,6 +42,9 @@ def breathe_leds():
                 pixels.fill((i, i, i))
                 pixels.show()
                 sleep(0.01)
+        elif scan_time and datetime.now() - scan_time > timedelta(0, 1, 0, 0, 0, 0, 0):
+            breathe = True
+            scan_time = None
 
 
 if __name__ == "__main__":
@@ -77,7 +80,9 @@ if __name__ == "__main__":
                 else:
                     color, timeout = response
                     print(color, timeout)
-                    colors = tuple([int(color[i:i+2], 16) for i in range(0, len(color), 2)])
+                    colors = tuple(
+                        [int(color[i : i + 2], 16) for i in range(0, len(color), 2)]
+                    )
                     print(colors)
                     breathe = False
                     scan_time = datetime.now()
@@ -86,9 +91,7 @@ if __name__ == "__main__":
                     pixels.show()
             else:
                 print("error - scanned too soon or not scanned")
-                if scan_time and datetime.now() - scan_time > timedelta(0, 1, 0, 0, 0, 0, 0):
-                    breathe = True
-                    scan_time = None
+
     except KeyboardInterrupt:
         nfc.close()
         raise
