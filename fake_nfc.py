@@ -5,7 +5,7 @@ from multiprocessing import Process, Queue
 
 
 def read_card():
-    delay = random.randint(0, 20)
+    delay = random.randint(0, 10)
     print('delay', delay)
     time.sleep(delay)
     if (random.random() > 2/3):
