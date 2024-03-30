@@ -95,4 +95,5 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         nfc.close()
+        pixels.fill((0, 0, 0))
         raise
