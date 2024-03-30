@@ -107,4 +107,4 @@ if __name__ == "__main__":
             sleep(BREATHE_DELAY)
         pixels.fill((0, 0, 0))
         pixels.show()
-        raise
+        pass
