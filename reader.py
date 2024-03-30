@@ -29,6 +29,7 @@ BREATHE_DELAY = 0.02  # seconds
 
 
 def breathe_leds():
+    global breathe, scan_time
     while True:
         if breathe:
             for i in range(0, 255, 5):
