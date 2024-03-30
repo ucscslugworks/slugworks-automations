@@ -51,10 +51,7 @@ def breathe_leds():
                 scan_time = None
                 pixels.brightness = 0.2
     except KeyboardInterrupt:
-        if breathe:
-            pixels.fill((0, 0, 0))
-            pixels.show()
-        raise
+        pass
 
 
 if __name__ == "__main__":
@@ -105,7 +102,9 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         nfc.close()
-        if not breathe:
-            pixels.fill((0, 0, 0))
-            pixels.show()
+        if breathe:
+            breathe = False
+            sleep(BREATHE_DELAY)
+        pixels.fill((0, 0, 0))
+        pixels.show()
         raise
