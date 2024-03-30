@@ -29,26 +29,32 @@ BREATHE_DELAY = 0.02  # seconds
 
 def breathe_leds():
     global breathe, scan_time
-    while True:
+    try:
+        while True:
+            if breathe:
+                for i in range(0, 255, 5):
+                    if not breathe:
+                        break
+                    pixels.fill((i, i, i))
+                    pixels.show()
+                    sleep(BREATHE_DELAY)
+                for i in range(255, 0, -5):
+                    if not breathe:
+                        break
+                    pixels.fill((i, i, i))
+                    pixels.show()
+                    sleep(BREATHE_DELAY)
+            elif scan_time and datetime.now() - scan_time > timedelta(
+                0, SCAN_COLOR_HOLD, 0, 0, 0, 0, 0
+            ):
+                breathe = True
+                scan_time = None
+                pixels.brightness = 0.2
+    except KeyboardInterrupt:
         if breathe:
-            for i in range(0, 255, 5):
-                if not breathe:
-                    break
-                pixels.fill((i, i, i))
-                pixels.show()
-                sleep(BREATHE_DELAY)
-            for i in range(255, 0, -5):
-                if not breathe:
-                    break
-                pixels.fill((i, i, i))
-                pixels.show()
-                sleep(BREATHE_DELAY)
-        elif scan_time and datetime.now() - scan_time > timedelta(
-            0, SCAN_COLOR_HOLD, 0, 0, 0, 0, 0
-        ):
-            breathe = True
-            scan_time = None
-            pixels.brightness = 0.2
+            pixels.fill((0, 0, 0))
+            pixels.show()
+        raise
 
 
 if __name__ == "__main__":
@@ -99,5 +105,7 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         nfc.close()
-        pixels.fill((0, 0, 0))
+        if not breathe:
+            pixels.fill((0, 0, 0))
+            pixels.show()
         raise
