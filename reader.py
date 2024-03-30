@@ -1,14 +1,13 @@
 from datetime import datetime, timedelta
 from multiprocessing import Process, Queue
+from threading import Thread
 from time import sleep
 
-# import fake_nfc as nfc
-from threading import Thread
+import board
+import neopixel
 
 import reader_nfc as nfc
 import sheet
-import board
-import neopixel
 
 SHEET_UPDATE_HOUR = 4  # 4am
 CHECKIN_TIMEOUT = 30  # 30 seconds
@@ -44,7 +43,9 @@ def breathe_leds():
                 pixels.fill((i, i, i))
                 pixels.show()
                 sleep(BREATHE_DELAY)
-        elif scan_time and datetime.now() - scan_time > timedelta(0, SCAN_COLOR_HOLD, 0, 0, 0, 0, 0):
+        elif scan_time and datetime.now() - scan_time > timedelta(
+            0, SCAN_COLOR_HOLD, 0, 0, 0, 0, 0
+        ):
             breathe = True
             scan_time = None
             pixels.brightness = 0.2
