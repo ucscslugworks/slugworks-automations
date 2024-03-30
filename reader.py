@@ -86,7 +86,7 @@ if __name__ == "__main__":
                     pixels.show()
             else:
                 print("error - scanned too soon or not scanned")
-                if scan_time and datetime.now() - scan_time > timedelta(0, 5, 0, 0, 0, 0, 0):
+                if scan_time and datetime.now() - scan_time > timedelta(0, 1, 0, 0, 0, 0, 0):
                     breathe = True
                     scan_time = None
     except KeyboardInterrupt:
