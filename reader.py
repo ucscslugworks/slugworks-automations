@@ -72,11 +72,12 @@ if __name__ == "__main__":
                 response = sheet.scan_uid(card_id)
                 if not response:
                     print("error - card not in database or something else")
+                    # TODO: flash no access color
                     pass
                 else:
                     color, timeout = response
                     print(color, timeout)
-                    colors = (int(color[i:i+2], 16) for i in range(0, len(color), 2))
+                    colors = tuple([int(color[i:i+2], 16) for i in range(0, len(color), 2)])
                     print(colors)
                     breathe = False
                     scan_time = datetime.now()
