@@ -6,8 +6,9 @@
 sudo apt install --upgrade python3-pip python3-venv
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-[device].txt
 ```
+Where `[device]` is the device you are using (`control` or `reader`). Additionally, pip must be run as sudo for the `reader` devices so the NeoPixel library has the proper permissions to control the GPIO pins.
 
 ### NeoPixel Setup on Readers (Pi Zero)
 (run from the `slugworks-access-cards` directory)
@@ -15,7 +16,7 @@ pip install -r requirements.txt
 sudo apt install --upgrade python3-setuptools
 source venv/bin/activate
 cd ~
-pip3 install --upgrade adafruit-python-shell
+pip install --upgrade adafruit-python-shell
 wget https://raw.githubusercontent.com/adafruit/Raspberry-Pi-Installer-Scripts/master/raspi-blinka.py
 sudo -E env PATH=$PATH python3 raspi-blinka.py
 ```
@@ -25,7 +26,7 @@ sudo python3 blinkatest.py
 ```
 This should return a series of "ok!" messages. Next, run the following command to install and test the NeoPixel library:
 ```bash
-sudo pip3 install --upgrade adafruit-circuitpython-neopixel
+sudo pip install --upgrade adafruit-circuitpython-neopixel
 sudo python3 neopixeltest.py
 ```
 This should light up the NeoPixels connected to the reader with a rainbow pattern. If this works, the NeoPixel library is set up correctly. (You may need to adjust the num_pixels and pixel_pin variables in the `neopixeltest.py` file to match the number of NeoPixels and the GPIO pin they are connected to.)
