@@ -1153,7 +1153,6 @@ def scan_uid(uid, alarm_status=False):
 
     elif student_exists(uid=uid):
         for i in range(len(rooms)):
-            print(rooms[i])
             if get_access(rooms[i], uid=uid) and access_data[rooms[i]]:
                 log(uid, rooms[i], alarm_status, access_data[rooms[i]][1])
                 return access_data[rooms[i]]

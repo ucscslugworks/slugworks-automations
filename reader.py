@@ -23,6 +23,7 @@ pixels = neopixel.NeoPixel(
 )
 
 breathe = True
+scan_time = None
 
 
 def breathe_leds():
@@ -46,7 +47,7 @@ def breathe_leds():
 if __name__ == "__main__":
     sheet.get_sheet_data(limited=True)
     sheet.check_in(alarm_status=alarm_status)
-    # Thread(target=breathe_leds).start()
+    Thread(target=breathe_leds).start()
     try:
         while True:
             if (
@@ -75,10 +76,16 @@ if __name__ == "__main__":
                 else:
                     color, timeout = response
                     print(color, timeout)
-                    colors = [int(color[i:i+2], 16) for i in range(0, len(color), 2)]
+                    colors = (int(color[i:i+2], 16) for i in range(0, len(color), 2))
                     print(colors)
+                    breathe = False
+                    scan_time = datetime.now()
+                    pixels.fill(colors)
             else:
                 print("error - scanned too soon or not scanned")
+                if scan_time and datetime.now() - scan_time > timedelta(0, 5, 0, 0, 0, 0, 0):
+                    breathe = True
+                    scan_time = None
     except KeyboardInterrupt:
         nfc.close()
         raise
