@@ -1,21 +1,52 @@
 from datetime import datetime, timedelta
-import random
 from multiprocessing import Process, Queue
 from time import sleep
 
 import fake_nfc as nfc
+from threading import Thread
 
 # import reader_nfc as nfc
 import sheet
+import board
+import neopixel
 
 SHEET_UPDATE_HOUR = 4  # 4am
 CHECKIN_TIMEOUT = 30  # 30 seconds
 
 alarm_status = False
 
+num_pixels = 30  # 30 LEDs
+pixel_pin = board.D18  # GPIO pin 18
+ORDER = neopixel.GRB  # RGB color order
+pixels = neopixel.NeoPixel(
+    pixel_pin, num_pixels, brightness=0.2, auto_write=False, pixel_order=ORDER
+)
+
+breathe = True
+
+
+def breathe_leds():
+    global breathe
+    while True:
+        if breathe:
+            for i in range(0, 255, 5):
+                if not breathe:
+                    break
+                pixels.fill((i, i, i))
+                pixels.show()
+                sleep(0.01)
+            for i in range(255, 0, -5):
+                if not breathe:
+                    break
+                pixels.fill((i, i, i))
+                pixels.show()
+                sleep(0.01)
+
+
 if __name__ == "__main__":
     sheet.get_sheet_data(limited=True)
     sheet.check_in(alarm_status=alarm_status)
+    # Thread(target=breathe_leds).start()
     try:
         while True:
             if (
@@ -44,6 +75,8 @@ if __name__ == "__main__":
                 else:
                     color, timeout = response
                     print(color, timeout)
+                    colors = [int(color[i:i+2], 16) for i in range(0, len(color), 2)]
+                    print(colors)
             else:
                 print("error - scanned too soon or not scanned")
     except KeyboardInterrupt:
