@@ -16,7 +16,7 @@ def read_card():
     #     return random.choice(["63B104FF", "73B104FF", "83B104FF"])
     # else:
     #     return random.choice([None, False])
-    return "20646297"
+    return "A5F1BF2D"
 
 
 def read_card_queue(q):

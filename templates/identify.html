@@ -53,13 +53,16 @@
 
                 <table>
                     <tr>
+                        <th>cruzid</th>
+                        <td>
+                            <input type="text" name="cruzid" value="{{ user_data.cruzid or None }}">
+                        </td>
+                    </tr>
+                    <tr>
                         <th>is staff?</th>
                         <td>{{ user_data.is_staff }}</td>
                     </tr>
-                    <tr>
-                        <th>cruzid</th>
-                        <td>{{ user_data.cruzid }}</td>
-                    </tr>
+                   
                     <tr>
                         <th>uid</th>
                         <td>{{ user_data.uid }}</td>

@@ -491,7 +491,7 @@ def card():
     )
 
 @app.route("/identify", methods=("GET", "POST"))
-@login_required
+# @login_required
 def identify():
     cruzid = ""
     uid = ""
@@ -500,14 +500,28 @@ def identify():
 
     try:
         if request.method == "POST":
+            cruzid = ""
             flash("You are using POST")
             # print(request.form)
             if request.form["label"] == "identifyuid":
-                print("reading UID")
+                cruzid = request.form.get("cruzid")
+                print("my cruz id is", cruzid)
                 uid = nfc.read_card()
                 print(uid)
-                user_data = dict(zip(["is_staff", "cruzid", "uid", "first_name", "last_name", "access1", "access2", "access3", "access4", "access5", "access6", "access7", "access8"], sheet.get_user_data(uid=uid)))
-                print(user_data)
+                
+                
+                if cruzid != None and cruzid != "" and cruzid != "None" :
+                    print(cruzid)
+                    # print(uid)
+                    user_data = dict(zip(["is_staff", "cruzid", "uid", "first_name", "last_name", "access1", "access2", "access3", "access4", "access5", "access6", "access7", "access8"], sheet.get_user_data(cruzid=cruzid)))
+                    print(user_data)
+                else:
+                    print
+                    print("reading UID")
+                    
+                    print(uid)
+                    user_data = dict(zip(["is_staff", "cruzid", "uid", "first_name", "last_name", "access1", "access2", "access3", "access4", "access5", "access6", "access7", "access8"], sheet.get_user_data(uid=uid)))
+                    print(user_data)
                 
                 # if uid:
                 #     if find_owner(uid) is not None:
@@ -522,7 +536,7 @@ def identify():
 
     return render_template(
         "identify.html",
-        # cruzid=cruzid,
+        #cruzid=cruzid,
         # uid=uid,
         err=err,
         user_data=user_data,
