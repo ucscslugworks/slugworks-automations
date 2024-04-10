@@ -36,6 +36,8 @@ CANVAS_STATUS_SHEET = "Canvas Status"  # contains the last update time of the Ca
 
 SEND_BLOCK = 100
 
+ENABLE_SCAN_LOGS = False # disable scan logs - considered P3 data due to tracking locations of students (can add back in for testing or when a secure logging system is implemented)
+
 student_data = None
 staff_data = None
 module_data = None
@@ -1142,30 +1144,37 @@ def scan_uid(uid, alarm_status=False):
 
     if is_staff(uid=uid):
         if access_data["staff"]:
-            log(uid, "Staff", alarm_status, access_data["staff"][1])
+            if ENABLE_SCAN_LOGS:
+                log(uid, "Staff", alarm_status, access_data["staff"][1])
             return access_data["staff"]
         elif access_data["no_access"]:
-            log(uid, "Staff", alarm_status, access_data["no_access"][1])
+            if ENABLE_SCAN_LOGS:
+                log(uid, "Staff", alarm_status, access_data["no_access"][1])
             return access_data["no_access"]
         else:
-            log(uid, "Staff (Not Found)", alarm_status, 0)
+            if ENABLE_SCAN_LOGS:
+                log(uid, "Staff (Not Found)", alarm_status, 0)
             return False
 
     elif student_exists(uid=uid):
         for i in range(len(rooms)):
             if get_access(rooms[i], uid=uid) and access_data[rooms[i]]:
-                log(uid, rooms[i], alarm_status, access_data[rooms[i]][1])
+                if ENABLE_SCAN_LOGS:
+                    log(uid, rooms[i], alarm_status, access_data[rooms[i]][1])
                 return access_data[rooms[i]]
 
         if access_data["no_access"]:
-            log(uid, "No Access", alarm_status, access_data["no_access"][1])
+            if ENABLE_SCAN_LOGS:
+                log(uid, "No Access", alarm_status, access_data["no_access"][1])
             return access_data["no_access"]
         else:
-            log(uid, "Student (Not Found)", alarm_status, 0)
+            if ENABLE_SCAN_LOGS:
+                log(uid, "Student (Not Found)", alarm_status, 0)
             return False
 
     else:
-        log(uid, "Unknown", alarm_status, 0)
+        if ENABLE_SCAN_LOGS:
+            log(uid, "Unknown", alarm_status, 0)
         return access_data["no_access"]
 
 
