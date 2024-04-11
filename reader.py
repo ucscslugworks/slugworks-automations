@@ -59,6 +59,9 @@ if __name__ == "__main__":
     sheet.check_in(alarm_status=alarm_status)
     Thread(target=breathe_leds).start()
     try:
+
+        last_id = None
+
         while True:
             if (
                 not sheet.last_update_date
@@ -78,7 +81,7 @@ if __name__ == "__main__":
             print("Hold a tag near the reader")
             card_id = nfc.read_card_queue_timeout(10)
             print(card_id)
-            if card_id:
+            if card_id and card_id != last_id:
                 response = sheet.scan_uid(card_id)
                 if not response:
                     print("error - card not in database or something else")
@@ -98,7 +101,8 @@ if __name__ == "__main__":
                     pixels.fill(colors)
                     pixels.show()
             else:
-                print("error - scanned too soon or not scanned")
+                # print("error - scanned too soon or not scanned")
+                last_id = None
 
     except KeyboardInterrupt:
         nfc.close()
