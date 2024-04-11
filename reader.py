@@ -82,6 +82,7 @@ if __name__ == "__main__":
             card_id = nfc.read_card_queue_timeout(10)
             print(card_id)
             if card_id and card_id != last_id:
+                print(card_id, last_id)
                 last_id = card_id
                 response = sheet.scan_uid(card_id)
                 if not response:
