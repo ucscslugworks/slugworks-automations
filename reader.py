@@ -82,7 +82,6 @@ if __name__ == "__main__":
             card_id = nfc.read_card_queue_timeout(10)
             print(card_id)
             if card_id and card_id not in last_ids:
-                print(card_id, last_ids)
                 last_ids.append(card_id)
                 last_ids.pop(0)
                 response = sheet.scan_uid(card_id)
@@ -103,7 +102,7 @@ if __name__ == "__main__":
                     pixels.brightness = 0.5
                     pixels.fill(colors)
                     pixels.show()
-            else:
+            elif not card_id:
                 # print("error - scanned too soon or not scanned")
                 last_ids.append(None)
                 last_ids.pop(0)
