@@ -60,7 +60,7 @@ if __name__ == "__main__":
     Thread(target=breathe_leds).start()
     try:
 
-        last_id = None
+        last_ids = [None] * 5
 
         while True:
             if (
@@ -81,9 +81,10 @@ if __name__ == "__main__":
             print("Hold a tag near the reader")
             card_id = nfc.read_card_queue_timeout(10)
             print(card_id)
-            if card_id and card_id != last_id:
-                print(card_id, last_id)
-                last_id = card_id
+            if card_id and card_id not in last_ids:
+                print(card_id, last_ids)
+                last_ids.append(card_id)
+                last_ids.pop(0)
                 response = sheet.scan_uid(card_id)
                 if not response:
                     print("error - card not in database or something else")
@@ -104,7 +105,8 @@ if __name__ == "__main__":
                     pixels.show()
             else:
                 # print("error - scanned too soon or not scanned")
-                last_id = None
+                last_ids.append(None)
+                last_ids.pop(0)
 
     except KeyboardInterrupt:
         nfc.close()
