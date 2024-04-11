@@ -103,7 +103,7 @@ if __name__ == "__main__":
                     pixels.fill(colors)
                     pixels.show()
             elif not card_id:
-                # print("error - scanned too soon or not scanned")
+                print("error - scanned too soon or not scanned")
                 last_ids.append(None)
                 last_ids.pop(0)
 
