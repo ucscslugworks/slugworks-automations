@@ -79,7 +79,7 @@ if __name__ == "__main__":
                 sheet.check_in(alarm_status=alarm_status)
 
             print("Hold a tag near the reader")
-            card_id = nfc.read_card_queue_timeout(10)
+            card_id = nfc.read_card_queue_timeout(1)
             print(card_id)
             if card_id and card_id not in last_ids:
                 last_ids.append(card_id)
