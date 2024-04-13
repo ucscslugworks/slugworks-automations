@@ -36,7 +36,7 @@ CANVAS_STATUS_SHEET = "Canvas Status"  # contains the last update time of the Ca
 
 SEND_BLOCK = 100
 
-ENABLE_SCAN_LOGS = False # disable scan logs - considered P3 data due to tracking locations of students (can add back in for testing or when a secure logging system is implemented)
+ENABLE_SCAN_LOGS = False  # disable scan logs - considered P3 data due to tracking locations of students (can add back in for testing or when a secure logging system is implemented)
 
 student_data = None
 staff_data = None
@@ -63,11 +63,12 @@ this_reader = None
 module_count = 0
 rooms = list()
 
-last_update_date = None
+last_update_time = None
 last_checkin_time = None
 
 last_canvas_update_time = None
 canvas_is_updating = None
+canvas_needs_update = None
 
 student_sheet_read_len = 0
 staff_sheet_read_len = 0
@@ -111,7 +112,7 @@ def get_sheet_data(limited=None):
 
     Returns True if the data was retrieved, or False if it was not.
     """
-    global student_data, staff_data, module_data, access_data, rooms, module_count, limited_data, last_update_date, student_sheet_read_len, staff_sheet_read_len
+    global student_data, staff_data, module_data, access_data, rooms, module_count, limited_data, last_update_time, student_sheet_read_len, staff_sheet_read_len
 
     if limited is not None:
         limited_data = limited
@@ -132,7 +133,7 @@ def get_sheet_data(limited=None):
             exit()
 
         values = [r + [""] * (len(values[0]) - len(r)) for r in values]
-        staff_sheet_read_len = len(values)
+        student_sheet_read_len = len(values)
 
         student_data = pd.DataFrame(
             values[1:] if len(values) > 1 else None,
@@ -203,7 +204,7 @@ def get_sheet_data(limited=None):
                         r[1] = int(r[1])
                     access_data[access_headers[i]] = tuple(r)
 
-        last_update_date = datetime.datetime.now().date()
+        last_update_time = datetime.datetime.now()
 
         return True and get_reader_data()
     except HttpError as e:
@@ -304,7 +305,7 @@ def check_in(alarm_status=False):
 
 
 def get_canvas_status_sheet():
-    global last_canvas_update_time, canvas_is_updating
+    global last_canvas_update_time, canvas_is_updating, canvas_needs_update
     """
     Get the time of the last Canvas update.
 
@@ -322,6 +323,7 @@ def get_canvas_status_sheet():
         ).get("values", [])
 
         canvas_is_updating = True if values[0][0] == "UPDATING" else False
+        canvas_needs_update = True if values[0][0] == "PENDING" else False
         last_canvas_update_time = datetime.datetime.strptime(
             values[0][1], "%Y-%m-%d %H:%M:%S"
         )
@@ -814,11 +816,18 @@ def write_student_sheet():
         vals = student_data.values.tolist()
         vals.insert(0, student_data.columns.tolist())
         length = len(vals)
+        blank_filled = 0
+
+        # print(vals)
 
         if student_sheet_read_len > length:
-            vals = vals + [[""] * len(student_data.columns)] * (
-                student_sheet_read_len - length
-            )
+            blank_filled = student_sheet_read_len - length
+            vals = vals + [[""] * len(student_data.columns)] * (blank_filled)
+        else:
+            student_sheet_read_len = length
+
+        # print(student_sheet_read_len)
+        # print(vals)
 
         for i in range(0, student_sheet_read_len, SEND_BLOCK):
             _ = (
@@ -834,7 +843,7 @@ def write_student_sheet():
                 )
                 .execute()
             )
-        student_sheet_read_len = length
+        student_sheet_read_len -= blank_filled
         return True
     except HttpError as e:
         print(e)
@@ -999,11 +1008,14 @@ def remove_student(cruzid):
     """
 
     if not student_exists(cruzid=cruzid):
+        # print("not found")
         return False
 
     row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
+    # print(row)
     student_data.drop(row, inplace=True)  # TODO: move to archive sheet instead
     student_data.reset_index(drop=True, inplace=True)
+    # print(student_data)
 
     return True
 
@@ -1063,6 +1075,7 @@ def clamp_students(student_list):
         # print(student_data.loc[i, "CruzID"])
         # print(student_data.loc[i])
         if student_data.loc[i, "CruzID"] not in student_list:
+            # print("drop")
             student_data.drop(i, inplace=True)  # TODO: move to archive sheet instead
 
 
@@ -1345,7 +1358,8 @@ if __name__ == "__main__":
     # if not new_student("Cédric", "Chartier", "cchartie"):
     #     print("CruzID, Canvas ID, or Card UID already in use.")
 
-    # print(set_uid("cchartie", "01234567", overwrite=True))
+    # print(set_uid("sabsadik", "23458923", overwrite=True))
+    # remove_student("sabsadik")
 
     # print(staff_data)
     # remove_staff("imadan0")
@@ -1364,8 +1378,8 @@ if __name__ == "__main__":
     # print(get_all_accesses(cruzid="tstudent"))
     # print(evaluate_modules([1, 2, 5, 6, 7, 8, 9, 10], cruzid="tstudent"))
 
-    # write_student_sheet()
-    # write_staff_sheet()
+    write_student_sheet()
+    write_staff_sheet()
 
     # log("63B104FF", "Staff", True, 10)
 
@@ -1375,8 +1389,8 @@ if __name__ == "__main__":
     # print(get_user_data(cruzid="ewachtel"))
     # print(get_user_data(cruzid="cchartie"))
 
-    # print()
-    # print(student_data)
+    print()
+    print(student_data)
     # print()
     # print(staff_data)
     # print()

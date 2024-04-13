@@ -22,7 +22,6 @@ from threading import Thread
 from flask import Flask, flash, redirect, render_template, request, url_for
 
 import canvas
-
 # import control_nfc as nfc
 import fake_nfc as nfc
 import sheet
@@ -31,6 +30,7 @@ import sheet
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
 app = Flask(__name__)
 app.secret_key = os.urandom(12).hex()
+
 sheet.get_sheet_data(limited=False)
 alarm_enable_names = ["ENABLE", "DISABLE"]
 device_status_names = ["ONLINE", "OFFLINE"]
@@ -39,47 +39,66 @@ alarm_status_names = ["OK", "ALARM", "TAGGED OUT", "DISABLED"]
 alarm_status_colors = ["#3CBC8D", "red", "yellow", "gray"]
 
 
-# TODO: this just needs canvas.update() and then sheet.check_in(alarm_status=False)
-def updateme():  # updates the pi5
-    print("Updating")
-    # if pi5update < datetime.now()
-    # if time > 3am and time < 5am
-    # update the pi5 with canvas
-    canvas.update()
+# # TODO: this just needs canvas.update() and then sheet.check_in(alarm_status=False)
+# def updateme():  # updates the pi5
+#     print("Updating")
+#     # if pi5update < datetime.now()
+#     # if time > 3am and time < 5am
+#     # update the pi5 with canvas
+#     canvas.update()
 
-    # update the pizero
-    pi5update = datetime.now()
-    print("Updated")
-
-
-# TODO: use sheet.update_all_readers() to set all readers to need updating
-def updatemyfriends():  # updates the pizero
-    print("Updating")
-    pizeroupdate = datetime.now()
-    # update the pizero
-    print("Updated")
+#     # update the pizero
+#     pi5update = datetime.now()
+#     print("Updated")
 
 
-# TODO: just call updateme() then updatemyfriends()
-def updateall():  # updates both
-    print("Updating")
-    pitupdateall = datetime.now()
-    canvas.update()
-    # update the pizero
-    print("Updated")
+# # TODO: use sheet.update_all_readers() to set all readers to need updating
+# def updatemyfriends():  # updates the pizero
+#     print("Updating")
+#     pizeroupdate = datetime.now()
+#     # update the pizero
+#     print("Updated")
 
 
-def status():  # status of reader
-    print("Status")
-    # status of reader
+# # TODO: just call updateme() then updatemyfriends()
+# def updateall():  # updates both
+#     print("Updating")
+#     pitupdateall = datetime.now()
+#     canvas.update()
+#     # update the pizero
+#     print("Updated")
 
-def staff_or_student(cruzid, overwritecheck, uid ):
+
+# def status():  # status of reader
+#     print("Status")
+#     # status of reader
+
+
+def update_data():
+    sheet.get_canvas_status_sheet()
+    if (
+        not sheet.last_update_time
+        or sheet.last_canvas_update_time > sheet.last_update_time
+    ):
+        print("Getting sheet data...")
+        sheet.get_sheet_data()
+        sheet.check_in()
+    elif (
+        not sheet.last_checkin_time
+        or datetime.now() - sheet.last_checkin_time
+        > timedelta(0, 0, 0, 0, CHECKIN_TIMEOUT, 0, 0)
+    ):
+        print("Checking in...")
+        sheet.check_in()
+
+
+def staff_or_student(cruzid, overwritecheck, uid):
     if sheet.is_staff(cruzid=cruzid) or sheet.is_staff(uid="uid"):
         return assign_staff_uid(cruzid, uid, overwritecheck)
     elif sheet.student_exists(cruzid=cruzid) or sheet.student_exists(uid="uid"):
         return assign_student_uid(cruzid, overwritecheck, uid)
     else:
-        carderror="CruzID not in database, please add user to Canvas first, then update database"
+        carderror = "CruzID not in database, please add user to Canvas first, then update database"
         return carderror, False
 
 
@@ -149,6 +168,7 @@ def assign_staff_uid(cruzid, first, last, uid, overwrite):  # set
             sheet.run_in_thread(f=sheet.write_student_staff_sheets)
     return carderror, added
 
+
 def find_owner(uid):
     info = sheet.get_user_data(uid)
     return info
@@ -182,9 +202,8 @@ def find_owner(uid):
 
 @app.route("/", methods=("GET", "POST"))
 def server():
-    err = ""
-    wait = False
-    canvas_update = sheet.last_canvas_update_time 
+    update_data()
+    canvas_update = sheet.last_canvas_update_time
     devices = sheet.reader_data.loc[
         :,
         [
@@ -244,7 +263,6 @@ def server():
     try:
         if request.method == "POST":
             flash("You are using POST")
-            
 
             if request.form["label"] == "update-device":
 
@@ -266,7 +284,6 @@ def server():
                 device_info[req_id]["location"] = req_location
                 device_info[req_id]["alarm_delay_min"] = req_delay
 
-
                 sheet.run_in_thread(
                     f=sheet.update_reader,
                     kwargs={
@@ -286,12 +303,15 @@ def server():
         print(e)
 
     return render_template(
-        "dashboard.html", devices=device_info, canvas_update=canvas_update,
+        "dashboard.html",
+        devices=device_info,
+        canvas_update=canvas_update,
     )  # Pass devices to the template
 
 
 @app.route("/card", methods=("GET", "POST"))
 def card():
+    update_data()
     err = ""
     added = False
 
@@ -302,11 +322,14 @@ def card():
             sheet.get_canvas_status_sheet()
             print("status")
             print(sheet.canvas_is_updating)
-            if request.form["label"] == "uidsetup" and sheet.canvas_is_updating == False:
+            if (
+                request.form["label"] == "uidsetup"
+                and sheet.canvas_is_updating == False
+            ):
                 print("reading UID")
                 cruzid = request.form.get("cruzid")
-                #sheet.last_canvas_update_time
-             
+                # sheet.last_canvas_update_time
+
                 overwritecheck = (
                     True if request.form.get("overwrite") == "overwrite" else False
                 )
@@ -331,8 +354,10 @@ def card():
         added=added,
     )
 
+
 @app.route("/identify", methods=("GET", "POST"))
 def identify():
+    update_data()
     cruzid = ""
     uid = ""
     err = ""
@@ -346,9 +371,28 @@ def identify():
                 print("reading UID")
                 uid = nfc.read_card()
                 print(uid)
-                user_data = dict(zip(["is_staff", "cruzid", "uid", "first_name", "last_name", "access1", "access2", "access3", "access4", "access5", "access6", "access7", "access8"], sheet.get_user_data(uid=uid)))
+                user_data = dict(
+                    zip(
+                        [
+                            "is_staff",
+                            "cruzid",
+                            "uid",
+                            "first_name",
+                            "last_name",
+                            "access1",
+                            "access2",
+                            "access3",
+                            "access4",
+                            "access5",
+                            "access6",
+                            "access7",
+                            "access8",
+                        ],
+                        sheet.get_user_data(uid=uid),
+                    )
+                )
                 print(user_data)
-                
+
                 # if uid:
                 #     if find_owner(uid) is not None:
                 #         cruzid = find_owner(uid)
@@ -366,7 +410,6 @@ def identify():
         # uid=uid,
         err=err,
         user_data=user_data,
-
     )
 
 

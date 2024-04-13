@@ -64,8 +64,8 @@ if __name__ == "__main__":
 
         while True:
             if (
-                not sheet.last_update_date
-                or datetime.now().date() > sheet.last_update_date
+                not sheet.last_update_time
+                or datetime.now().date() > sheet.last_update_time.date()
             ) and datetime.now().hour >= SHEET_UPDATE_HOUR:
                 print("Updating sheet...")
                 sheet.get_sheet_data()

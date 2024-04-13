@@ -1,4 +1,5 @@
 import json
+import time
 from datetime import datetime, timedelta
 
 import requests
@@ -28,13 +29,18 @@ def update():
         "per_page": 1000,
     }
 
+    staff_count = 0
+
     response = requests.request("GET", url + endpoint, headers=headers, params=params)
     staff_json = response.json()
+    print(f"Successfully retrieved staff data part {staff_count} from Canvas")
     while "next" in response.links:
         response = requests.request(
             "GET", response.links["next"]["url"], headers=headers
         )
         staff_json += response.json()
+        staff_count += 1
+        print(f"Successfully retrieved staff data part {staff_count} from Canvas")
 
     params = {
         "enrollment_type[]": "ta",
@@ -43,41 +49,48 @@ def update():
 
     response = requests.request("GET", url + endpoint, headers=headers, params=params)
     staff_json += response.json()
+    if len(response.json()) > 0:
+        staff_count += 1
+        print(f"Successfully retrieved staff data part {staff_count} from Canvas")
     while "next" in response.links:
         response = requests.request(
             "GET", response.links["next"]["url"], headers=headers
         )
         staff_json += response.json()
-
-    # print(json.dumps(staff, indent=4))
+        staff_count += 1
+        print(f"Successfully retrieved staff data part {staff_count} from Canvas")
 
     params = {
         "enrollment_type[]": "student",
         "per_page": 1000,
     }
 
+    student_count = 0
+
     response = requests.request("GET", url + endpoint, headers=headers, params=params)
     students_json = response.json()
+    print(f"Successfully retrieved student data part {student_count} from Canvas")
     while "next" in response.links:
         response = requests.request(
             "GET", response.links["next"]["url"], headers=headers
         )
         students_json += response.json()
+        student_count += 1
+        print(f"Successfully retrieved student data part {student_count} from Canvas")
 
-    print("Successfully retrieved staff and student data from Canvas")
+    print("Successfully retrieved all staff and student data from Canvas")
 
     staff = []
     for s in staff_json:
-        if (
-            "login_id" not in s
-            or "ucsc.edu" not in s["login_id"]
-            or s["login_id"] in staff
-        ):
+        if "login_id" not in s or "ucsc.edu" not in s["login_id"]:
             continue
 
         cruzid = s["login_id"].split("@ucsc.edu")[0]
 
-        if not sheet.is_staff(cruzid):
+        if cruzid in staff:
+            continue
+
+        if not sheet.is_staff(cruzid=cruzid):
             sn = s["sortable_name"].split(", ")
             # students[cruzid] = s["id"]
             uid = None
@@ -91,37 +104,39 @@ def update():
         staff.append(cruzid)
 
     # print("staff", staff)
-    # print("staffdata", sheet.staff_data)
+    # print("staffdata\n", sheet.staff_data)
 
     sheet.clamp_staff(staff)
 
     print("Successfully processed staff data")
+    # time.sleep(10)
 
     students = {}
     for s in students_json:
         if (
             "login_id" not in s
             or "ucsc.edu" not in s["login_id"]
-            or s["login_id"] in students
+            # or s["login_id"] in students
         ):
             continue
 
         cruzid = s["login_id"].split("@ucsc.edu")[0]
 
-        if cruzid in staff:
+        if cruzid in students or cruzid in staff:
+            print(f"Skipping {cruzid}")
             continue
 
         if not sheet.student_exists(cruzid):
             sn = s["sortable_name"].split(", ")
             students[cruzid] = s["id"]
 
-            uid = None
+            # uid = None
 
-            if sheet.is_staff(cruzid):
-                uid = sheet.get_uid(cruzid)
-                sheet.remove_staff(cruzid)
+            # if sheet.is_staff(cruzid):
+            #     uid = sheet.get_uid(cruzid)
+            #     sheet.remove_staff(cruzid)
 
-            sheet.new_student(sn[1], sn[0], cruzid, s["id"], uid)
+            sheet.new_student(sn[1], sn[0], cruzid, s["id"], None)
 
         students[cruzid] = s["id"]
 
@@ -148,6 +163,17 @@ def update():
 
     print("\nSuccessfully evaluated modules for all students")
 
+    # with sheet.pd.option_context(
+    #     "display.max_rows",
+    #     None,
+    #     "display.max_columns",
+    #     None,
+    #     "display.max_colwidth",
+    #     None,
+    # ):
+    #     print()
+    #     print(sheet.staff_data)
+    #     print(sheet.student_data)
     # print(sheet.student_data)
     # print(sheet.staff_data)
 
@@ -177,22 +203,33 @@ CANVAS_UPDATE_HOUR = 0  # 12am
 CHECKIN_TIMEOUT = 5  # 5 minutes
 
 if __name__ == "__main__":
-    update()
-    exit()
+    # update()
+    # exit()
     while True:
+        sheet.get_canvas_status_sheet()
         if (
-            not sheet.last_update_date or datetime.now().date() > sheet.last_update_date
-        ) and datetime.now().hour >= CANVAS_UPDATE_HOUR:
+            sheet.canvas_needs_update
+            or not sheet.last_update_time
+            or (
+                (
+                    datetime.now().date() > sheet.last_update_time.date()
+                    and datetime.now().hour >= CANVAS_UPDATE_HOUR
+                )
+            )
+        ):
             print("Canvas update...")
             sheet.set_canvas_status_sheet(True)
-            # update()
+            update()
             sheet.get_sheet_data()
-            sheet.check_in()
+            # sheet.check_in()
             sheet.set_canvas_status_sheet(False)
-        elif (
-            not sheet.last_checkin_time
-            or datetime.now() - sheet.last_checkin_time
-            > timedelta(0, 0, 0, 0, CHECKIN_TIMEOUT, 0, 0)
-        ):
-            print("Checking in...")
-            sheet.check_in()
+        else:
+            print("Waiting for next update...")
+        time.sleep(60)
+        # elif (
+        #     not sheet.last_checkin_time
+        #     or datetime.now() - sheet.last_checkin_time
+        #     > timedelta(0, 0, 0, 0, CHECKIN_TIMEOUT, 0, 0)
+        # ):
+        #     print("Checking in...")
+        #     sheet.check_in()
