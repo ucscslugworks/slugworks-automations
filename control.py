@@ -205,6 +205,8 @@ def logout():
 def dashboard():
     update_data()
     canvas_update = sheet.last_canvas_update_time
+    if sheet.canvas_is_updating:
+        canvas_update = "Updating..."
     devices = sheet.reader_data.loc[
         :,
         [
@@ -262,7 +264,7 @@ def dashboard():
 
     try:
         if request.method == "POST":
-            flash("You are using POST")
+            # flash("You are using POST")
 
             if request.form["label"] == "update-device":
 
@@ -320,8 +322,7 @@ def setup():
 
     try:
         if request.method == "POST":
-            flash("You are using POST")
-            sheet.get_canvas_status_sheet()
+            # flash("You are using POST")
             if request.form["label"] == "uidsetup" and not sheet.canvas_is_updating:
                 cruzid = request.form.get("cruzid")
                 overwritecheck = (
@@ -334,8 +335,10 @@ def setup():
                     err = "Card not detected, please try again"
                 else:
                     err, added = assign_uid(cruzid, overwritecheck, uid)
-            else:
+            elif sheet.canvas_is_updating:
                 err = "Canvas is updating, please wait"
+            else:
+                err = "Invalid request"
 
     except Exception as e:
         print(e)
@@ -355,57 +358,52 @@ def identify():
     uid = ""
     err = ""
     user_data = None
+    accesses = []
+    rooms = sheet.rooms
 
     try:
         if request.method == "POST":
             cruzid = ""
-            flash("You are using POST")
+            # flash("You are using POST")
             if request.form["label"] == "identifyuid":
                 cruzid = request.form.get("cruzid")
-                uid = nfc.read_card()
 
                 if cruzid != None and cruzid != "" and cruzid != "None":
                     user_data = dict(
                         zip(
                             [
-                                "is_staff",
+                                "type",
                                 "cruzid",
                                 "uid",
                                 "first_name",
                                 "last_name",
-                                "access1",
-                                "access2",
-                                "access3",
-                                "access4",
-                                "access5",
-                                "access6",
-                                "access7",
-                                "access8",
                             ],
                             sheet.get_user_data(cruzid=cruzid),
                         )
                     )
+                    accesses = sheet.get_all_accesses(cruzid=cruzid)
                 else:
+                    uid = nfc.read_card()
                     user_data = dict(
                         zip(
                             [
-                                "is_staff",
+                                "type",
                                 "cruzid",
                                 "uid",
                                 "first_name",
                                 "last_name",
-                                "access1",
-                                "access2",
-                                "access3",
-                                "access4",
-                                "access5",
-                                "access6",
-                                "access7",
-                                "access8",
                             ],
                             sheet.get_user_data(uid=uid),
                         )
                     )
+                    accesses = sheet.get_all_accesses(uid=uid)
+
+                if user_data["type"] is True:
+                    user_data["type"] = "Staff"
+                elif user_data["type"] is False:
+                    user_data["type"] = "Student"
+                else:
+                    user_data["type"] = "Unknown"
 
     except Exception as e:
         print(e)
@@ -414,6 +412,9 @@ def identify():
         "identify.html",
         err=err,
         user_data=user_data,
+        accesses=accesses,
+        rooms=rooms,
+        length=0 if not rooms else len(rooms),
     )
 
 

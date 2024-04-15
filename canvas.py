@@ -18,7 +18,7 @@ def update():
         course_id = keys["course_id"]
 
         url = f"https://canvas.ucsc.edu/api/v1/courses/{course_id}/"
-        endpoint = "users"  # TODO: replace with https://canvas.instructure.com/doc/api/all_resources.html#method.courses.users this endpoint, and get both students and staff to populate both sheets & check for duplicates
+        endpoint = "users"
         headers = {"Authorization": f"Bearer {token}"}
 
         staff_json = []
@@ -100,7 +100,6 @@ def update():
 
             if not sheet.is_staff(cruzid=cruzid):
                 sn = s["sortable_name"].split(", ")
-                # students[cruzid] = s["id"]
                 uid = None
 
                 if sheet.student_exists(cruzid):
@@ -111,21 +110,13 @@ def update():
 
             staff.append(cruzid)
 
-        # print("staff", staff)
-        # print("staffdata\n", sheet.staff_data)
-
         sheet.clamp_staff(staff)
 
         print("Successfully processed staff data")
-        # time.sleep(10)
 
         students = {}
         for s in students_json:
-            if (
-                "login_id" not in s
-                or "ucsc.edu" not in s["login_id"]
-                # or s["login_id"] in students
-            ):
+            if "login_id" not in s or "ucsc.edu" not in s["login_id"]:
                 continue
 
             cruzid = s["login_id"].split("@ucsc.edu")[0]
@@ -138,22 +129,13 @@ def update():
                 sn = s["sortable_name"].split(", ")
                 students[cruzid] = s["id"]
 
-                # uid = None
-
-                # if sheet.is_staff(cruzid):
-                #     uid = sheet.get_uid(cruzid)
-                #     sheet.remove_staff(cruzid)
-
                 sheet.new_student(sn[1], sn[0], cruzid, s["id"], None)
 
             students[cruzid] = s["id"]
 
-        # print("studentdata", sheet.student_data)
-        # print("students", list(students.keys()))
         sheet.clamp_students(students.keys())
 
         print("Successfully processed student data")
-        # print(sheet.module_data)
 
         endpoint = "modules"
 
@@ -208,7 +190,6 @@ if __name__ == "__main__":
     try:
         while True:
             sheet.get_canvas_status_sheet()
-            print(sheet.last_canvas_update_time)
             if (
                 sheet.canvas_needs_update
                 or not sheet.last_update_time

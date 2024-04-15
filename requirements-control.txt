@@ -7,3 +7,4 @@ flask
 flask-login
 pyserial
 pyopenssl
+sqlite3

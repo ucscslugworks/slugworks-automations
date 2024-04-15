@@ -3,134 +3,135 @@
 
 
 <head>
-  <title>Dashboard
-  </title>
-  <style>
-    #container {
-      display: flex;
-      flex-flow: row wrap;
-      justify-content: space-evenly;
-      align-items: flex-start;
-      align-content: space-around;
-    }
+    <title>Dashboard
+    </title>
+    <style>
+        #container {
+            display: flex;
+            flex-flow: row wrap;
+            justify-content: space-evenly;
+            align-items: flex-start;
+            align-content: space-around;
+        }
 
-    #container2 {
-      display: flex;
-      justify-content: right;
-      align-items: right;
-      height: 30vh;
-    }
+        #container2 {
+            display: flex;
+            justify-content: right;
+            align-items: right;
+            height: 30vh;
+        }
 
-    table,
-    th,
-    td {
-      border: 1px solid black;
-    }
+        table,
+        th,
+        td {
+            border: 1px solid black;
+        }
 
-    th,
-    td {
-      padding: 5px;
-    }
-  </style>
+        th,
+        td {
+            padding: 5px;
+        }
+    </style>
 </head>
 
 
 <body>
-  <p> <strong>THIS IS TO BE USED BY AUTHORIZED STAFF ONLY</strong>.</p>
-  {% for message in get_flashed_messages() %}
-  <div class="alert">{{ message }}</div>
-  {% endfor %}
-  <div>
-    <h2><strong>Canvas Last Updated: </strong></h2>
-    <h2 style="color: red;">{{ canvas_update }}</h2>
-    <h2>Update Buttons</h2>
-    <form method="post">
-      <input type="hidden" name="label" value="update-all">
-      <button type="submit" name="update-all">Update All Devices</button>
-    </form>
-    <br>
-    <form method="post">
-      <input type="hidden" name="label" value="update-canvas">
-      <button type="submit" name="update-canvas">Update from Canvas</button>
-    </form>
-  </div>
-  <h2>Device Control</h2>
-  <table>
-    <tr>
-      <th>Device</th>
-      <th>Status</th>
-      <th>Location</th>
-      <th>Alarm ON</th>
-      <th>Alarm Delay</th>
-      <th>Alarm Status</th>
-      <th>Last Checked In</th>
-      <th>Update</th>
-
-
-
-    </tr>
-    {% for device in devices %}
-    <tr>
-      <form method="post">
-        <td>{{ device.id }}{% if (device.id == 0) %} (Canvas){%endif%}</td>
-        <input type="hidden" name="id" value="{{ device.id }}">
-        </td>
-        <td style="background-color: {{ device.status_color }};">
-          {{ device.status }}
-        </td>
-        <td>
-          <input type="text" name="location" value="{{ device.location }}">
-        </td>
-
-        <td style="background-color: {{ device.alarm_power_color }};">
-          {% if (device.id > 0) %}
-          <select name="alarm_power" id="alarm_power" style="border: 0; background: transparent;">
-            <!-- this is the default value -->
-            <option disabled selected hidden value="">{{ device.alarm_power }}</option>
-            {% for option in device.alarm_enable_names %}
-            <option value="{{ option }}">{{ option }}</option>
-            {% endfor %}
-          </select>
-          {% endif %}
-        </td>
-        <td>
-          {% if (device.id > 0) %}
-          <input type="text" name="delay" value="{{ device.alarm_delay_min }}" style="max-width: 10;">
-          {% endif %}
-        </td>
-        <td style="background-color: {{ device.alarm_color }};">
-          {% if (device.id > 0) %}
-          {{ device.alarm_status }}
-          {% endif %}
-        </td>
-
-
-        <td>{{device.last_checked_in}}</td>
-        <td>
-          {% if (device.id > 0) %}
-          <input type="hidden" name="label" value="update-device">
-          <button type="submit" name="update-device-{{ device.id }}">Update</button>
-          {% endif %}
-        </td>
-      </form>
-    </tr>
+    <p> <strong>THIS SYSTEM IS TO BE USED BY AUTHORIZED STAFF ONLY</strong></p>
+    {% for message in get_flashed_messages() %}
+    <div class="alert">{{ message }}</div>
     {% endfor %}
-  </table>
 
-  <h2>LINKME</h2>
-  <div>
-    <a href="setup">
-      <button>Setup Card</button>
+    <a href="logout">
+        <button>Logout</button>
     </a>
-    <br>
-    <a href="identify">
-      <button>Identify Card</button>
-    </a>
-    <br>
-    <!-- <a href="log">
+
+    <div>
+        <h2><strong>Canvas Last Updated: </strong></h2>
+        <h2 style="color: red;">{{ canvas_update }}</h2>
+        <!-- <h2>Update Buttons</h2> -->
+        <form method="post">
+            <input type="hidden" name="label" value="update-canvas">
+            <button type="submit" name="update-canvas">Update user data from Canvas</button>
+        </form>
+        <form method="post">
+            <input type="hidden" name="label" value="update-all">
+            <button type="submit" name="update-all">Update All Readers</button>
+        </form>
+        <a href="setup">
+            <button>Setup Card</button>
+        </a>
+        <br>
+        <a href="identify">
+            <button>Identify User/Card</button>
+        </a>
+        <br>
+        <!-- <a href="log">
       <button>Log Files</button>
     </a> -->
-  </div>
+    </div>
+
+    <h2>Device Control</h2>
+    <table>
+        <tr>
+            <th>Device</th>
+            <th>Status</th>
+            <th>Location</th>
+            <th>Alarm ON</th>
+            <th>Alarm Delay</th>
+            <th>Alarm Status</th>
+            <th>Last Checked In</th>
+            <th>Update</th>
+        </tr>
+        {% for device in devices %}
+        <tr>
+            <form method="post">
+                <td>{{ device.id }}{% if (device.id == 0) %} (Canvas){%endif%}
+                    <input type="hidden" name="id" value="{{ device.id }}">
+                </td>
+
+                <td style="background-color: {{ device.status_color }};">
+                    {{ device.status }}
+                </td>
+
+                <td>
+                    <input type="text" name="location" value="{{ device.location }}">
+                </td>
+
+                <td style="background-color: {{ device.alarm_power_color }};">
+                    {% if (device.id > 0) %}
+                    <select name="alarm_power" id="alarm_power" style="border: 0; background: transparent;">
+                        <!-- this is the default value -->
+                        <option disabled selected hidden value="">{{ device.alarm_power }}</option>
+                        {% for option in device.alarm_enable_names %}
+                        <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if (device.id > 0) %}
+                    <input type="text" name="delay" value="{{ device.alarm_delay_min }}" style="max-width: 10;">
+                    {% endif %}
+                </td>
+
+                <td style="background-color: {{ device.alarm_color }};">
+                    {% if (device.id > 0) %}
+                    {{ device.alarm_status }}
+                    {% endif %}
+                </td>
+
+                <td>{{device.last_checked_in}}</td>
+                <td>
+                    {% if (device.id > 0) %}
+                    <input type="hidden" name="label" value="update-device">
+                    <button type="submit" name="update-device-{{ device.id }}">Update</button>
+                    {% endif %}
+                </td>
+            </form>
+        </tr>
+        {% endfor %}
+    </table>
 </body>
 
 </html>

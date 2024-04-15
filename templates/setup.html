@@ -2,53 +2,57 @@
 <html>
 
 <head>
-  <title>Student Card Setup</title>
-  <style>
-    #container {
-      display: flex;
-      flex-flow: row wrap;
-      justify-content: space-evenly;
-      align-items: flex-start;
-      align-content: space-around;
-    }
-  </style>
+    <title>Card Setup</title>
+    <style>
+        #container {
+            display: flex;
+            flex-flow: row wrap;
+            justify-content: space-evenly;
+            align-items: flex-start;
+            align-content: space-around;
+        }
+    </style>
 </head>
 
 <body>
-  <p> <strong>THIS IS TO BE USED BY AUTHORIZED STAFF ONLY</strong>.</p>
-  {% for message in get_flashed_messages() %}
-  <div class="alert">{{ message }}</div>
-  {% endfor %}
+    <p> <strong>THIS SYSTEM IS TO BE USED BY AUTHORIZED STAFF ONLY</strong></p>
+    {% for message in get_flashed_messages() %}
+    <div class="alert">{{ message }}</div>
+    {% endfor %}
 
-
-  <div>
-    <h2>Card Setup</h2>
-    <form method="post">
-      <input type="hidden" name="label" value="uidsetup">
-      {% if (err != "") %}
-      <label for="error-lab">Error: </label>
-      <div id="error-cont">
-        <p id="error" name="error" style="color:{% if added %}green{% else %}red{% endif %}">{{ err }}</p>
-      </div>
-      {% endif %}
-      <div id="cruzid-div">
-        <label for="cruzid-label">CruzID: </label> <br>
-        <input type="text" id="cruzid" name="cruzid">
-      </div>
-      <label for="overwrite-label">Overwrite existing card?</label>
-      <input type="checkbox" id="overwrite" name="overwrite" value="overwrite">
-      <div>
-        <button type="submit" name="formatuid">Generate</button>
-      </div>
-    </form>
-  </div>
-
-  <div>
-    <br>
-    <a href="/dashboard">
-      <button>Return to Dashboard</button>
+    <a href="logout">
+        <button>Logout</button>
     </a>
-  </div>
+
+    <div>
+        <h2>Card Setup</h2>
+        <form method="post">
+            <input type="hidden" name="label" value="uidsetup">
+            {% if (err != "") %}
+            <label for="error-lab">Error: </label>
+            <!-- <div id="error-cont"> -->
+            <span id="error" name="error" style="color:{% if added %}green{% else %}red{% endif %}">{{ err }}</span>
+            <br><br>
+            <!-- </div> -->
+            {% endif %}
+            <div id="cruzid-div">
+                <label for="cruzid-label">CruzID: </label> <br>
+                <input type="text" id="cruzid" name="cruzid">
+            </div>
+            <label for="overwrite-label">Overwrite existing card?</label>
+            <input type="checkbox" id="overwrite" name="overwrite" value="overwrite">
+            <div>
+                <button type="submit" name="formatuid">Generate</button>
+            </div>
+        </form>
+    </div>
+
+    <div>
+        <br>
+        <a href="/dashboard">
+            <button>Return to Dashboard</button>
+        </a>
+    </div>
 </body>
 
 </html>

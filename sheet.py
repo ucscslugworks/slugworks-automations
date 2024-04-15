@@ -936,12 +936,18 @@ def evaluate_modules(completed_modules, cruzid=None, uid=None):
 
     for i in range(len(module_data)):
         exp = str(module_data.loc[i, "Modules"])
-        for m in range(1, module_count + 1):
-            exp = exp.replace(str(m), str(m in completed_modules))
+        exp = exp.lower()
+        exp = exp.replace("and", "&")
+        exp = exp.replace("or", "|")
+        exp = exp.replace(" ", "")
+
+        for m in range(module_count, 0, -1):
+            exp = exp.replace(str(m), "t" if m in completed_modules else "f")
+
         if (
             set_access(
                 module_data.loc[i, "Access Levels"],
-                eval(exp) if len(exp) > 0 else False,
+                (string_eval(exp) == "t") if len(exp) > 0 else False,
                 cruzid=cruzid,
                 uid=uid,
             )
@@ -949,6 +955,62 @@ def evaluate_modules(completed_modules, cruzid=None, uid=None):
         ):
             return False
     return True
+
+
+def string_eval(exp):
+    """
+    Evaluate a string expression for modules.
+
+    exp: str: the expression to evaluate.
+
+    Returns the evaluated expression.
+    """
+
+    while "(" in exp:
+        start = 0
+        end = exp.index(")")
+        while "(" in exp[start + 1 : end]:
+            start = exp.index("(", start + 1)
+
+        exp = exp[:start] + string_eval(exp[start + 1 : end]) + exp[end + 1 :]
+
+    while "&" in exp:
+        i = exp.index("&")
+
+        bw = 0
+        if "|" in exp[:i]:
+            bw = exp.rindex("|", 0, i) + 1
+
+        fw = len(exp)
+        if "|" in exp[i + 1 :]:
+            fw = exp.index("|", i + 1)
+
+        exp = (
+            exp[:bw]
+            + (
+                "t"
+                if (
+                    string_eval(exp[bw:i]) == "t"
+                    and string_eval(exp[i + 1 : fw]) == "t"
+                )
+                else "f"
+            )
+            + exp[fw:]
+        )
+
+    while "|" in exp:
+        i = exp.index("|")
+        exp = (
+            exp[: i - 1]
+            + (
+                "t"
+                if (string_eval(exp[:i]) == "t" or string_eval(exp[i + 1 :]) == "t")
+                else "f"
+            )
+            + exp[i + 2 :]
+        )
+
+    return exp
 
 
 def is_staff(cruzid=None, uid=None):
@@ -995,7 +1057,7 @@ def get_user_data(cruzid=None, uid=None):
                 ),
                 "First Name":"Last Name",
             ].values.tolist()[0]
-            + get_all_accesses(cruzid=cruzid, uid=uid)
+            # + get_all_accesses(cruzid=cruzid, uid=uid)
         )
     elif is_staff(cruzid=cruzid, uid=uid):
         if cruzid:
