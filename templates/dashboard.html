@@ -32,7 +32,7 @@
       padding: 5px;
     }
   </style>
-
+</head>
 
 
 <body>
@@ -42,25 +42,11 @@
   {% endfor %}
   <div>
     <h2><strong>Canvas Last Updated: </strong></h2>
-    <h2 style="color: red; animation: blink 1s infinite;">{{ canvas_update }}</h2>
-
-    <style>
-      @keyframes blink {
-        0% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0;
-        }
-        100% {
-          opacity: 1;
-        }
-      }
-    </style>
+    <h2 style="color: red;">{{ canvas_update }}</h2>
     <h2>Update Buttons</h2>
     <form method="post">
-      <input type="hidden" name="label" value="update-all-devices">
-      <button type="submit" name="update-all-devices">Update All Devices</button>
+      <input type="hidden" name="label" value="update-all">
+      <button type="submit" name="update-all">Update All Devices</button>
     </form>
     <br>
     <form method="post">
@@ -68,20 +54,9 @@
       <button type="submit" name="update-canvas">Update from Canvas</button>
     </form>
   </div>
-  <!-- {% if(pizerocolour1 == "red") %}
-  <div id="alarms">
-    <input type="text" id="alarm" name="01" value="{{ status_01 }}" readonly, textarea{ background-color: red; }>
-    <div>
-      {% else %}
-      <div id="alarms">
-        <input type="text" id="alarm" name="01" value="{{ status_01 }}" readonly, textarea{ background-color: green; }>
-        {% endif %}
-
-      </div> -->
   <h2>Device Control</h2>
   <table>
     <tr>
-      <!-- TODO: make location, alarm delay -->
       <th>Device</th>
       <th>Status</th>
       <th>Location</th>
@@ -94,13 +69,11 @@
 
 
     </tr>
-    <!-- wrap this tr in a for loop: -->
     {% for device in devices %}
     <tr>
       <form method="post">
-        <td>{{ device.id }}</td>
+        <td>{{ device.id }}{% if (device.id == 0) %} (Canvas){%endif%}</td>
         <input type="hidden" name="id" value="{{ device.id }}">
-        <!-- make the device location editable -->
         </td>
         <td style="background-color: {{ device.status_color }};">
           {{ device.status }}
@@ -110,10 +83,10 @@
         </td>
 
         <td style="background-color: {{ device.alarm_power_color }};">
-          {% if (device.alarm_power != "") %}
+          {% if (device.id > 0) %}
           <select name="alarm_power" id="alarm_power" style="border: 0; background: transparent;">
-            <option disabled selected hidden value="">{{ device.alarm_power }}</option>
             <!-- this is the default value -->
+            <option disabled selected hidden value="">{{ device.alarm_power }}</option>
             {% for option in device.alarm_enable_names %}
             <option value="{{ option }}">{{ option }}</option>
             {% endfor %}
@@ -121,39 +94,43 @@
           {% endif %}
         </td>
         <td>
+          {% if (device.id > 0) %}
           <input type="text" name="delay" value="{{ device.alarm_delay_min }}" style="max-width: 10;">
+          {% endif %}
         </td>
         <td style="background-color: {{ device.alarm_color }};">
+          {% if (device.id > 0) %}
           {{ device.alarm_status }}
+          {% endif %}
         </td>
 
 
         <td>{{device.last_checked_in}}</td>
         <td>
+          {% if (device.id > 0) %}
           <input type="hidden" name="label" value="update-device">
           <button type="submit" name="update-device-{{ device.id }}">Update</button>
+          {% endif %}
         </td>
       </form>
     </tr>
     {% endfor %}
-    <!-- for loop ends here -->
   </table>
 
-
-
   <h2>LINKME</h2>
-  <!-- create buttons to link to different sites -->
   <div>
-    <a href="card">
+    <a href="setup">
       <button>Setup Card</button>
     </a>
     <br>
     <a href="identify">
-      <button>Indentify Card</button>
+      <button>Identify Card</button>
     </a>
     <br>
-    <a href="log">
+    <!-- <a href="log">
       <button>Log Files</button>
-    </a>
+    </a> -->
   </div>
 </body>
+
+</html>
