@@ -1,6 +1,7 @@
 import json
 import os
 import sqlite3
+from datetime import datetime, timedelta
 
 import requests
 from flask import Flask, flash, redirect, render_template, request, url_for
@@ -29,6 +30,7 @@ GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configura
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
 app = Flask(__name__)
 app.secret_key = os.urandom(12).hex()
+
 sheet.get_sheet_data(limited=False)
 alarm_enable_names = ["ENABLE", "DISABLE"]
 device_status_names = ["ONLINE", "OFFLINE"]
@@ -81,6 +83,21 @@ def assign_uid(cruzid, overwrite, uid):
         carderror = f"Card added to database for {cruzid}"
         added = True
     return carderror, added
+
+
+CHECKIN_TIMEOUT = 30  # seconds
+
+
+def update_data():
+    sheet.get_canvas_status_sheet()
+    if (
+        not sheet.last_update_time
+        or sheet.last_canvas_update_time > sheet.last_update_time
+        or datetime.now() - sheet.last_update_time
+        > timedelta(0, CHECKIN_TIMEOUT, 0, 0, 0, 0, 0)
+    ):
+        print("Getting sheet data...")
+        sheet.get_sheet_data()
 
 
 @app.route("/")
@@ -186,7 +203,10 @@ def logout():
 @app.route("/dashboard", methods=("GET", "POST"))
 @login_required
 def dashboard():
+    update_data()
     canvas_update = sheet.last_canvas_update_time
+    if sheet.canvas_is_updating:
+        canvas_update = "Updating..."
     devices = sheet.reader_data.loc[
         :,
         [
@@ -244,7 +264,7 @@ def dashboard():
 
     try:
         if request.method == "POST":
-            flash("You are using POST")
+            # flash("You are using POST")
 
             if request.form["label"] == "update-device":
 
@@ -276,7 +296,7 @@ def dashboard():
                 )
                 return redirect("/dashboard")
             elif request.form["label"] == "update-canvas":
-                # canvas.update()  # TODO: fix, set canvas status to pending
+                sheet.update_canvas()
                 print("Updating canvas")
                 return redirect("/dashboard")
             elif request.form["label"] == "update-all":
@@ -296,13 +316,13 @@ def dashboard():
 @app.route("/setup", methods=("GET", "POST"))
 @login_required
 def setup():
+    update_data()
     err = ""
     added = False
 
     try:
         if request.method == "POST":
-            flash("You are using POST")
-            sheet.get_canvas_status_sheet()
+            # flash("You are using POST")
             if request.form["label"] == "uidsetup" and not sheet.canvas_is_updating:
                 cruzid = request.form.get("cruzid")
                 overwritecheck = (
@@ -315,8 +335,10 @@ def setup():
                     err = "Card not detected, please try again"
                 else:
                     err, added = assign_uid(cruzid, overwritecheck, uid)
-            else:
+            elif sheet.canvas_is_updating:
                 err = "Canvas is updating, please wait"
+            else:
+                err = "Invalid request"
 
     except Exception as e:
         print(e)
@@ -331,61 +353,57 @@ def setup():
 @app.route("/identify", methods=("GET", "POST"))
 @login_required
 def identify():
+    update_data()
     cruzid = ""
     uid = ""
     err = ""
     user_data = None
+    accesses = []
+    rooms = sheet.rooms
 
     try:
         if request.method == "POST":
             cruzid = ""
-            flash("You are using POST")
+            # flash("You are using POST")
             if request.form["label"] == "identifyuid":
                 cruzid = request.form.get("cruzid")
-                uid = nfc.read_card()
 
                 if cruzid != None and cruzid != "" and cruzid != "None":
                     user_data = dict(
                         zip(
                             [
-                                "is_staff",
+                                "type",
                                 "cruzid",
                                 "uid",
                                 "first_name",
                                 "last_name",
-                                "access1",
-                                "access2",
-                                "access3",
-                                "access4",
-                                "access5",
-                                "access6",
-                                "access7",
-                                "access8",
                             ],
                             sheet.get_user_data(cruzid=cruzid),
                         )
                     )
+                    accesses = sheet.get_all_accesses(cruzid=cruzid)
                 else:
+                    uid = nfc.read_card()
                     user_data = dict(
                         zip(
                             [
-                                "is_staff",
+                                "type",
                                 "cruzid",
                                 "uid",
                                 "first_name",
                                 "last_name",
-                                "access1",
-                                "access2",
-                                "access3",
-                                "access4",
-                                "access5",
-                                "access6",
-                                "access7",
-                                "access8",
                             ],
                             sheet.get_user_data(uid=uid),
                         )
                     )
+                    accesses = sheet.get_all_accesses(uid=uid)
+
+                if user_data["type"] is True:
+                    user_data["type"] = "Staff"
+                elif user_data["type"] is False:
+                    user_data["type"] = "Student"
+                else:
+                    user_data["type"] = "Unknown"
 
     except Exception as e:
         print(e)
@@ -394,6 +412,9 @@ def identify():
         "identify.html",
         err=err,
         user_data=user_data,
+        accesses=accesses,
+        rooms=rooms,
+        length=0 if not rooms else len(rooms),
     )
 
 

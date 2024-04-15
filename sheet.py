@@ -36,6 +36,8 @@ CANVAS_STATUS_SHEET = "Canvas Status"  # contains the last update time of the Ca
 
 SEND_BLOCK = 100
 
+ENABLE_SCAN_LOGS = False  # disable scan logs - considered P3 data due to tracking locations of students (can add back in for testing or when a secure logging system is implemented)
+
 student_data = None
 staff_data = None
 module_data = None
@@ -61,11 +63,12 @@ this_reader = None
 module_count = 0
 rooms = list()
 
-last_update_date = None
+last_update_time = None
 last_checkin_time = None
 
 last_canvas_update_time = None
 canvas_is_updating = None
+canvas_needs_update = None
 
 student_sheet_read_len = 0
 staff_sheet_read_len = 0
@@ -109,11 +112,12 @@ def get_sheet_data(limited=None):
 
     Returns True if the data was retrieved, or False if it was not.
     """
-    global student_data, staff_data, module_data, access_data, rooms, module_count, limited_data, last_update_date, student_sheet_read_len, staff_sheet_read_len
+    global student_data, staff_data, module_data, access_data, rooms, module_count, limited_data, last_update_time, student_sheet_read_len, staff_sheet_read_len
 
     if limited is not None:
         limited_data = limited
     try:
+        last_update_time = datetime.datetime.now()
         # get the students sheet
         students = (
             g_sheets.values()
@@ -130,7 +134,7 @@ def get_sheet_data(limited=None):
             exit()
 
         values = [r + [""] * (len(values[0]) - len(r)) for r in values]
-        staff_sheet_read_len = len(values)
+        student_sheet_read_len = len(values)
 
         student_data = pd.DataFrame(
             values[1:] if len(values) > 1 else None,
@@ -201,8 +205,6 @@ def get_sheet_data(limited=None):
                         r[1] = int(r[1])
                     access_data[access_headers[i]] = tuple(r)
 
-        last_update_date = datetime.datetime.now().date()
-
         return True and get_reader_data()
     except HttpError as e:
         print(e)
@@ -270,7 +272,9 @@ def check_in(alarm_status=False):
     if this_reader["alarm"] == "DISABLE":
         this_reader["alarm_status"] = "DISABLED"
     else:
-        if alarm_status is None:
+        if reader_id == 0:
+            this_reader["alarm_status"] = ""
+        elif alarm_status is None:
             this_reader["alarm_status"] = "TAGGED OUT"
         elif alarm_status:
             this_reader["alarm_status"] = "ALARM"
@@ -302,7 +306,7 @@ def check_in(alarm_status=False):
 
 
 def get_canvas_status_sheet():
-    global last_canvas_update_time, canvas_is_updating
+    global last_canvas_update_time, canvas_is_updating, canvas_needs_update
     """
     Get the time of the last Canvas update.
 
@@ -320,6 +324,7 @@ def get_canvas_status_sheet():
         ).get("values", [])
 
         canvas_is_updating = True if values[0][0] == "UPDATING" else False
+        canvas_needs_update = True if values[0][0] == "PENDING" else False
         last_canvas_update_time = datetime.datetime.strptime(
             values[0][1], "%Y-%m-%d %H:%M:%S"
         )
@@ -328,7 +333,7 @@ def get_canvas_status_sheet():
         return None
 
 
-def set_canvas_status_sheet(updating_now):
+def set_canvas_status_sheet(updating_now, update_time=None):
     """
     Set the time of the last Canvas update.
 
@@ -336,7 +341,7 @@ def set_canvas_status_sheet(updating_now):
 
     Returns True if the data was set, or False if it was not.
     """
-
+    global last_canvas_update_time
     try:
         _ = (
             g_sheets.values()
@@ -349,13 +354,41 @@ def set_canvas_status_sheet(updating_now):
                         [
                             "UPDATING" if updating_now else "DONE",
                             (
-                                str(datetime.datetime.now())
-                                if updating_now
+                                str(update_time)
+                                if not updating_now and update_time
                                 else str(last_canvas_update_time)
                             ),
                         ]
                     ]
                 },
+            )
+            .execute()
+        )
+        last_canvas_update_time = update_time
+        return True
+    except HttpError as e:
+        print(e)
+        return False
+
+
+def update_canvas():
+    """
+    Set the Canvas update status to pending.
+
+    Returns True if the data was set, or False if it was not.
+    """
+    global canvas_is_updating
+    get_canvas_status_sheet()
+    if canvas_is_updating:
+        return False
+    try:
+        _ = (
+            g_sheets.values()
+            .update(
+                spreadsheetId=SPREADSHEET_ID,
+                range=CANVAS_STATUS_SHEET + "!A2:A2",
+                valueInputOption="USER_ENTERED",
+                body={"values": [["PENDING"]]},
             )
             .execute()
         )
@@ -807,11 +840,18 @@ def write_student_sheet():
         vals = student_data.values.tolist()
         vals.insert(0, student_data.columns.tolist())
         length = len(vals)
+        blank_filled = 0
+
+        # print(vals)
 
         if student_sheet_read_len > length:
-            vals = vals + [[""] * len(student_data.columns)] * (
-                student_sheet_read_len - length
-            )
+            blank_filled = student_sheet_read_len - length
+            vals = vals + [[""] * len(student_data.columns)] * (blank_filled)
+        else:
+            student_sheet_read_len = length
+
+        # print(student_sheet_read_len)
+        # print(vals)
 
         for i in range(0, student_sheet_read_len, SEND_BLOCK):
             _ = (
@@ -827,7 +867,7 @@ def write_student_sheet():
                 )
                 .execute()
             )
-        student_sheet_read_len = length
+        student_sheet_read_len -= blank_filled
         return True
     except HttpError as e:
         print(e)
@@ -896,12 +936,18 @@ def evaluate_modules(completed_modules, cruzid=None, uid=None):
 
     for i in range(len(module_data)):
         exp = str(module_data.loc[i, "Modules"])
-        for m in range(1, module_count + 1):
-            exp = exp.replace(str(m), str(m in completed_modules))
+        exp = exp.lower()
+        exp = exp.replace("and", "&")
+        exp = exp.replace("or", "|")
+        exp = exp.replace(" ", "")
+
+        for m in range(module_count, 0, -1):
+            exp = exp.replace(str(m), "t" if m in completed_modules else "f")
+
         if (
             set_access(
                 module_data.loc[i, "Access Levels"],
-                eval(exp) if len(exp) > 0 else False,
+                (string_eval(exp) == "t") if len(exp) > 0 else False,
                 cruzid=cruzid,
                 uid=uid,
             )
@@ -909,6 +955,62 @@ def evaluate_modules(completed_modules, cruzid=None, uid=None):
         ):
             return False
     return True
+
+
+def string_eval(exp):
+    """
+    Evaluate a string expression for modules.
+
+    exp: str: the expression to evaluate.
+
+    Returns the evaluated expression.
+    """
+
+    while "(" in exp:
+        start = 0
+        end = exp.index(")")
+        while "(" in exp[start + 1 : end]:
+            start = exp.index("(", start + 1)
+
+        exp = exp[:start] + string_eval(exp[start + 1 : end]) + exp[end + 1 :]
+
+    while "&" in exp:
+        i = exp.index("&")
+
+        bw = 0
+        if "|" in exp[:i]:
+            bw = exp.rindex("|", 0, i) + 1
+
+        fw = len(exp)
+        if "|" in exp[i + 1 :]:
+            fw = exp.index("|", i + 1)
+
+        exp = (
+            exp[:bw]
+            + (
+                "t"
+                if (
+                    string_eval(exp[bw:i]) == "t"
+                    and string_eval(exp[i + 1 : fw]) == "t"
+                )
+                else "f"
+            )
+            + exp[fw:]
+        )
+
+    while "|" in exp:
+        i = exp.index("|")
+        exp = (
+            exp[: i - 1]
+            + (
+                "t"
+                if (string_eval(exp[:i]) == "t" or string_eval(exp[i + 1 :]) == "t")
+                else "f"
+            )
+            + exp[i + 2 :]
+        )
+
+    return exp
 
 
 def is_staff(cruzid=None, uid=None):
@@ -955,7 +1057,7 @@ def get_user_data(cruzid=None, uid=None):
                 ),
                 "First Name":"Last Name",
             ].values.tolist()[0]
-            + get_all_accesses(cruzid=cruzid, uid=uid)
+            # + get_all_accesses(cruzid=cruzid, uid=uid)
         )
     elif is_staff(cruzid=cruzid, uid=uid):
         if cruzid:
@@ -989,11 +1091,14 @@ def remove_student(cruzid):
     """
 
     if not student_exists(cruzid=cruzid):
+        # print("not found")
         return False
 
     row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
+    # print(row)
     student_data.drop(row, inplace=True)  # TODO: move to archive sheet instead
     student_data.reset_index(drop=True, inplace=True)
+    # print(student_data)
 
     return True
 
@@ -1048,6 +1153,7 @@ def clamp_students(student_list):
 
     for i in range(student_data.shape[0]):
         if student_data.loc[i, "CruzID"] not in student_list:
+            # print("drop")
             student_data.drop(i, inplace=True)  # TODO: move to archive sheet instead
 
 
@@ -1129,31 +1235,38 @@ def scan_uid(uid, alarm_status=False):
 
     if is_staff(uid=uid):
         if access_data["staff"]:
-            log(uid, "Staff", alarm_status, access_data["staff"][1])
+            if ENABLE_SCAN_LOGS:
+                log(uid, "Staff", alarm_status, access_data["staff"][1])
             return access_data["staff"]
         elif access_data["no_access"]:
-            log(uid, "Staff", alarm_status, access_data["no_access"][1])
+            if ENABLE_SCAN_LOGS:
+                log(uid, "Staff", alarm_status, access_data["no_access"][1])
             return access_data["no_access"]
         else:
-            log(uid, "Staff (Not Found)", alarm_status, 0)
+            if ENABLE_SCAN_LOGS:
+                log(uid, "Staff (Not Found)", alarm_status, 0)
             return False
 
     elif student_exists(uid=uid):
         for i in range(len(rooms)):
             if get_access(rooms[i], uid=uid) and access_data[rooms[i]]:
-                log(uid, rooms[i], alarm_status, access_data[rooms[i]][1])
+                if ENABLE_SCAN_LOGS:
+                    log(uid, rooms[i], alarm_status, access_data[rooms[i]][1])
                 return access_data[rooms[i]]
 
         if access_data["no_access"]:
-            log(uid, "No Access", alarm_status, access_data["no_access"][1])
+            if ENABLE_SCAN_LOGS:
+                log(uid, "No Access", alarm_status, access_data["no_access"][1])
             return access_data["no_access"]
         else:
-            log(uid, "Student (Not Found)", alarm_status, 0)
+            if ENABLE_SCAN_LOGS:
+                log(uid, "Student (Not Found)", alarm_status, 0)
             return False
 
     else:
-        log(uid, "Unknown", alarm_status, 0)
-        return None
+        if ENABLE_SCAN_LOGS:
+            log(uid, "Unknown", alarm_status, 0)
+        return access_data["no_access"]
 
 
 def run_in_thread(
@@ -1323,7 +1436,8 @@ if __name__ == "__main__":
     # if not new_student("Cédric", "Chartier", "cchartie"):
     #     print("CruzID, Canvas ID, or Card UID already in use.")
 
-    # print(set_uid("cchartie", "01234567", overwrite=True))
+    # print(set_uid("sabsadik", "23458923", overwrite=True))
+    # remove_student("sabsadik")
 
     # print(staff_data)
     # remove_staff("imadan0")
@@ -1342,8 +1456,8 @@ if __name__ == "__main__":
     # print(get_all_accesses(cruzid="tstudent"))
     # print(evaluate_modules([1, 2, 5, 6, 7, 8, 9, 10], cruzid="tstudent"))
 
-    # write_student_sheet()
-    # write_staff_sheet()
+    write_student_sheet()
+    write_staff_sheet()
 
     # set_uid("ewachtel", "63B104FF")
     # set_uid("cchartie", "63B104FF")
@@ -1357,8 +1471,8 @@ if __name__ == "__main__":
     # print(get_user_data(cruzid="ewachtel"))
     # print(get_user_data(cruzid="cchartie"))
 
-    # print()
-    # print(student_data)
+    print()
+    print(student_data)
     # print()
     # print(staff_data)
     # print()

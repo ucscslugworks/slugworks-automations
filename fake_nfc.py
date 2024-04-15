@@ -40,7 +40,8 @@ def read_card_queue_timeout(time):
         p.terminate()
         return None
 
-    return q.get().upper()
+    r = q.get()
+    return r if not r else r.upper()
 
 
 def close():

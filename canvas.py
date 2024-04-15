@@ -1,4 +1,5 @@
 import json
+import time
 from datetime import datetime, timedelta
 
 import requests
@@ -7,192 +8,216 @@ import sheet
 
 
 def update():
-    sheet.get_sheet_data(limited=False)
-    sheet.set_canvas_status_sheet(True)
-    print("Successfully retrieved sheet data")
+    try:
+        sheet.get_sheet_data(limited=False)
+        print("Successfully retrieved sheet data")
 
-    keys = json.load(open("canvas.json"))
+        keys = json.load(open("canvas.json"))
 
-    token = keys["auth_token"]
-    course_id = keys["course_id"]
+        token = keys["auth_token"]
+        course_id = keys["course_id"]
 
-    url = f"https://canvas.ucsc.edu/api/v1/courses/{course_id}/"
-    endpoint = "users"  # TODO: replace with https://canvas.instructure.com/doc/api/all_resources.html#method.courses.users this endpoint, and get both students and staff to populate both sheets & check for duplicates
-    headers = {"Authorization": f"Bearer {token}"}
+        url = f"https://canvas.ucsc.edu/api/v1/courses/{course_id}/"
+        endpoint = "users"
+        headers = {"Authorization": f"Bearer {token}"}
 
-    staff_json = []
-    students_json = []
+        staff_json = []
+        students_json = []
 
-    params = {
-        "enrollment_type[]": "teacher",
-        "per_page": 1000,
-    }
+        params = {
+            "enrollment_type[]": "teacher",
+            "per_page": 1000,
+        }
 
-    response = requests.request("GET", url + endpoint, headers=headers, params=params)
-    staff_json = response.json()
-    while "next" in response.links:
+        staff_count = 0
+
         response = requests.request(
-            "GET", response.links["next"]["url"], headers=headers
+            "GET", url + endpoint, headers=headers, params=params
+        )
+        staff_json = response.json()
+        print(f"Successfully retrieved staff data part {staff_count} from Canvas")
+        while "next" in response.links:
+            response = requests.request(
+                "GET", response.links["next"]["url"], headers=headers
+            )
+            staff_json += response.json()
+            staff_count += 1
+            print(f"Successfully retrieved staff data part {staff_count} from Canvas")
+
+        params = {
+            "enrollment_type[]": "ta",
+            "per_page": 1000,
+        }
+
+        response = requests.request(
+            "GET", url + endpoint, headers=headers, params=params
         )
         staff_json += response.json()
+        if len(response.json()) > 0:
+            staff_count += 1
+            print(f"Successfully retrieved staff data part {staff_count} from Canvas")
+        while "next" in response.links:
+            response = requests.request(
+                "GET", response.links["next"]["url"], headers=headers
+            )
+            staff_json += response.json()
+            staff_count += 1
+            print(f"Successfully retrieved staff data part {staff_count} from Canvas")
 
-    params = {
-        "enrollment_type[]": "ta",
-        "per_page": 1000,
-    }
+        params = {
+            "enrollment_type[]": "student",
+            "per_page": 1000,
+        }
 
-    response = requests.request("GET", url + endpoint, headers=headers, params=params)
-    staff_json += response.json()
-    while "next" in response.links:
+        student_count = 0
+
         response = requests.request(
-            "GET", response.links["next"]["url"], headers=headers
+            "GET", url + endpoint, headers=headers, params=params
         )
-        staff_json += response.json()
+        students_json = response.json()
+        print(f"Successfully retrieved student data part {student_count} from Canvas")
+        while "next" in response.links:
+            response = requests.request(
+                "GET", response.links["next"]["url"], headers=headers
+            )
+            students_json += response.json()
+            student_count += 1
+            print(
+                f"Successfully retrieved student data part {student_count} from Canvas"
+            )
 
-    # print(json.dumps(staff, indent=4))
+        print("Successfully retrieved all staff and student data from Canvas")
 
-    params = {
-        "enrollment_type[]": "student",
-        "per_page": 1000,
-    }
+        staff = []
+        for s in staff_json:
+            if "login_id" not in s or "ucsc.edu" not in s["login_id"]:
+                continue
 
-    response = requests.request("GET", url + endpoint, headers=headers, params=params)
-    students_json = response.json()
-    while "next" in response.links:
-        response = requests.request(
-            "GET", response.links["next"]["url"], headers=headers
-        )
-        students_json += response.json()
+            cruzid = s["login_id"].split("@ucsc.edu")[0]
 
-    print("Successfully retrieved staff and student data from Canvas")
+            if cruzid in staff:
+                continue
 
-    staff = []
-    for s in staff_json:
-        if (
-            "login_id" not in s
-            or "ucsc.edu" not in s["login_id"]
-            or s["login_id"] in staff
-        ):
-            continue
+            if not sheet.is_staff(cruzid=cruzid):
+                sn = s["sortable_name"].split(", ")
+                uid = None
 
-        cruzid = s["login_id"].split("@ucsc.edu")[0]
+                if sheet.student_exists(cruzid):
+                    uid = sheet.get_uid(cruzid)
+                    sheet.remove_student(cruzid)
 
-        if not sheet.is_staff(cruzid):
-            sn = s["sortable_name"].split(", ")
-            # students[cruzid] = s["id"]
-            uid = None
+                sheet.new_staff(sn[1], sn[0], cruzid, uid)
 
-            if sheet.student_exists(cruzid):
-                uid = sheet.get_uid(cruzid)
-                sheet.remove_student(cruzid)
+            staff.append(cruzid)
 
-            sheet.new_staff(sn[1], sn[0], cruzid, uid)
+        sheet.clamp_staff(staff)
 
-        staff.append(cruzid)
+        print("Successfully processed staff data")
 
-    # print("staff", staff)
-    # print("staffdata", sheet.staff_data)
+        students = {}
+        for s in students_json:
+            if "login_id" not in s or "ucsc.edu" not in s["login_id"]:
+                continue
 
-    sheet.clamp_staff(staff)
+            cruzid = s["login_id"].split("@ucsc.edu")[0]
 
-    print("Successfully processed staff data")
+            if cruzid in students or cruzid in staff:
+                print(f"Skipping {cruzid}")
+                continue
 
-    students = {}
-    for s in students_json:
-        if (
-            "login_id" not in s
-            or "ucsc.edu" not in s["login_id"]
-            or s["login_id"] in students
-        ):
-            continue
+            if not sheet.student_exists(cruzid):
+                sn = s["sortable_name"].split(", ")
+                students[cruzid] = s["id"]
 
-        cruzid = s["login_id"].split("@ucsc.edu")[0]
+                sheet.new_student(sn[1], sn[0], cruzid, s["id"], None)
 
-        if cruzid in staff:
-            continue
-
-        if not sheet.student_exists(cruzid):
-            sn = s["sortable_name"].split(", ")
             students[cruzid] = s["id"]
 
-            uid = None
+        sheet.clamp_students(students.keys())
 
-            if sheet.is_staff(cruzid):
-                uid = sheet.get_uid(cruzid)
-                sheet.remove_staff(cruzid)
+        print("Successfully processed student data")
 
-            sheet.new_student(sn[1], sn[0], cruzid, s["id"], uid)
+        endpoint = "modules"
 
-        students[cruzid] = s["id"]
+        for i, cruzid in enumerate(students):
+            params = {"student_id": students[cruzid]}
+            response = requests.request(
+                "GET", url + endpoint, headers=headers, data=params
+            )
+            modules_json = json.loads(response.text)
+            completed_modules = []
+            for m in modules_json:
+                if m["state"] == "completed":
+                    completed_modules.append(int(m["position"]))
 
-    # print("studentdata", sheet.student_data)
-    # print("students", list(students.keys()))
-    sheet.clamp_students(students.keys())
+            sheet.evaluate_modules(completed_modules, cruzid)
+            print(
+                f"Successfully evaluated modules for {cruzid}, ({i+1}/{len(students)})"
+            )
 
-    print("Successfully processed student data")
-    # print(sheet.module_data)
+        print("\nSuccessfully evaluated modules for all students")
 
-    endpoint = "modules"
+        if sheet.write_student_sheet():
+            print("Successfully wrote student sheet")
+        else:
+            print("Failed to write student sheet")
+            return False
 
-    for i, cruzid in enumerate(students):
-        params = {"student_id": students[cruzid]}
-        response = requests.request("GET", url + endpoint, headers=headers, data=params)
-        modules_json = json.loads(response.text)
-        completed_modules = []
-        for m in modules_json:
-            if m["state"] == "completed":
-                completed_modules.append(int(m["position"]))
+        if sheet.write_staff_sheet():
+            print("Successfully wrote staff sheet")
+        else:
+            print("Failed to write staff sheet")
+            return False
 
-        sheet.evaluate_modules(completed_modules, cruzid)
-        print(f"Successfully evaluated modules for {cruzid}, ({i+1}/{len(students)})")
+        if sheet.log("Canvas Update", "", False, 0):
+            print("Successfully logged canvas update")
+        else:
+            print("Failed to log canvas update")
+            return False
 
-    print("\nSuccessfully evaluated modules for all students")
-
-    # print(sheet.student_data)
-    # print(sheet.staff_data)
-
-    if sheet.write_student_sheet():
-        print("Successfully wrote student sheet")
-    else:
-        print("Failed to write student sheet")
-        return False
-
-    if sheet.write_staff_sheet():
-        print("Successfully wrote staff sheet")
-    else:
-        print("Failed to write staff sheet")
-        return False
-
-    if sheet.log("Canvas Update", "", False, 0):
-        print("Successfully logged canvas update")
-    else:
-        print("Failed to log canvas update")
-        return False
-
-    sheet.set_canvas_status_sheet(False)
-    return True
+        return True
+    except KeyboardInterrupt:
+        print("Exiting...")
+        sheet.set_canvas_status_sheet(False)
+        exit(0)
 
 
-CANVAS_UPDATE_HOUR = 0  # 12am
+CANVAS_UPDATE_HOUR = 4  # 4am
 CHECKIN_TIMEOUT = 5  # 5 minutes
 
 if __name__ == "__main__":
-    update()
-    exit()
-    while True:
-        if (
-            not sheet.last_update_date or datetime.now().date() > sheet.last_update_date
-        ) and datetime.now().hour >= CANVAS_UPDATE_HOUR:
-            print("Canvas update...")
-            sheet.set_canvas_status_sheet(True)
-            # update()
-            sheet.get_sheet_data()
-            sheet.check_in()
-            sheet.set_canvas_status_sheet(False)
-        elif (
-            not sheet.last_checkin_time
-            or datetime.now() - sheet.last_checkin_time
-            > timedelta(0, 0, 0, 0, CHECKIN_TIMEOUT, 0, 0)
-        ):
-            print("Checking in...")
-            sheet.check_in()
+    sheet.last_update_time = datetime.now()
+    try:
+        while True:
+            sheet.get_canvas_status_sheet()
+            if (
+                sheet.canvas_needs_update
+                or not sheet.last_update_time
+                or (
+                    (
+                        datetime.now().date() > sheet.last_update_time.date()
+                        and datetime.now().hour >= CANVAS_UPDATE_HOUR
+                    )
+                )
+            ):
+                print("Canvas update...")
+                sheet.set_canvas_status_sheet(True)
+                tmp_time = datetime.now()
+                update()
+                sheet.get_sheet_data()
+                sheet.check_in()
+                sheet.set_canvas_status_sheet(False, tmp_time)
+            elif (
+                not sheet.last_checkin_time
+                or datetime.now() - sheet.last_checkin_time
+                > timedelta(0, 0, 0, 0, CHECKIN_TIMEOUT, 0, 0)
+            ):
+                print("Checking in...")
+                sheet.check_in()
+            else:
+                print("Waiting for next update...")
+            time.sleep(60)
+    except KeyboardInterrupt:
+        print("Exiting...")
+        sheet.set_canvas_status_sheet(False)
+        exit(0)
