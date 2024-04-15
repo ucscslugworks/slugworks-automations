@@ -2,35 +2,35 @@
 <html>
 
 <head>
-        <title>Student Card Setup</title>
-        <style>
-            #container {
-                display: flex;
-                flex-flow: row wrap;
-                justify-content: space-evenly;
-                align-items: flex-start;
-                align-content: space-around;
-            }
-        </style>
-    </head>
+    <title>Student Card Setup</title>
+    <style>
+        #container {
+            display: flex;
+            flex-flow: row wrap;
+            justify-content: space-evenly;
+            align-items: flex-start;
+            align-content: space-around;
+        }
+    </style>
+</head>
 
-    <body>
-        <p> <strong>THIS IS TO BE USED BY AUTHORIZED STAFF ONLY</strong>.</p>
-        {% for message in get_flashed_messages() %}
-        <div class="alert">{{ message }}</div>
-        {% endfor %}
-        <div>
-            <h2>Card Setup</h2>
-            <form method="post">
-                <input type="hidden" name="label" value="identifyuid">
-                {% if (err != "") %}
-                <label for="error-lab">Error: </label>
-                <div id="error-cont">
-                    <!-- <input type="text" id="error" name="error" value="{{ err }}" readonly style="color:red"> -->
-                    <p id="error" name="error" style="color:{{color}}">{{ err }}</p>
-                </div>
-                {% endif %}
-                <!-- <div>
+<body>
+    <p> <strong>THIS IS TO BE USED BY AUTHORIZED STAFF ONLY</strong>.</p>
+    {% for message in get_flashed_messages() %}
+    <div class="alert">{{ message }}</div>
+    {% endfor %}
+    <div>
+        <h2>Card Setup</h2>
+        <form method="post">
+            <input type="hidden" name="label" value="identifyuid">
+            {% if (err != "") %}
+            <label for="error-lab">Error: </label>
+            <div id="error-cont">
+                <!-- <input type="text" id="error" name="error" value="{{ err }}" readonly style="color:red"> -->
+                <p id="error" name="error" style="color:{{color}}">{{ err }}</p>
+            </div>
+            {% endif %}
+            <!-- <div>
                     <label for="first-name">First Name:</label>
                     <p id="first-name-output">{{ first_name }}</p>
                 </div>
@@ -38,7 +38,7 @@
                     <label for="last-name">Last Name:</label>
                     <p id="last-name-output">{{ last_name }}</p>
                 </div> -->
-                <!-- <div>
+            <!-- <div>
                     <label for="cruzid">cruzid:</label>
                     <p id="id-output">{{ cruzid }}</p>
                 </div>
@@ -51,77 +51,83 @@
                     <p id="affiliation-output">{{ affiliation }}</p>
                 </div> -->
 
-                <table>
-                    <tr>
-                        <th>cruzid</th>
-                        <td>
-                            <input type="text" name="cruzid" value="{{ user_data.cruzid or None }}">
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>is staff?</th>
-                        <td>{{ user_data.is_staff }}</td>
-                    </tr>
-                   
-                    <tr>
-                        <th>uid</th>
-                        <td>{{ user_data.uid }}</td>
-                    </tr>
-                    <tr>
-                        <th>first name</th>
-                        <td>{{ user_data.first_name }}</td>
-                    </tr>
-                    <tr>
-                        <th>last name</th>
-                        <td>{{ user_data.last_name }}</td>
-                    </tr>
-                    <tr>
-                        <th>super user</th>
-                        <td>{{ user_data.access1 }}</td>
-                    </tr>
-                    <tr>
-                        <th>club leadership</th>
-                        <td>{{ user_data.access2 }}</td>
-                    </tr>
-                    <tr>
-                        <th>BE-49</th>
-                        <td>{{ user_data.access3 }}</td>
-                    </tr>
-                    <tr>
-                        <th>BE-50</th>
-                        <td>{{ user_data.access4 }}</td>
-                    </tr>
-                    <tr>
-                        <th>BE-51</th>
-                        <td>{{ user_data.access5 }}</td>
-                    </tr>
-                    <tr>
-                        <th>BE-53</th>
-                        <td>{{ user_data.access6 }}</td>
-                    </tr>
-                    <tr>
-                        <th>BE-54</th>
-                        <td>{{ user_data.access7 }}</td>
-                    </tr>
-                    <tr>
-                        <th>BE-55</th>
-                        <td>{{ user_data.access8 }}</td>
-                    </tr>
-                </table>
-                    
+            <table>
+                <tr>
+                    <th>cruzid</th>
+                    <td>
+                        <input type="text" name="cruzid" value="{{ user_data.cruzid or None }}">
+                    </td>
+                </tr>
+                <tr>
+                    <th>is staff?</th>
+                    <td>{{ user_data.is_staff }}</td>
+                </tr>
+
+                <tr>
+                    <th>uid</th>
+                    <td>{{ user_data.uid }}</td>
+                </tr>
+                <tr>
+                    <th>first name</th>
+                    <td>{{ user_data.first_name }}</td>
+                </tr>
+                <tr>
+                    <th>last name</th>
+                    <td>{{ user_data.last_name }}</td>
+                </tr>
+                <tr>
+                    <th>super user</th>
+                    <td>{{ user_data.access1 }}</td>
+                </tr>
+                <tr>
+                    <th>club leadership</th>
+                    <td>{{ user_data.access2 }}</td>
+                </tr>
+                <tr>
+                    <th>BE-49</th>
+                    <td>{{ user_data.access3 }}</td>
+                </tr>
+                <tr>
+                    <th>BE-50</th>
+                    <td>{{ user_data.access4 }}</td>
+                </tr>
+                <tr>
+                    <th>BE-51</th>
+                    <td>{{ user_data.access5 }}</td>
+                </tr>
+                <tr>
+                    <th>BE-53</th>
+                    <td>{{ user_data.access6 }}</td>
+                </tr>
+                <tr>
+                    <th>BE-54</th>
+                    <td>{{ user_data.access7 }}</td>
+                </tr>
+                <tr>
+                    <th>BE-55</th>
+                    <td>{{ user_data.access8 }}</td>
+                </tr>
+            </table>
 
 
-                <div>
-                    <button type="submit" name="checkcard" value="checkcard">Check Card</button>
-                </div>
-            </form>
-        </div>
-    </body>
 
-    </html>
-          
-    </form>
-  </div>
+            <div>
+                <button type="submit" name="checkcard" value="checkcard">Check Card</button>
+            </div>
+        </form>
+    </div>
+    <div>
+        <br>
+        <a href="/dashboard">
+            <button>Return to Dashboard</button>
+        </a>
+    </div>
+</body>
+
+</html>
+
+</form>
+</div>
 </body>
 
 </html>
