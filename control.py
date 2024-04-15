@@ -13,13 +13,9 @@ from flask_login import (
 )
 from oauthlib.oauth2 import WebApplicationClient
 
-import canvas
-
 # import control_nfc as nfc
 import fake_nfc as nfc
 import sheet
-
-# Internal imports
 from db import init_db_command
 from user import User
 
