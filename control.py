@@ -38,7 +38,7 @@ alarm_enable_names = ["ENABLE", "DISABLE"]
 device_status_names = ["ONLINE", "OFFLINE"]
 status_colors = ["#3CBC8D", "red", ""]
 alarm_status_names = ["OK", "ALARM", "TAGGED OUT", "DISABLED"]
-alarm_status_colors = ["#3CBC8D", "red", "yellow", "gray"]
+alarm_status_colors = ["#3CBC8D", "red", "yellow", "gray", ""]
 
 
 login_manager = LoginManager()
@@ -92,9 +92,9 @@ def index():
     if current_user.is_authenticated:
         return (
             "<p>Hello, you're logged in as {}! Email: {}</p>"
-            "<a class='button' href='/dashboard'>Dashboard</a>"
+            "<a class='button' href='/dashboard'>Dashboard</a><br>"
             '<a class="button" href="/logout">Logout</a>'.format(
-                current_user.name, current_user.email, current_user.profile_pic
+                current_user.name, current_user.email
             )
         )
     else:
@@ -232,7 +232,7 @@ def dashboard():
 
         device_info.append(
             {
-                "id": device["id"],
+                "id": int(device["id"]),
                 "status": device["status"],
                 "alarm_power": device["alarm"],
                 "alarm_enable_names": alarm_enable_names,
@@ -256,7 +256,6 @@ def dashboard():
                 req_location = request.form.get("location")
                 req_alarm = request.form.get("alarm_power")
                 req_delay = request.form.get("delay")
-                canvas_update = sheet.last_canvas_update_time
 
                 if req_alarm:
                     device_info[req_id]["alarm_power"] = req_alarm
@@ -279,10 +278,14 @@ def dashboard():
                         "alarm_delay": req_delay,
                     },
                 )
-                return redirect("/")
+                return redirect("/dashboard")
             elif request.form["label"] == "update-canvas":
-                canvas.update()  # TODO: no
-                return redirect("/")
+                # canvas.update()  # TODO: fix, set canvas status to pending
+                print("Updating canvas")
+                return redirect("/dashboard")
+            elif request.form["label"] == "update-all":
+                sheet.run_in_thread(f=sheet.update_all_readers)
+                return redirect("/dashboard")
 
     except Exception as e:
         print(e)
