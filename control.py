@@ -1,6 +1,7 @@
 import json
 import os
 import sqlite3
+from datetime import datetime, timedelta
 
 import requests
 from flask import Flask, flash, redirect, render_template, request, url_for
@@ -83,22 +84,21 @@ def assign_uid(cruzid, overwrite, uid):
         added = True
     return carderror, added
 
+
+CHECKIN_TIMEOUT = 30  # seconds
+
+
 def update_data():
     sheet.get_canvas_status_sheet()
     if (
         not sheet.last_update_time
         or sheet.last_canvas_update_time > sheet.last_update_time
+        or datetime.now() - sheet.last_update_time
+        > timedelta(0, CHECKIN_TIMEOUT, 0, 0, 0, 0, 0)
     ):
         print("Getting sheet data...")
         sheet.get_sheet_data()
-        sheet.check_in()
-    elif (
-        not sheet.last_checkin_time
-        or datetime.now() - sheet.last_checkin_time
-        > timedelta(0, 0, 0, 0, CHECKIN_TIMEOUT, 0, 0)
-    ):
-        print("Checking in...")
-        sheet.check_in()
+
 
 @app.route("/")
 def index():
@@ -294,7 +294,7 @@ def dashboard():
                 )
                 return redirect("/dashboard")
             elif request.form["label"] == "update-canvas":
-                # canvas.update()  # TODO: fix, set canvas status to pending
+                sheet.update_canvas()
                 print("Updating canvas")
                 return redirect("/dashboard")
             elif request.form["label"] == "update-all":

@@ -117,6 +117,7 @@ def get_sheet_data(limited=None):
     if limited is not None:
         limited_data = limited
     try:
+        last_update_time = datetime.datetime.now()
         # get the students sheet
         students = (
             g_sheets.values()
@@ -204,8 +205,6 @@ def get_sheet_data(limited=None):
                         r[1] = int(r[1])
                     access_data[access_headers[i]] = tuple(r)
 
-        last_update_time = datetime.datetime.now()
-
         return True and get_reader_data()
     except HttpError as e:
         print(e)
@@ -273,7 +272,9 @@ def check_in(alarm_status=False):
     if this_reader["alarm"] == "DISABLE":
         this_reader["alarm_status"] = "DISABLED"
     else:
-        if alarm_status is None:
+        if reader_id == 0:
+            this_reader["alarm_status"] = ""
+        elif alarm_status is None:
             this_reader["alarm_status"] = "TAGGED OUT"
         elif alarm_status:
             this_reader["alarm_status"] = "ALARM"
@@ -332,7 +333,7 @@ def get_canvas_status_sheet():
         return None
 
 
-def set_canvas_status_sheet(updating_now):
+def set_canvas_status_sheet(updating_now, update_time=None):
     """
     Set the time of the last Canvas update.
 
@@ -340,7 +341,7 @@ def set_canvas_status_sheet(updating_now):
 
     Returns True if the data was set, or False if it was not.
     """
-
+    global last_canvas_update_time
     try:
         _ = (
             g_sheets.values()
@@ -353,13 +354,41 @@ def set_canvas_status_sheet(updating_now):
                         [
                             "UPDATING" if updating_now else "DONE",
                             (
-                                str(datetime.datetime.now())
-                                if updating_now
+                                str(update_time)
+                                if not updating_now and update_time
                                 else str(last_canvas_update_time)
                             ),
                         ]
                     ]
                 },
+            )
+            .execute()
+        )
+        last_canvas_update_time = update_time
+        return True
+    except HttpError as e:
+        print(e)
+        return False
+
+
+def update_canvas():
+    """
+    Set the Canvas update status to pending.
+
+    Returns True if the data was set, or False if it was not.
+    """
+    global canvas_is_updating
+    get_canvas_status_sheet()
+    if canvas_is_updating:
+        return False
+    try:
+        _ = (
+            g_sheets.values()
+            .update(
+                spreadsheetId=SPREADSHEET_ID,
+                range=CANVAS_STATUS_SHEET + "!A2:A2",
+                valueInputOption="USER_ENTERED",
+                body={"values": [["PENDING"]]},
             )
             .execute()
         )
