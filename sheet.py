@@ -88,7 +88,7 @@ if not creds or not creds.valid:
         creds.refresh(Request())
     else:
         flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
-        creds = flow.run_local_server(port=0)
+        creds = flow.run_local_server(port=44649)
     # Save the credentials for the next run
     with open("token.json", "w") as token:
         token.write(creds.to_json())
@@ -482,6 +482,7 @@ def set_uid(cruzid, uid, overwrite=False):
     """
     if (
         not cruzid
+        or not uid
         or limited_data
         or (
             cruzid not in student_data["CruzID"].values
@@ -497,32 +498,26 @@ def set_uid(cruzid, uid, overwrite=False):
     ):
         return False
 
-    print("set")
-
     if overwrite:
         if uid in student_data["Card UID"].values:
             row = student_data.index[student_data["Card UID"] == uid].tolist()[0]
             student_data.loc[row, "Card UID"] = ""
-            print(row)
-            print(student_data.loc[row])
+
         if uid in staff_data["Card UID"].values:
             row = staff_data.index[staff_data["Card UID"] == uid].tolist()[0]
             staff_data.loc[row, "Card UID"] = ""
 
-    if not uid:
-        uid = None
-
-    if cruzid in staff_data["CruzID"].values:
+    if is_staff(cruzid=cruzid):
         row = staff_data.index[staff_data["CruzID"] == cruzid].tolist()[0]
         if not staff_data.loc[row, "Card UID"] or overwrite:
             staff_data.loc[row, "Card UID"] = uid
-        return staff_data.loc[row, "Card UID"]
+            return staff_data.loc[row, "Card UID"]
 
     else:
         row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
         if not student_data.loc[row, "Card UID"] or overwrite:
             student_data.loc[row, "Card UID"] = uid
-        return student_data.loc[row, "Card UID"]
+            return student_data.loc[row, "Card UID"]
 
 
 def get_uid(cruzid):
@@ -557,11 +552,11 @@ def get_uid(cruzid):
 
 def get_cruzid(uid):
     """
-    Get a student's CruzID from their card UID.
+    Get a student or staff's CruzID from their card UID.
 
-    uid: str: the student's card UID.
+    uid: str: the card UID.
 
-    Returns the student's CruzID if it exists, or False if it does not.
+    Returns the CruzID if it exists, or False if it does not.
     """
 
     if limited_data or (
@@ -923,9 +918,6 @@ def evaluate_modules(completed_modules, cruzid=None, uid=None):
             )
             is None
         ):
-            # print(module_data.loc[i, "Room"], "<" + exp + ">")
-            # print(eval(exp))
-            # print("fail")
             return False
     return True
 
@@ -1068,12 +1060,7 @@ def clamp_students(student_list):
     Returns the clamped student list.
     """
 
-    # with pd.option_context("display.max_rows", None, "display.max_columns", None):
-    #     print(student_data, student_data.shape)
     for i in range(student_data.shape[0]):
-        # print(i)
-        # print(student_data.loc[i, "CruzID"])
-        # print(student_data.loc[i])
         if student_data.loc[i, "CruzID"] not in student_list:
             # print("drop")
             student_data.drop(i, inplace=True)  # TODO: move to archive sheet instead
@@ -1380,6 +1367,10 @@ if __name__ == "__main__":
 
     write_student_sheet()
     write_staff_sheet()
+
+    # set_uid("ewachtel", "63B104FF")
+    # set_uid("cchartie", "63B104FF")
+    # write_student_staff_sheets()
 
     # log("63B104FF", "Staff", True, 10)
 

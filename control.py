@@ -1,30 +1,29 @@
-# https://www.digitalocean.com/community/tutorials/how-to-make-a-web-application-using-flask-in-python-3
-# force update button for pi5 funcheck
-# force update button for pizero funcheck
-# button to update both funcheck
-# status of reader funcheck
-# status of last update funcheck
-# format student id  funcheck
-# enter cruzid
-# prompt button to start reader
-# show warning if card already exists and if they want to overwrite funkcheck
-# show a warning if the cruzid is not in the database funkcheck
-# once button is pressed, show a message that the card is being written funkcheck
-# write to the sheet funcheck
-# show a message that the card has been written and added to sheet funkcheck
-
-
+import json
 import os
-import time
-from datetime import datetime, timedelta
-from threading import Thread
+import sqlite3
 
+import requests
 from flask import Flask, flash, redirect, render_template, request, url_for
+from flask_login import (
+    LoginManager,
+    current_user,
+    login_required,
+    login_user,
+    logout_user,
+)
+from oauthlib.oauth2 import WebApplicationClient
 
-import canvas
 # import control_nfc as nfc
 import fake_nfc as nfc
 import sheet
+from db import init_db_command
+from user import User
+
+# Configuration
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", sheet.creds.client_id)
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", sheet.creds.client_secret)
+GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
+
 
 # initialize flask app
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
@@ -36,43 +35,53 @@ alarm_enable_names = ["ENABLE", "DISABLE"]
 device_status_names = ["ONLINE", "OFFLINE"]
 status_colors = ["#3CBC8D", "red", ""]
 alarm_status_names = ["OK", "ALARM", "TAGGED OUT", "DISABLED"]
-alarm_status_colors = ["#3CBC8D", "red", "yellow", "gray"]
+alarm_status_colors = ["#3CBC8D", "red", "yellow", "gray", ""]
 
 
-# # TODO: this just needs canvas.update() and then sheet.check_in(alarm_status=False)
-# def updateme():  # updates the pi5
-#     print("Updating")
-#     # if pi5update < datetime.now()
-#     # if time > 3am and time < 5am
-#     # update the pi5 with canvas
-#     canvas.update()
+login_manager = LoginManager()
+login_manager.init_app(app)
 
-#     # update the pizero
-#     pi5update = datetime.now()
-#     print("Updated")
+# Naive database setup
+try:
+    init_db_command()
+except sqlite3.OperationalError:
+    # Assume it's already been created
+    pass
 
-
-# # TODO: use sheet.update_all_readers() to set all readers to need updating
-# def updatemyfriends():  # updates the pizero
-#     print("Updating")
-#     pizeroupdate = datetime.now()
-#     # update the pizero
-#     print("Updated")
+# OAuth 2 client setup
+client = WebApplicationClient(GOOGLE_CLIENT_ID)
 
 
-# # TODO: just call updateme() then updatemyfriends()
-# def updateall():  # updates both
-#     print("Updating")
-#     pitupdateall = datetime.now()
-#     canvas.update()
-#     # update the pizero
-#     print("Updated")
+# Flask-Login helper to retrieve a user from our db
+@login_manager.user_loader
+def load_user(user_id):
+    return User.get(user_id)
 
 
-# def status():  # status of reader
-#     print("Status")
-#     # status of reader
+@login_manager.unauthorized_handler
+def unauthorized():
+    return redirect("/login")
 
+
+def assign_uid(cruzid, overwrite, uid):
+    added = False
+    carderror = ""
+    if sheet.get_uid(cruzid) == uid:
+        carderror = f"Card is already assigned to {cruzid}"
+    elif sheet.get_uid(cruzid) and sheet.get_cruzid(uid) and not overwrite:
+        carderror = f"Card is already assigned to {sheet.get_cruzid(uid)}, and {cruzid} already has a card. If you would like to reassign the card to {cruzid} and replace {cruzid}'s existing card, please overwrite."
+    elif sheet.get_uid(cruzid) and not overwrite:
+        carderror = (
+            f"{cruzid} already has a card, please overwrite to replace with this card"
+        )
+    elif sheet.get_cruzid(uid) and not overwrite:
+        carderror = f"Card is already assigned to {sheet.get_cruzid(uid)}. If you would like to reassign the card to {cruzid}, please overwrite."
+    else:
+        sheet.set_uid(cruzid, uid, overwrite)
+        sheet.run_in_thread(f=sheet.write_student_staff_sheets)
+        carderror = f"Card added to database for {cruzid}"
+        added = True
+    return carderror, added
 
 def update_data():
     sheet.get_canvas_status_sheet()
@@ -91,117 +100,109 @@ def update_data():
         print("Checking in...")
         sheet.check_in()
 
-
-def staff_or_student(cruzid, overwritecheck, uid):
-    if sheet.is_staff(cruzid=cruzid) or sheet.is_staff(uid="uid"):
-        return assign_staff_uid(cruzid, uid, overwritecheck)
-    elif sheet.student_exists(cruzid=cruzid) or sheet.student_exists(uid="uid"):
-        return assign_student_uid(cruzid, overwritecheck, uid)
-    else:
-        carderror = "CruzID not in database, please add user to Canvas first, then update database"
-        return carderror, False
-
-
-def assign_student_uid(cruzid, overwritecheck, uid):  # set uid
-    added = False
-    carderror = ""
-    if sheet.is_staff(cruzid=cruzid):
-        carderror = f"{cruzid} is a staff member, please use a student CruzID"
-    elif not sheet.student_exists(cruzid=cruzid):
-        carderror = f"CruzID {cruzid} not in database, please add student to Canvas first, then update database"
-    elif sheet.get_uid(cruzid) == uid:
-        carderror = f"Card is already assigned to {cruzid}"
-    elif sheet.get_uid(cruzid) and not overwritecheck:
-        carderror = (
-            f"{cruzid} already has a card, please overwrite to replace with this card"
+@app.route("/")
+def index():
+    if current_user.is_authenticated:
+        return (
+            "<p>Hello, you're logged in as {}! Email: {}</p>"
+            "<a class='button' href='/dashboard'>Dashboard</a><br>"
+            '<a class="button" href="/logout">Logout</a>'.format(
+                current_user.name, current_user.email
+            )
         )
-    elif sheet.get_cruzid(uid) and not overwritecheck:
-        carderror = f"Card is already assigned to {sheet.get_cruzid(uid)}. If you would like to reassign the card to {cruzid}, please overwrite."
     else:
-        sheet.set_uid(cruzid, uid, overwritecheck)
-        sheet.run_in_thread(f=sheet.write_student_staff_sheets)
-        carderror = f"Card added to database for {cruzid}"
-        added = True
-
-    return carderror, added
+        return '<a class="button" href="/login">Google Login</a>'
 
 
-# If they are not staff, but they are a student complain
-# if they are not staff && not student check if Firstname Lastname is provided if not complain
-# ELSE: (at this point either cruzid is alrdy staff or they are neither staff nor student and have provided a name)
-# do standard cruzid && uid checks
-# if all checks pass, add to staff sheet
-# IDEAS:
-# add a list of staff with a remove button
-def assign_staff_uid(cruzid, first, last, uid, overwrite):  # set
-    print("assigning staff UID", cruzid, overwrite, uid)
-    added = False
-    carderror = ""
-    if not sheet.is_staff(cruzid=cruzid) and sheet.student_exists(cruzid=cruzid):
-        carderror = "CruzID is a student, please mark as a staff member in Canvas and perform a Canvas update"
-    elif (
-        not sheet.is_staff(cruzid=cruzid)
-        and not sheet.student_exists(cruzid=cruzid)
-        and (not first or not last)
-    ):
-        carderror = "Please provide a first and last name"
-    elif (
-        not sheet.is_staff(cruzid=cruzid)
-        and not sheet.student_exists(cruzid=cruzid)
-        and first
-        and last
-    ) or sheet.is_staff(cruzid=cruzid):
-        if sheet.get_uid(cruzid) == uid:
-            carderror = f"Card is already assigned to {cruzid}"
-        elif sheet.get_uid(cruzid) and not overwrite:
-            carderror = f"{cruzid} already has a card, please overwrite to replace with this card"
-        elif sheet.get_cruzid(uid) and not overwrite:
-            carderror = f"Card is already assigned to {sheet.get_cruzid(uid)}. If you would like to reassign the card to {cruzid}, please overwrite."
-        else:
-            # if not sheet.is_staff(cruzid):
-            #     sheet.new_staff(first, last, cruzid, uid)
-            #     carderror = f"New staff member {first} {last} added to database with CruzID {cruzid}"
-            # else:
-            sheet.set_uid(cruzid, uid, overwrite)
-            carderror = f"Card added to database for {cruzid}"
-            added = True
-            sheet.run_in_thread(f=sheet.write_student_staff_sheets)
-    return carderror, added
+def get_google_provider_cfg():
+    return requests.get(GOOGLE_DISCOVERY_URL).json()
 
 
-def find_owner(uid):
-    info = sheet.get_user_data(uid)
-    return info
+@app.route("/login")
+def login():
+    # Find out what URL to hit for Google login
+    google_provider_cfg = get_google_provider_cfg()
+    authorization_endpoint = google_provider_cfg["authorization_endpoint"]
 
-    # print(0)
-    # if sheet.is_staff(cruzid=cruzid):
-    #     print(1)
-    #     carderror = "Staff member, please use a student CruzID"
-    # elif not sheet.student_exists(cruzid=cruzid):
-    #     print(2)
-    #     carderror = "CruzID not in database, please add student to Canvas first, then update database"
-    # elif sheet.get_uid(cruzid) == uid:
-    #     print(3)
-    #     carderror = f"Card is already assigned to {cruzid}"
-    # elif sheet.get_uid(cruzid) is not None and not overwritecheck:
-    #     print(4)
-    #     carderror = (
-    #         f"{cruzid} already has a card, please overwrite to replace with this card"
-    #     )
-    # elif sheet.get_cruzid(uid) is not None and not overwritecheck:
-    #     print(5)
-    #     carderror = f"Card is already assigned to {sheet.get_cruzid(uid)}. If you would like to reassign the card to {cruzid}, please overwrite."
-    # else:
-    #     print(6)
-    #     sheet.set_uid(cruzid, uid, overwritecheck)
-    #     print(7)
-    #     # sheet.run_in_thread(f=sheet.write_student_sheet)
-    #     sheet.write_student_sheet()
-    #     carderror = "Card added to database"
+    # Use library to construct the request for Google login and provide
+    # scopes that let you retrieve user's profile from Google
+    request_uri = client.prepare_request_uri(
+        authorization_endpoint,
+        redirect_uri=request.base_url + "/callback",
+        scope=["openid", "email", "profile"],
+    )
+    return redirect(request_uri)
 
 
-@app.route("/", methods=("GET", "POST"))
-def server():
+@app.route("/login/callback")
+def callback():
+    # Get authorization code Google sent back to you
+    code = request.args.get("code")
+    # Find out what URL to hit to get tokens that allow you to ask for
+    # things on behalf of a user
+    google_provider_cfg = get_google_provider_cfg()
+    token_endpoint = google_provider_cfg["token_endpoint"]
+
+    # Prepare and send a request to get tokens! Yay tokens!
+    token_url, headers, body = client.prepare_token_request(
+        token_endpoint,
+        authorization_response=request.url,
+        redirect_url=request.base_url,
+        code=code,
+    )
+    token_response = requests.post(
+        token_url,
+        headers=headers,
+        data=body,
+        auth=(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET),
+    )
+
+    # Parse the tokens!
+    client.parse_request_body_response(json.dumps(token_response.json()))
+
+    # Now that you have tokens (yay) let's find and hit the URL
+    # from Google that gives you the user's profile information,
+    # including their Google profile image and email
+    userinfo_endpoint = google_provider_cfg["userinfo_endpoint"]
+    uri, headers, body = client.add_token(userinfo_endpoint)
+    userinfo_response = requests.get(uri, headers=headers, data=body)
+
+    # You want to make sure their email is verified.
+    # The user authenticated with Google, authorized your
+    # app, and now you've verified their email through Google!
+    if userinfo_response.json().get("email_verified"):
+        unique_id = userinfo_response.json()["sub"]
+        users_email = userinfo_response.json()["email"]
+        picture = userinfo_response.json()["picture"]
+        users_name = userinfo_response.json()["given_name"]
+    else:
+        return "User email not available or not verified by Google.", 400
+
+    # Create a user in your db with the information provided
+    # by Google
+    user = User(id_=unique_id, name=users_name, email=users_email, profile_pic=picture)
+
+    # Doesn't exist? Add it to the database.
+    if not User.get(unique_id):
+        User.create(unique_id, users_name, users_email, picture)
+
+    # Begin user session by logging the user in
+    login_user(user)
+
+    # Send user back to homepage
+    return redirect(url_for("dashboard"))
+
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for("index"))
+
+
+@app.route("/dashboard", methods=("GET", "POST"))
+@login_required
+def dashboard():
     update_data()
     canvas_update = sheet.last_canvas_update_time
     devices = sheet.reader_data.loc[
@@ -216,7 +217,6 @@ def server():
             "last_checked_in",
         ],
     ]  # Pull device data from sheet.py
-    # print(devices, sheet.this_reader)
 
     # Extract name, colour, and status attributes from devices
     device_info = []
@@ -246,7 +246,7 @@ def server():
 
         device_info.append(
             {
-                "id": device["id"],
+                "id": int(device["id"]),
                 "status": device["status"],
                 "alarm_power": device["alarm"],
                 "alarm_enable_names": alarm_enable_names,
@@ -270,7 +270,6 @@ def server():
                 req_location = request.form.get("location")
                 req_alarm = request.form.get("alarm_power")
                 req_delay = request.form.get("delay")
-                canvas_update = sheet.last_canvas_update_time
 
                 if req_alarm:
                     device_info[req_id]["alarm_power"] = req_alarm
@@ -293,11 +292,14 @@ def server():
                         "alarm_delay": req_delay,
                     },
                 )
-                return redirect("/")
+                return redirect("/dashboard")
             elif request.form["label"] == "update-canvas":
-                print("im updating canvas")
-                canvas.update()
-                return redirect("/")
+                # canvas.update()  # TODO: fix, set canvas status to pending
+                print("Updating canvas")
+                return redirect("/dashboard")
+            elif request.form["label"] == "update-all":
+                sheet.run_in_thread(f=sheet.update_all_readers)
+                return redirect("/dashboard")
 
     except Exception as e:
         print(e)
@@ -309,8 +311,9 @@ def server():
     )  # Pass devices to the template
 
 
-@app.route("/card", methods=("GET", "POST"))
-def card():
+@app.route("/setup", methods=("GET", "POST"))
+@login_required
+def setup():
     update_data()
     err = ""
     added = False
@@ -318,30 +321,19 @@ def card():
     try:
         if request.method == "POST":
             flash("You are using POST")
-            print(request.form)
             sheet.get_canvas_status_sheet()
-            print("status")
-            print(sheet.canvas_is_updating)
-            if (
-                request.form["label"] == "uidsetup"
-                and sheet.canvas_is_updating == False
-            ):
-                print("reading UID")
+            if request.form["label"] == "uidsetup" and not sheet.canvas_is_updating:
                 cruzid = request.form.get("cruzid")
-                # sheet.last_canvas_update_time
-
                 overwritecheck = (
                     True if request.form.get("overwrite") == "overwrite" else False
                 )
                 uid = nfc.read_card()
-                print(cruzid, overwritecheck, uid)
                 if not cruzid:
                     err = "Please enter a CruzID"
                 elif not uid:
                     err = "Card not detected, please try again"
                 else:
-                    err, added = staff_or_student(cruzid, overwritecheck, uid)
-                    # err = "temp"
+                    err, added = assign_uid(cruzid, overwritecheck, uid)
             else:
                 err = "Canvas is updating, please wait"
 
@@ -349,13 +341,14 @@ def card():
         print(e)
 
     return render_template(
-        "student.html",
+        "setup.html",
         err=err,
         added=added,
     )
 
 
 @app.route("/identify", methods=("GET", "POST"))
+@login_required
 def identify():
     update_data()
     cruzid = ""
@@ -365,141 +358,64 @@ def identify():
 
     try:
         if request.method == "POST":
+            cruzid = ""
             flash("You are using POST")
-            # print(request.form)
             if request.form["label"] == "identifyuid":
-                print("reading UID")
+                cruzid = request.form.get("cruzid")
                 uid = nfc.read_card()
-                print(uid)
-                user_data = dict(
-                    zip(
-                        [
-                            "is_staff",
-                            "cruzid",
-                            "uid",
-                            "first_name",
-                            "last_name",
-                            "access1",
-                            "access2",
-                            "access3",
-                            "access4",
-                            "access5",
-                            "access6",
-                            "access7",
-                            "access8",
-                        ],
-                        sheet.get_user_data(uid=uid),
-                    )
-                )
-                print(user_data)
 
-                # if uid:
-                #     if find_owner(uid) is not None:
-                #         cruzid = find_owner(uid)
-                #     else:
-                #         err = "User not found in the database. Please add the user to the database first."
-                # else:
-                #     err = "Card not detected. Please try again."
+                if cruzid != None and cruzid != "" and cruzid != "None":
+                    user_data = dict(
+                        zip(
+                            [
+                                "is_staff",
+                                "cruzid",
+                                "uid",
+                                "first_name",
+                                "last_name",
+                                "access1",
+                                "access2",
+                                "access3",
+                                "access4",
+                                "access5",
+                                "access6",
+                                "access7",
+                                "access8",
+                            ],
+                            sheet.get_user_data(cruzid=cruzid),
+                        )
+                    )
+                else:
+                    user_data = dict(
+                        zip(
+                            [
+                                "is_staff",
+                                "cruzid",
+                                "uid",
+                                "first_name",
+                                "last_name",
+                                "access1",
+                                "access2",
+                                "access3",
+                                "access4",
+                                "access5",
+                                "access6",
+                                "access7",
+                                "access8",
+                            ],
+                            sheet.get_user_data(uid=uid),
+                        )
+                    )
 
     except Exception as e:
         print(e)
 
     return render_template(
         "identify.html",
-        # cruzid=cruzid,
-        # uid=uid,
         err=err,
         user_data=user_data,
     )
 
 
-# @app.route("/staff", methods=("GET", "POST"))
-
-# # TODO:
-# # If they are not staff, but they are a student complain
-# # if they are not staff && not student check if Firstname Lastname is provided if not complain
-# # ELSE: (at this point either cruzid is alrdy staff or they are neither staff nor student and have provided a name)
-# # do standard cruzid && uid checks
-# # if all checks pass, add to staff sheet
-# # IDEAS:
-# # add a list of staff with a remove button
-
-
-# def staff():
-#     err = ""
-#     added = False
-
-#     try:
-#         if request.method == "POST":
-#             flash("You are using POST")
-#             print(request.form)
-#             if request.form["label"] == "uidsetup":
-#                 print("reading UID")
-#                 cruzid = request.form.get("cruzid")
-#                 overwritecheck = (
-#                     True if request.form.get("overwrite") == "overwrite" else False
-#                 )
-#                 uid = nfc.read_card()
-#                 print(cruzid, overwritecheck, uid)
-#                 if not cruzid:
-#                     err = "Please enter a CruzID"
-#                 elif not uid:
-#                     err = "Card not detected, please try again"
-#                 else:
-#                     # err = assign_uid(cruzid, overwritecheck, uid)
-#                     # err = "temp"
-#                     err, added = assign_staff_uid(
-#                         cruzid,
-#                         request.form.get("first"),
-#                         request.form.get("last"),
-#                         uid,
-#                         overwritecheck,
-#                     )
-
-#     except Exception as e:
-#         print(e)
-
-#     return render_template("staff.html", err=err, added=added)
-
-
-CANVAS_UPDATE_HOUR = 20  # 3am
-CHECKIN_TIMEOUT = 30  # 30 seconds
-
-card_id = None
-
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001)
-    # sheet.get_sheet_data(limited=False)
-    # sheet.check_in()
-    # t = Thread(target=app.run, kwargs={"host": "0.0.0.0", "port": 5001})
-    # print(sheet.access_data)
-    # while True:
-    #     continue
-    #     if (
-    #         not sheet.last_update_date or datetime.now().date() > sheet.last_update_date
-    #     ) and datetime.now().hour >= CANVAS_UPDATE_HOUR:
-    #         print("Canvas update...")
-    #         # canvas.update()
-    #         sheet.get_sheet_data()
-    #         sheet.check_in()
-    #     elif (
-    #         not sheet.last_checkin_time
-    #         or datetime.now() - sheet.last_checkin_time
-    #         > timedelta(0, CHECKIN_TIMEOUT, 0, 0, 0, 0, 0)
-    #     ):
-    #         print("Checking in...")
-    #         sheet.check_in()
-    #     # time.sleep(60)
-    #     print("Hold a tag near the reader")
-    #     card_id = nfc.read_card()
-    #     print(card_id)
-    #     if card_id:
-    #         response = sheet.scan_uid(card_id)
-    #         if not response:
-    #             print("error - card not in database or something else")
-    #             pass
-    #         else:
-    #             color, timeout = response
-    #             print(color, timeout)
-    #     else:
-    #         print("error - scanned too soon or not scanned")
+    app.run(host="0.0.0.0", port=5001, ssl_context="adhoc")
