@@ -6,7 +6,7 @@ from time import sleep, time
 import board  # type: ignore
 import neopixel  # type: ignore
 
-import reader_nfc as nfc
+import nfc_reader as nfc
 import sheet
 
 SHEET_UPDATE_HOUR = 4  # 4am
