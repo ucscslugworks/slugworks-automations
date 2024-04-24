@@ -114,13 +114,11 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         EXIT = True
 
-    nfc.close()
     if breathe:
         breathe = False
-    wait = time() + BREATHE_DELAY * 2
 
-    while time() < wait:
-        pass
+    sleep(BREATHE_DELAY * 2)
 
     pixels.fill((0, 0, 0))
     pixels.show()
+    nfc.close()
