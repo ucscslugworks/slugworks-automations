@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from multiprocessing import Process, Queue
 from threading import Thread
-from time import sleep
+from time import sleep, time
 
 import board  # type: ignore
 import neopixel  # type: ignore
@@ -117,6 +117,10 @@ if __name__ == "__main__":
     nfc.close()
     if breathe:
         breathe = False
-    sleep(BREATHE_DELAY * 2)
+    wait = time() + BREATHE_DELAY * 2
+
+    while time() < wait:
+        pass
+
     pixels.fill((0, 0, 0))
     pixels.show()
