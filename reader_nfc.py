@@ -52,9 +52,14 @@ def read_card_queue_timeout(time):
             print("timeout")
             return None
 
-        return q.get().upper()
+        val = q.get()
+
+        if val is None:
+            return False
+
+        return val.upper()
     except:
-        return None
+        return False
 
 
 def close():

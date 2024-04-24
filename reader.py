@@ -106,10 +106,13 @@ if __name__ == "__main__":
                     pixels.brightness = 0.5
                     pixels.fill(colors)
                     pixels.show()
-            elif not card_id:
+            elif card_id is None:
                 # print("error - scanned too soon or not scanned")
                 last_ids.append(None)
                 last_ids.pop(0)
+            else:
+                # False --> exception occurred
+                EXIT = True
 
     except KeyboardInterrupt:
         EXIT = True
