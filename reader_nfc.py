@@ -24,14 +24,14 @@ def read_card():
         id = hex(id)[2:-2]
         return id
     except:
-        raise
+        return None
 
 
 def read_card_queue(q):
     try:
         q.put(read_card())
     except:
-        raise
+        q.put(None)
 
 
 def read_card_queue_timeout(time):
@@ -54,7 +54,7 @@ def read_card_queue_timeout(time):
 
         return q.get().upper()
     except:
-        raise
+        return None
 
 
 def close():

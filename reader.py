@@ -3,8 +3,8 @@ from multiprocessing import Process, Queue
 from threading import Thread
 from time import sleep
 
-import board
-import neopixel
+import board  # type: ignore
+import neopixel  # type: ignore
 
 import reader_nfc as nfc
 import sheet
@@ -117,3 +117,4 @@ if __name__ == "__main__":
     nfc.close()
     if breathe:
         breathe = False
+    sleep(BREATHE_DELAY*2)
