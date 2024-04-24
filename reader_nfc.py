@@ -11,22 +11,22 @@ reader = SimpleMFRC522()
 
 # TODO: when refreshing the database from the sheet, clear the timestamps (otherwise this will fill up & take a lot of memory)
 # maintain the last scanned time for each card id so that we can prevent multiple scans within a short time
-timestamps = {}
+# timestamps = {}
 
 
-def read_card(timestamps):
+def read_card():
     """
     read a card and return its id, or None if there was an error, or False if the card was scanned too soon
     """
-    print(timestamps)
+    # print(timestamps)
     try:
         id, _ = reader.read()
         print("Card read: ", id)
         id = hex(id)[2:-2]
-        if id in timestamps and time() - timestamps[id] < DELAY:
-            print("error 1")
-            return False
-        timestamps[id] = time()
+        # if id in timestamps and time() - timestamps[id] < DELAY:
+        #     print("error 1")
+        #     return False
+        # timestamps[id] = time()
         return id
     except KeyboardInterrupt:
         raise
@@ -35,8 +35,8 @@ def read_card(timestamps):
         return None
 
 
-def read_card_queue(q, timestamps):
-    q.put(read_card(timestamps))
+def read_card_queue(q):
+    q.put(read_card())
 
 
 def read_card_queue_timeout(time):
@@ -48,7 +48,7 @@ def read_card_queue_timeout(time):
     Returns None if there was an error, or passes through the return value of read_card()
     """
     q = Queue()
-    p = Process(target=read_card_queue, args=(q,timestamps))
+    p = Process(target=read_card_queue, args=(q,))
     p.start()
     p.join(time)
     if p.is_alive():
