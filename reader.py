@@ -54,9 +54,6 @@ def breathe_leds():
     except KeyboardInterrupt:
         EXIT = True
 
-    pixels.fill((0, 0, 0))
-    pixels.show()
-
 
 if __name__ == "__main__":
     sheet.get_sheet_data(limited=True)
@@ -116,8 +113,10 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         EXIT = True
-        pass
+
     nfc.close()
     if breathe:
         breathe = False
-    sleep(BREATHE_DELAY*2)
+    sleep(BREATHE_DELAY * 2)
+    pixels.fill((0, 0, 0))
+    pixels.show()
