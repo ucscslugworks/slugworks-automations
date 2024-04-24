@@ -18,25 +18,20 @@ def read_card():
     """
     read a card and return its id, or None if there was an error, or False if the card was scanned too soon
     """
-    # print(timestamps)
     try:
         id, _ = reader.read()
         print("Card read: ", id)
         id = hex(id)[2:-2]
-        # if id in timestamps and time() - timestamps[id] < DELAY:
-        #     print("error 1")
-        #     return False
-        # timestamps[id] = time()
         return id
-    except KeyboardInterrupt:
-        raise
     except:
-        print("error 2")
-        return None
+        raise
 
 
 def read_card_queue(q):
-    q.put(read_card())
+    try:
+        q.put(read_card())
+    except:
+        raise
 
 
 def read_card_queue_timeout(time):
@@ -47,16 +42,19 @@ def read_card_queue_timeout(time):
 
     Returns None if there was an error, or passes through the return value of read_card()
     """
-    q = Queue()
-    p = Process(target=read_card_queue, args=(q,))
-    p.start()
-    p.join(time)
-    if p.is_alive():
-        p.terminate()
-        print("timeout")
-        return None
+    try:
+        q = Queue()
+        p = Process(target=read_card_queue, args=(q,))
+        p.start()
+        p.join(time)
+        if p.is_alive():
+            p.terminate()
+            print("timeout")
+            return None
 
-    return q.get().upper()
+        return q.get().upper()
+    except:
+        raise
 
 
 def close():

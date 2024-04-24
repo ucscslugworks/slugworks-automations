@@ -25,12 +25,13 @@ breathe = True
 scan_time = None
 SCAN_COLOR_HOLD = 2  # seconds
 BREATHE_DELAY = 0.02  # seconds
+EXIT = False
 
 
 def breathe_leds():
-    global breathe, scan_time
+    global breathe, scan_time, EXIT
     try:
-        while True:
+        while not EXIT:
             if breathe:
                 for i in range(0, 255, 5):
                     if not breathe:
@@ -51,7 +52,10 @@ def breathe_leds():
                 scan_time = None
                 pixels.brightness = 0.2
     except KeyboardInterrupt:
-        pass
+        EXIT = True
+
+    pixels.fill((0, 0, 0))
+    pixels.show()
 
 
 if __name__ == "__main__":
@@ -62,7 +66,7 @@ if __name__ == "__main__":
 
         last_ids = [None] * 5
 
-        while True:
+        while not EXIT:
             if (
                 not sheet.last_update_time
                 or datetime.now().date() > sheet.last_update_time.date()
@@ -108,10 +112,8 @@ if __name__ == "__main__":
                 last_ids.pop(0)
 
     except KeyboardInterrupt:
-        nfc.close()
-        if breathe:
-            breathe = False
-            sleep(BREATHE_DELAY)
-        pixels.fill((0, 0, 0))
-        pixels.show()
+        EXIT = True
         pass
+    nfc.close()
+    if breathe:
+        breathe = False
