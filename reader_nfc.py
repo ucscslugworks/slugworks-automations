@@ -21,14 +21,17 @@ def read_card():
 
     try:
         id, _ = reader.read()
+        print("Card read: ", id)
         id = hex(id)[2:-2]
         if id in timestamps and time() - timestamps[id] < DELAY:
+            print("error 1")
             return False
         timestamps[id] = time()
         return id
     except KeyboardInterrupt:
         raise
     except:
+        print("error 2")
         return None
 
 
@@ -50,6 +53,7 @@ def read_card_queue_timeout(time):
     p.join(time)
     if p.is_alive():
         p.terminate()
+        print("timeout")
         return None
 
     return q.get().upper()
