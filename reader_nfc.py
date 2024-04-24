@@ -18,6 +18,7 @@ def read_card():
     """
     read a card and return its id, or None if there was an error, or False if the card was scanned too soon
     """
+    global timestamps
     print(timestamps)
     try:
         id, _ = reader.read()
