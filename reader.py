@@ -107,7 +107,7 @@ if __name__ == "__main__":
                 # print("error - scanned too soon or not scanned")
                 last_ids.append(None)
                 last_ids.pop(0)
-            else:
+            elif card_id is False:
                 # False --> exception occurred
                 EXIT = True
 
