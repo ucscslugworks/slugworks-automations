@@ -14,11 +14,10 @@ reader = SimpleMFRC522()
 timestamps = {}
 
 
-def read_card():
+def read_card(timestamps):
     """
     read a card and return its id, or None if there was an error, or False if the card was scanned too soon
     """
-    global timestamps
     print(timestamps)
     try:
         id, _ = reader.read()
@@ -36,8 +35,8 @@ def read_card():
         return None
 
 
-def read_card_queue(q):
-    q.put(read_card())
+def read_card_queue(q, timestamps):
+    q.put(read_card(timestamps))
 
 
 def read_card_queue_timeout(time):
@@ -49,7 +48,7 @@ def read_card_queue_timeout(time):
     Returns None if there was an error, or passes through the return value of read_card()
     """
     q = Queue()
-    p = Process(target=read_card_queue, args=(q,))
+    p = Process(target=read_card_queue, args=(q,timestamps))
     p.start()
     p.join(time)
     if p.is_alive():
