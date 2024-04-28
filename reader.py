@@ -56,9 +56,17 @@ def breathe_leds():
 
 
 if __name__ == "__main__":
-    sheet.get_sheet_data(limited=True)
-    sheet.check_in(alarm_status=alarm_status)
-    Thread(target=breathe_leds).start()
+    try:
+        sheet.get_sheet_data(limited=True)
+        sheet.check_in(alarm_status=alarm_status)
+        Thread(target=breathe_leds).start()
+    except Exception as e:
+        print(e)
+        pixels.fill((255, 0, 0))
+        pixels.show()
+        sleep(5)
+        EXIT = True
+
     try:
 
         last_ids = [None] * 5
