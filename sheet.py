@@ -944,6 +944,10 @@ def evaluate_modules(completed_modules, cruzid=None, uid=None):
         for m in range(module_count, 0, -1):
             exp = exp.replace(str(m), "t" if m in completed_modules else "f")
 
+        for l in exp:
+            if l not in "tf&|()":
+                exp = exp.replace(l, "")
+
         if (
             set_access(
                 module_data.loc[i, "Access Levels"],
