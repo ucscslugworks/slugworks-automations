@@ -24,7 +24,7 @@ pixels = neopixel.NeoPixel(
 breathe = True
 scan_time = None
 SCAN_COLOR_HOLD = 2  # seconds
-BREATHE_DELAY = 0.02  # seconds
+BREATHE_DELAY = 0.05  # seconds
 EXIT = False
 
 
