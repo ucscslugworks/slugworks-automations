@@ -332,6 +332,7 @@ def get_canvas_status_sheet():
         last_canvas_update_time = datetime.datetime.strptime(
             values[0][1], "%Y-%m-%d %H:%M:%S"
         )
+        return True
     except HttpError as e:
         print(e)
         return None
