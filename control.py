@@ -124,13 +124,11 @@ def login():
 
     # Use library to construct the request for Google login and provide
     # scopes that let you retrieve user's profile from Google
-    print(request.base_url + "/callback")
     request_uri = client.prepare_request_uri(
         authorization_endpoint,
         redirect_uri=request.base_url + "/callback",
         scope=["openid", "email", "profile"],
     )
-    print(request_uri)
     return redirect(request_uri)
 
 
@@ -203,11 +201,8 @@ def logout():
 @app.route("/dashboard", methods=("GET", "POST"))
 @login_required
 def dashboard():
-    print(1)
     update_data()
-    print(2)
     canvas_update = sheet.last_canvas_update_time
-    print(3)
     if sheet.canvas_is_updating:
         canvas_update = "Updating..."
     devices = sheet.reader_data.loc[
@@ -387,7 +382,6 @@ def identify():
                     accesses = sheet.get_all_accesses(cruzid=cruzid)
                 else:
                     uid = nfc.read_card()
-                    print(uid)
                     user_data = dict(
                         zip(
                             [

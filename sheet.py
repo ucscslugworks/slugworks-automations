@@ -843,16 +843,11 @@ def write_student_sheet():
         length = len(vals)
         blank_filled = 0
 
-        # print(vals)
-
         if student_sheet_read_len > length:
             blank_filled = student_sheet_read_len - length
             vals = vals + [[""] * len(student_data.columns)] * (blank_filled)
         else:
             student_sheet_read_len = length
-
-        # print(student_sheet_read_len)
-        # print(vals)
 
         for i in range(0, student_sheet_read_len, SEND_BLOCK):
             _ = (
@@ -1096,14 +1091,11 @@ def remove_student(cruzid):
     """
 
     if not student_exists(cruzid=cruzid):
-        # print("not found")
         return False
 
     row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
-    # print(row)
     student_data.drop(row, inplace=True)  # TODO: move to archive sheet instead
     student_data.reset_index(drop=True, inplace=True)
-    # print(student_data)
 
     return True
 
@@ -1158,7 +1150,6 @@ def clamp_students(student_list):
 
     for i in range(student_data.shape[0]):
         if student_data.loc[i, "CruzID"] not in student_list:
-            # print("drop")
             student_data.drop(i, inplace=True)  # TODO: move to archive sheet instead
 
 
