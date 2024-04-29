@@ -38,6 +38,8 @@ def breathe_leds():
                     while time() - last_change_time < BREATHE_DELAY:
                         if not breathe:
                             break
+                    if not breathe:
+                        break
                     last_change_time = time()
                     pixels.fill((i, i, i))
                     pixels.show()
@@ -45,6 +47,8 @@ def breathe_leds():
                     while time() - last_change_time < BREATHE_DELAY:
                         if not breathe:
                             break
+                    if not breathe:
+                        break
                     last_change_time = time()
                     pixels.fill((i, i, i))
                     pixels.show()
