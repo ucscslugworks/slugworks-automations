@@ -110,7 +110,7 @@ if __name__ == "__main__":
                     print(colors)
                     breathe = False
                     scan_time = datetime.now()
-                    sleep(BREATHE_DELAY)
+                    sleep(BREATHE_DELAY * 2)
                     pixels.brightness = 0.5
                     pixels.fill(colors)
                     pixels.show()
