@@ -386,6 +386,7 @@ def identify():
                     accesses = sheet.get_all_accesses(cruzid=cruzid)
                 else:
                     uid = nfc.read_card()
+                    print(uid)
                     user_data = dict(
                         zip(
                             [
