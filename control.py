@@ -367,6 +367,7 @@ def identify():
         if request.method == "POST":
             cruzid = ""
             # flash("You are using POST")
+            print(request.form["label"])
             if request.form["label"] == "identifyuid":
                 cruzid = request.form.get("cruzid")
 
