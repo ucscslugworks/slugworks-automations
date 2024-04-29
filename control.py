@@ -205,8 +205,11 @@ def logout():
 @app.route("/dashboard", methods=("GET", "POST"))
 @login_required
 def dashboard():
+    print(1)
     update_data()
+    print(2)
     canvas_update = sheet.last_canvas_update_time
+    print(3)
     if sheet.canvas_is_updating:
         canvas_update = "Updating..."
     devices = sheet.reader_data.loc[
