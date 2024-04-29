@@ -38,10 +38,14 @@
 
             <table>
                 <tr>
-                    <th>CruzID (optional)</th>
+                    <th>CruzID to lookup (optional)</th>
                     <td>
-                        <input type="text" name="cruzid" value="{{ user_data.cruzid or None }}">
+                        <input type="text" name="cruzid" value="{{ None }}">
                     </td>
+                </tr>
+                <tr>
+                    <th>CruzID</th>
+                    <td>{{ user_data.cruzid }}</td>
                 </tr>
                 <tr>
                     <th>Type</th>
