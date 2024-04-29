@@ -30,7 +30,6 @@ os.chdir(os.path.dirname(os.path.realpath(__file__)))
 app = Flask(__name__)
 app.secret_key = os.urandom(12).hex()
 
-print(0)
 sheet.get_sheet_data(limited=False)
 alarm_enable_names = ["ENABLE", "DISABLE"]
 device_status_names = ["ONLINE", "OFFLINE"]
