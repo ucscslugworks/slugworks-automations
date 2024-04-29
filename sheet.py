@@ -314,6 +314,7 @@ def get_canvas_status_sheet():
     """
 
     try:
+        print(1.1)
         values = (
             g_sheets.values()
             .get(
@@ -322,6 +323,7 @@ def get_canvas_status_sheet():
             )
             .execute()
         ).get("values", [])
+        print(1.2)
 
         print(values)
 
