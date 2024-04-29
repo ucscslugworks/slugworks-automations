@@ -5,7 +5,7 @@ from multiprocessing import Process, Queue
 import serial  # type: ignore
 
 # delay between reads for the same card
-DELAY = 1
+DELAY = 0.1
 
 # open the serial port w/ 9600 baud rate and 0.1 second timeout
 ser = serial.Serial("/dev/ttyUSB0", 9600, timeout=0.1)
@@ -76,7 +76,7 @@ def get_mifare_1k_uid(response):
     if response in timestamps and time.time() - timestamps[response] < DELAY:
         return False
     timestamps[response] = time.time()
-    return response
+    return response.upper()
 
 
 def get_type(response):
