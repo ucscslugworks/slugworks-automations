@@ -124,7 +124,6 @@ def read_card():
 
     if len(responses) > 0 and responses[0][0] == "00":
         # print("Card Type:", get_type(responses[0]))
-        print(responses)
         card_type = get_type(responses[0])
         if card_type == "06":
             # command to output UID of the scanned card

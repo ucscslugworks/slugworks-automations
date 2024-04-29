@@ -323,6 +323,8 @@ def get_canvas_status_sheet():
             .execute()
         ).get("values", [])
 
+        print(values)
+
         canvas_is_updating = True if values[0][0] == "UPDATING" else False
         canvas_needs_update = True if values[0][0] == "PENDING" else False
         last_canvas_update_time = datetime.datetime.strptime(
