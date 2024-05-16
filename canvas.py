@@ -7,6 +7,26 @@ import requests
 import sheet
 
 
+def list_modules():
+    keys = json.load(open("canvas.json"))
+
+    token = keys["auth_token"]
+    course_id = keys["course_id"]
+
+    url = f"https://canvas.ucsc.edu/api/v1/courses/{course_id}/"
+    headers = {"Authorization": f"Bearer {token}"}
+
+    endpoint = "modules"
+
+    params = {
+        "per_page": 1000,
+    }
+
+    response = requests.request("GET", url + endpoint, headers=headers, params=params)
+
+    print(json.dumps(response.json(), indent=4))
+
+
 def update():
     try:
         sheet.get_sheet_data(limited=False)
@@ -139,18 +159,27 @@ def update():
 
         endpoint = "modules"
 
+        num_modules = -1
+
         for i, cruzid in enumerate(students):
-            params = {"student_id": students[cruzid]}
+            data = {"student_id": students[cruzid]}
+            params = {"per_page": 1000}
             response = requests.request(
-                "GET", url + endpoint, headers=headers, data=params
+                "GET", url + endpoint, headers=headers, data=data, params=params
             )
             modules_json = json.loads(response.text)
+
+            if num_modules == -1:
+                num_modules = len(modules_json)
+
             completed_modules = []
             for m in modules_json:
                 if m["state"] == "completed":
                     completed_modules.append(int(m["position"]))
 
-            sheet.evaluate_modules(completed_modules, cruzid)
+            sheet.evaluate_modules(
+                completed_modules, cruzid=cruzid, num_modules=num_modules
+            )
             print(
                 f"Successfully evaluated modules for {cruzid}, ({i+1}/{len(students)})"
             )

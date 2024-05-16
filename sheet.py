@@ -921,7 +921,7 @@ def write_student_staff_sheets():
     return write_student_sheet() and write_staff_sheet()
 
 
-def evaluate_modules(completed_modules, cruzid=None, uid=None):
+def evaluate_modules(completed_modules, cruzid=None, uid=None, num_modules=None):
     """
     Evaluate a student's completed modules and update their room accesses.
 
@@ -930,6 +930,9 @@ def evaluate_modules(completed_modules, cruzid=None, uid=None):
     uid: str: the student's card UID.
     """
 
+    if not num_modules:
+        num_modules = 1000
+
     for i in range(len(module_data)):
         exp = str(module_data.loc[i, "Modules"])
         exp = exp.lower()
@@ -937,7 +940,7 @@ def evaluate_modules(completed_modules, cruzid=None, uid=None):
         exp = exp.replace("or", "|")
         exp = exp.replace(" ", "")
 
-        for m in range(module_count, 0, -1):
+        for m in range(num_modules, 0, -1):
             exp = exp.replace(str(m), "t" if m in completed_modules else "f")
 
         for l in exp:
@@ -1469,11 +1472,11 @@ if __name__ == "__main__":
 
     print()
     print(student_data)
-    # print()
-    # print(staff_data)
-    # print()
-    # print(access_data)
-    # # print()
-    # # print(module_data)
-    # print()
-    # print(reader_data)
+    print()
+    print(staff_data)
+    print()
+    print(access_data)
+    print()
+    print(module_data)
+    print()
+    print(reader_data)
