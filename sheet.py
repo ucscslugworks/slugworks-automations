@@ -1455,8 +1455,8 @@ if __name__ == "__main__":
     # print(get_all_accesses(cruzid="tstudent"))
     # print(evaluate_modules([1, 2, 5, 6, 7, 8, 9, 10], cruzid="tstudent"))
 
-    write_student_sheet()
-    write_staff_sheet()
+    # write_student_sheet()
+    # write_staff_sheet()
 
     # set_uid("ewachtel", "63B104FF")
     # set_uid("cchartie", "63B104FF")
@@ -1470,13 +1470,20 @@ if __name__ == "__main__":
     # print(get_user_data(cruzid="ewachtel"))
     # print(get_user_data(cruzid="cchartie"))
 
-    print()
-    print(student_data)
-    print()
-    print(staff_data)
-    print()
-    print(access_data)
-    print()
-    print(module_data)
-    print()
-    print(reader_data)
+    # print(
+    #     student_data.loc[
+    #         student_data["3D Printing"].isin(["Access", "Override Access"])
+    #     ]["CruzID"].values.tolist()
+    # )
+    # print(staff_data["CruzID"].values.tolist())
+
+    # print()
+    # print(student_data)
+    # print()
+    # print(staff_data)
+    # print()
+    # print(access_data)
+    # print()
+    # print(module_data)
+    # print()
+    # print(reader_data)
