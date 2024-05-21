@@ -215,16 +215,15 @@ CANVAS_UPDATE_HOUR = 4  # 4am
 CHECKIN_TIMEOUT = 5  # 5 minutes
 
 if __name__ == "__main__":
-    sheet.last_update_time = datetime.now()
     try:
         while True:
             sheet.get_canvas_status_sheet()
             if (
                 sheet.canvas_needs_update
-                or not sheet.last_update_time
+                or not sheet.last_canvas_update_time
                 or (
                     (
-                        datetime.now().date() > sheet.last_update_time.date()
+                        datetime.now().date() > sheet.last_canvas_update_time.date()
                         and datetime.now().hour >= CANVAS_UPDATE_HOUR
                     )
                 )
