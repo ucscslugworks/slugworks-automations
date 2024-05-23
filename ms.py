@@ -1,11 +1,14 @@
 import sheet
 from ms_active_directory import *
+from ldap3 import *
+import gssapi
+
 
 def login():
     print("starting ....")
     domain = ADDomain("au.ucsc.edu")
     print("domain connected")
-    session = domain.create_session_as_user("username", "password")
+    session = domain.create_session_as_user(authentication_mechanism="SASL",sasl_mechanism=KERBEROS)
     print("session created")
     return session
 
@@ -54,3 +57,8 @@ def main():
     add_user(session, to_add)
     remove_user(session, to_remove)
     print("done")
+
+
+
+if __name__ == "__main__":
+    main()
