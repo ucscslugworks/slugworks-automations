@@ -11,6 +11,11 @@ from googleapiclient.errors import HttpError
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 
+#potential intigrations: https://github.com/Kartones/flask-calendar
+#https://github.com/yonakahara/flask-calendar
+#https://medium.com/@matthieu.ru/part-1-3-python-dash-flask-sessions-and-callbacks-building-an-interactive-calendar-with-1c4d1c2cd706
+#https://www.youtube.com/watch?v=2tZ2HP3gDtA
+
 def main():
   """Shows basic usage of the Google Calendar API.
   Prints the start and name of the next 10 events on the user's calendar.
