@@ -217,34 +217,39 @@ CHECKIN_TIMEOUT = 5  # 5 minutes
 if __name__ == "__main__":
     try:
         while True:
-            sheet.get_canvas_status_sheet()
-            if (
-                sheet.canvas_needs_update
-                or not sheet.last_canvas_update_time
-                or (
-                    (
-                        datetime.now().date() > sheet.last_canvas_update_time.date()
-                        and datetime.now().hour >= CANVAS_UPDATE_HOUR
+            try:
+                sheet.get_canvas_status_sheet()
+                if (
+                    sheet.canvas_needs_update
+                    or not sheet.last_canvas_update_time
+                    or (
+                        (
+                            datetime.now().date() > sheet.last_canvas_update_time.date()
+                            and datetime.now().hour >= CANVAS_UPDATE_HOUR
+                        )
                     )
-                )
-            ):
-                print("Canvas update...")
-                sheet.set_canvas_status_sheet(True)
-                tmp_time = datetime.now()
-                update()
-                sheet.get_sheet_data()
-                sheet.check_in()
-                sheet.set_canvas_status_sheet(False, tmp_time)
-            elif (
-                not sheet.last_checkin_time
-                or datetime.now() - sheet.last_checkin_time
-                > timedelta(0, 0, 0, 0, CHECKIN_TIMEOUT, 0, 0)
-            ):
-                print("Checking in...")
-                sheet.check_in()
-            else:
-                print("Waiting for next update...")
-            time.sleep(60)
+                ):
+                    print("Canvas update...")
+                    sheet.set_canvas_status_sheet(True)
+                    tmp_time = datetime.now()
+                    update()
+                    sheet.get_sheet_data()
+                    sheet.check_in()
+                    sheet.set_canvas_status_sheet(False, tmp_time)
+                elif (
+                    not sheet.last_checkin_time
+                    or datetime.now() - sheet.last_checkin_time
+                    > timedelta(0, 0, 0, 0, CHECKIN_TIMEOUT, 0, 0)
+                ):
+                    print("Checking in...")
+                    sheet.check_in()
+                else:
+                    print("Waiting for next update...")
+                time.sleep(60)
+            except Exception as e:
+                if type(e) == KeyboardInterrupt:
+                    raise e
+                print(f"Error: {e}")
     except KeyboardInterrupt:
         print("Exiting...")
         sheet.set_canvas_status_sheet(False)
