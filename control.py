@@ -186,7 +186,7 @@ def logout():
     return redirect(url_for("index"))
 
 @app.route("/dashboard", methods=("GET", "POST"))
-@login_required
+#@login_required
 def dashboard():
     canvas_update = sheet.last_canvas_update_time
     if sheet.canvas_is_updating:
