@@ -250,7 +250,7 @@ if __name__ == "__main__":
                 if type(e) == KeyboardInterrupt:
                     raise e
                 print(f"Error: {e}")
-                time.sleep(1)
+                time.sleep(60)
     except KeyboardInterrupt:
         print("Exiting...")
         sheet.set_canvas_status_sheet(False)
