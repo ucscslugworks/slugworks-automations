@@ -28,6 +28,7 @@ from user import User
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", sheet.creds.client_id)
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", sheet.creds.client_secret)
 GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
+ALLOWED_EMAILS = {"chartier@ucsc.edu", "imadan1@ucsc.edu", "nkouatli@ucsc.edu"}
 
 # Initialize Flask app
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
@@ -201,6 +202,12 @@ def callback():
         picture = userinfo_response.json()["picture"]
         users_name = userinfo_response.json()["given_name"]
         logger.info(f"User {users_email} authenticated successfully.")
+
+        # Check if email is allowed
+        if users_email not in ALLOWED_EMAILS:
+            logger.warning(f"Unauthorized login attempt by {users_email}.")
+            return "Unauthorized user", 403
+
     else:
         logger.error("User email not available or not verified by Google.")
         return "User email not available or not verified by Google.", 400
@@ -223,7 +230,7 @@ def logout():
     return redirect(url_for("index"))
 
 @app.route("/dashboard", methods=("GET", "POST"))
-#@login_required
+@login_required
 def dashboard():
     canvas_update = sheet.last_canvas_update_time
     if sheet.canvas_is_updating:
