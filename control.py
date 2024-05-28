@@ -2,9 +2,10 @@ import json
 import os
 import sqlite3
 from datetime import datetime, timedelta
+import time
 
 import requests
-from flask import Flask, flash, redirect, render_template, request, url_for
+from flask import Flask, redirect, render_template, request, url_for
 from flask_login import (
     LoginManager,
     current_user,
@@ -12,7 +13,9 @@ from flask_login import (
     login_user,
     logout_user,
 )
+from flask_socketio import SocketIO, emit
 from oauthlib.oauth2 import WebApplicationClient
+from threading import Thread, Event
 
 # import control_nfc as nfc
 import fake_nfc as nfc
@@ -25,11 +28,13 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", sheet.creds.client_id)
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", sheet.creds.client_secret)
 GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
 
-
-# initialize flask app
+# Initialize Flask app
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
 app = Flask(__name__)
 app.secret_key = os.urandom(12).hex()
+socketio = SocketIO(app, cors_allowed_origins="*")
+thread = None
+thread_stop_event = Event()
 
 sheet.get_sheet_data(limited=False)
 alarm_enable_names = ["ENABLE", "DISABLE"]
@@ -37,7 +42,6 @@ device_status_names = ["ONLINE", "OFFLINE"]
 status_colors = ["#3CBC8D", "red", ""]
 alarm_status_names = ["OK", "ALARM", "TAGGED OUT", "DISABLED"]
 alarm_status_colors = ["#3CBC8D", "red", "yellow", "gray", ""]
-
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -52,17 +56,14 @@ except sqlite3.OperationalError:
 # OAuth 2 client setup
 client = WebApplicationClient(GOOGLE_CLIENT_ID)
 
-
 # Flask-Login helper to retrieve a user from our db
 @login_manager.user_loader
 def load_user(user_id):
     return User.get(user_id)
 
-
 @login_manager.unauthorized_handler
 def unauthorized():
     return redirect("/login")
-
 
 def assign_uid(cruzid, overwrite, uid):
     added = False
@@ -84,9 +85,7 @@ def assign_uid(cruzid, overwrite, uid):
         added = True
     return carderror, added
 
-
 CHECKIN_TIMEOUT = 30  # seconds
-
 
 def update_data():
     sheet.get_canvas_status_sheet()
@@ -99,6 +98,16 @@ def update_data():
         print("Getting sheet data...")
         sheet.get_sheet_data()
 
+def background_thread():
+    while not thread_stop_event.is_set():
+        try:
+            print("Background thread updating data...")
+            update_data()
+            socketio.emit('update', {'message': 'Data updated'})
+            print("Data updated and event emitted.")
+            time.sleep(30)  # 30 seconds interval
+        except Exception as e:
+            print(f"Error during background update: {e}")
 
 @app.route("/")
 def index():
@@ -113,19 +122,14 @@ def index():
     else:
         return '<a class="button" href="/login">Google Login</a>'
 
-
 def get_google_provider_cfg():
     return requests.get(GOOGLE_DISCOVERY_URL).json()
 
-
 @app.route("/login")
 def login():
-    # Find out what URL to hit for Google login
     google_provider_cfg = get_google_provider_cfg()
     authorization_endpoint = google_provider_cfg["authorization_endpoint"]
 
-    # Use library to construct the request for Google login and provide
-    # scopes that let you retrieve user's profile from Google
     request_uri = client.prepare_request_uri(
         authorization_endpoint,
         redirect_uri=request.base_url + "/callback",
@@ -133,17 +137,12 @@ def login():
     )
     return redirect(request_uri)
 
-
 @app.route("/login/callback")
 def callback():
-    # Get authorization code Google sent back to you
     code = request.args.get("code")
-    # Find out what URL to hit to get tokens that allow you to ask for
-    # things on behalf of a user
     google_provider_cfg = get_google_provider_cfg()
     token_endpoint = google_provider_cfg["token_endpoint"]
 
-    # Prepare and send a request to get tokens! Yay tokens!
     token_url, headers, body = client.prepare_token_request(
         token_endpoint,
         authorization_response=request.url,
@@ -157,19 +156,12 @@ def callback():
         auth=(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET),
     )
 
-    # Parse the tokens!
     client.parse_request_body_response(json.dumps(token_response.json()))
 
-    # Now that you have tokens (yay) let's find and hit the URL
-    # from Google that gives you the user's profile information,
-    # including their Google profile image and email
     userinfo_endpoint = google_provider_cfg["userinfo_endpoint"]
     uri, headers, body = client.add_token(userinfo_endpoint)
     userinfo_response = requests.get(uri, headers=headers, data=body)
 
-    # You want to make sure their email is verified.
-    # The user authenticated with Google, authorized your
-    # app, and now you've verified their email through Google!
     if userinfo_response.json().get("email_verified"):
         unique_id = userinfo_response.json()["sub"]
         users_email = userinfo_response.json()["email"]
@@ -178,20 +170,14 @@ def callback():
     else:
         return "User email not available or not verified by Google.", 400
 
-    # Create a user in your db with the information provided
-    # by Google
     user = User(id_=unique_id, name=users_name, email=users_email, profile_pic=picture)
 
-    # Doesn't exist? Add it to the database.
     if not User.get(unique_id):
         User.create(unique_id, users_name, users_email, picture)
 
-    # Begin user session by logging the user in
     login_user(user)
 
-    # Send user back to homepage
     return redirect(url_for("dashboard"))
-
 
 @app.route("/logout")
 @login_required
@@ -199,11 +185,9 @@ def logout():
     logout_user()
     return redirect(url_for("index"))
 
-
 @app.route("/dashboard", methods=("GET", "POST"))
 @login_required
 def dashboard():
-    update_data()
     canvas_update = sheet.last_canvas_update_time
     if sheet.canvas_is_updating:
         canvas_update = "Updating..."
@@ -218,12 +202,10 @@ def dashboard():
             "alarm_delay_min",
             "last_checked_in",
         ],
-    ]  # Pull device data from sheet.py
+    ]
 
-    # Extract name, colour, and status attributes from devices
     device_info = []
     for _, device in devices.iterrows():
-
         alarm_color = status_colors[
             (
                 -1
@@ -264,10 +246,7 @@ def dashboard():
 
     try:
         if request.method == "POST":
-            # flash("You are using POST")
-
             if request.form["label"] == "update-device":
-
                 req_id = int(request.form.get("id"))
                 req_location = request.form.get("location")
                 req_alarm = request.form.get("alarm_power")
@@ -310,19 +289,16 @@ def dashboard():
         "dashboard.html",
         devices=device_info,
         canvas_update=canvas_update,
-    )  # Pass devices to the template
-
+    )
 
 @app.route("/setup", methods=("GET", "POST"))
 @login_required
 def setup():
-    update_data()
     err = ""
     added = False
 
     try:
         if request.method == "POST":
-            # flash("You are using POST")
             if request.form["label"] == "uidsetup" and not sheet.canvas_is_updating:
                 cruzid = request.form.get("cruzid")
                 overwritecheck = (
@@ -349,11 +325,9 @@ def setup():
         added=added,
     )
 
-
 @app.route("/identify", methods=("GET", "POST"))
 @login_required
 def identify():
-    update_data()
     cruzid = ""
     uid = ""
     err = ""
@@ -364,7 +338,6 @@ def identify():
     try:
         if request.method == "POST":
             cruzid = ""
-            # flash("You are using POST")
             if request.form["label"] == "identifyuid":
                 cruzid = request.form.get("cruzid")
 
@@ -417,6 +390,13 @@ def identify():
         length=0 if not rooms else len(rooms),
     )
 
+@socketio.on('connect')
+def handle_connect():
+    global thread
+    if thread is None or not thread.is_alive():
+        print("Starting background thread...")
+        thread = Thread(target=background_thread)
+        thread.start()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, ssl_context="adhoc")
+    socketio.run(app, host="0.0.0.0", port=5001, ssl_context="adhoc")

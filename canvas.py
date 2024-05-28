@@ -1,223 +1,398 @@
 import json
-import time
+import os
+import sqlite3
 from datetime import datetime, timedelta
+import time
 
 import requests
+from flask import Flask, redirect, render_template, request, url_for, flash, get_flashed_messages
+from flask_login import (
+    LoginManager,
+    current_user,
+    login_required,
+    login_user,
+    logout_user,
+)
+from flask_socketio import SocketIO, emit
+from oauthlib.oauth2 import WebApplicationClient
+from threading import Thread, Event
 
+# import control_nfc as nfc
+import fake_nfc as nfc
 import sheet
+from db import init_db_command
+from user import User
 
+# Configuration
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", sheet.creds.client_id)
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", sheet.creds.client_secret)
+GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
 
-def update():
+# Initialize Flask app
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
+app = Flask(__name__)
+app.secret_key = os.urandom(12).hex()
+socketio = SocketIO(app, cors_allowed_origins="*")
+thread = None
+thread_stop_event = Event()
+
+sheet.get_sheet_data(limited=False)
+alarm_enable_names = ["ENABLE", "DISABLE"]
+device_status_names = ["ONLINE", "OFFLINE"]
+status_colors = ["#3CBC8D", "red", ""]
+alarm_status_names = ["OK", "ALARM", "TAGGED OUT", "DISABLED"]
+alarm_status_colors = ["#3CBC8D", "red", "yellow", "gray", ""]
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+
+# Naive database setup
+try:
+    init_db_command()
+except sqlite3.OperationalError:
+    # Assume it's already been created
+    pass
+
+# OAuth 2 client setup
+client = WebApplicationClient(GOOGLE_CLIENT_ID)
+
+# Flask-Login helper to retrieve a user from our db
+@login_manager.user_loader
+def load_user(user_id):
+    return User.get(user_id)
+
+@login_manager.unauthorized_handler
+def unauthorized():
+    return redirect("/login")
+
+def assign_uid(cruzid, overwrite, uid):
+    added = False
+    carderror = ""
+    if sheet.get_uid(cruzid) == uid:
+        carderror = f"Card is already assigned to {cruzid}"
+    elif sheet.get_uid(cruzid) and sheet.get_cruzid(uid) and not overwrite:
+        carderror = f"Card is already assigned to {sheet.get_cruzid(uid)}, and {cruzid} already has a card. If you would like to reassign the card to {cruzid} and replace {cruzid}'s existing card, please overwrite."
+    elif sheet.get_uid(cruzid) and not overwrite:
+        carderror = (
+            f"{cruzid} already has a card, please overwrite to replace with this card"
+        )
+    elif sheet.get_cruzid(uid) and not overwrite:
+        carderror = f"Card is already assigned to {sheet.get_cruzid(uid)}. If you would like to reassign the card to {cruzid}, please overwrite."
+    else:
+        sheet.set_uid(cruzid, uid, overwrite)
+        sheet.run_in_thread(f=sheet.write_student_staff_sheets)
+        carderror = f"Card added to database for {cruzid}"
+        added = True
+    return carderror, added
+
+CHECKIN_TIMEOUT = 30  # seconds
+
+def update_data():
+    sheet.get_canvas_status_sheet()
+    if (
+        not sheet.last_update_time
+        or sheet.last_canvas_update_time > sheet.last_update_time
+        or datetime.now() - sheet.last_update_time
+        > timedelta(0, CHECKIN_TIMEOUT, 0, 0, 0, 0, 0)
+    ):
+        print("Getting sheet data...")
+        sheet.get_sheet_data()
+
+def background_thread():
+    while not thread_stop_event.is_set():
+        try:
+            print("Background thread updating data...")
+            update_data()
+            socketio.emit('update', {'message': 'Data updated'})
+            print("Data updated and event emitted.")
+            time.sleep(30)  # 30 seconds interval
+        except Exception as e:
+            print(f"Error during background update: {e}")
+
+@app.route("/")
+def index():
+    if current_user.is_authenticated:
+        return (
+            "<p>Hello, you're logged in as {}! Email: {}</p>"
+            "<a class='button' href='/dashboard'>Dashboard</a><br>"
+            '<a class="button" href="/logout">Logout</a>'.format(
+                current_user.name, current_user.email
+            )
+        )
+    else:
+        return '<a class="button" href="/login">Google Login</a>'
+
+def get_google_provider_cfg():
+    return requests.get(GOOGLE_DISCOVERY_URL).json()
+
+@app.route("/login")
+def login():
+    google_provider_cfg = get_google_provider_cfg()
+    authorization_endpoint = google_provider_cfg["authorization_endpoint"]
+
+    request_uri = client.prepare_request_uri(
+        authorization_endpoint,
+        redirect_uri=request.base_url + "/callback",
+        scope=["openid", "email", "profile"],
+    )
+    return redirect(request_uri)
+
+@app.route("/login/callback")
+def callback():
+    code = request.args.get("code")
+    google_provider_cfg = get_google_provider_cfg()
+    token_endpoint = google_provider_cfg["token_endpoint"]
+
+    token_url, headers, body = client.prepare_token_request(
+        token_endpoint,
+        authorization_response=request.url,
+        redirect_url=request.base_url,
+        code=code,
+    )
+    token_response = requests.post(
+        token_url,
+        headers=headers,
+        data=body,
+        auth=(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET),
+    )
+
+    client.parse_request_body_response(json.dumps(token_response.json()))
+
+    userinfo_endpoint = google_provider_cfg["userinfo_endpoint"]
+    uri, headers, body = client.add_token(userinfo_endpoint)
+    userinfo_response = requests.get(uri, headers=headers, data=body)
+
+    if userinfo_response.json().get("email_verified"):
+        unique_id = userinfo_response.json()["sub"]
+        users_email = userinfo_response.json()["email"]
+        picture = userinfo_response.json()["picture"]
+        users_name = userinfo_response.json()["given_name"]
+    else:
+        return "User email not available or not verified by Google.", 400
+
+    user = User(id_=unique_id, name=users_name, email=users_email, profile_pic=picture)
+
+    if not User.get(unique_id):
+        User.create(unique_id, users_name, users_email, picture)
+
+    login_user(user)
+
+    return redirect(url_for("dashboard"))
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for("index"))
+
+@app.route("/dashboard", methods=("GET", "POST"))
+@login_required
+def dashboard():
+    if request.method == "POST":
+        if request.form["label"] == "update-device":
+            req_id = int(request.form.get("id"))
+            req_location = request.form.get("location")
+            req_alarm = request.form.get("alarm_power")
+            req_delay = request.form.get("delay")
+
+            if req_alarm:
+                device_info[req_id]["alarm_power"] = req_alarm
+                device_info[req_id]["alarm_power_color"] = status_colors[
+                    (
+                        -1
+                        if req_alarm not in alarm_enable_names
+                        else alarm_enable_names.index(req_alarm)
+                    )
+                ]
+            device_info[req_id]["location"] = req_location
+            device_info[req_id]["alarm_delay_min"] = req_delay
+
+            sheet.run_in_thread(
+                f=sheet.update_reader,
+                kwargs={
+                    "id": req_id,
+                    "location": req_location,
+                    "alarm": req_alarm,
+                    "alarm_delay": req_delay,
+                },
+            )
+            flash("Device updated")
+        elif request.form["label"] == "update-canvas":
+            sheet.update_canvas()
+            flash("Updating canvas")
+        elif request.form["label"] == "update-all":
+            sheet.run_in_thread(f=sheet.update_all_readers)
+            flash("Updating all readers")
+        return redirect(url_for("dashboard"))
+
+    canvas_update = sheet.last_canvas_update_time
+    if sheet.canvas_is_updating:
+        canvas_update = "Updating..."
+    devices = sheet.reader_data.loc[
+        :,
+        [
+            "id",
+            "location",
+            "alarm",
+            "status",
+            "alarm_status",
+            "alarm_delay_min",
+            "last_checked_in",
+        ],
+    ]
+
+    device_info = []
+    for _, device in devices.iterrows():
+        alarm_color = status_colors[
+            (
+                -1
+                if device["alarm"] not in alarm_enable_names
+                else alarm_enable_names.index(device["alarm"])
+            )
+        ]
+        status_color = status_colors[
+            (
+                -1
+                if device["status"] not in device_status_names
+                else device_status_names.index(device["status"])
+            )
+        ]
+        warning_color = alarm_status_colors[
+            (
+                -1
+                if device["alarm_status"] not in alarm_status_names
+                else alarm_status_names.index(device["alarm_status"])
+            )
+        ]
+
+        device_info.append(
+            {
+                "id": int(device["id"]),
+                "status": device["status"],
+                "alarm_power": device["alarm"],
+                "alarm_enable_names": alarm_enable_names,
+                "alarm_power_color": alarm_color,
+                "status_color": status_color,
+                "alarm_color": warning_color,
+                "alarm_status": device["alarm_status"],
+                "location": device["location"],
+                "alarm_delay_min": device["alarm_delay_min"],
+                "last_checked_in": device["last_checked_in"],
+            }
+        )
+
+    return render_template(
+        "dashboard.html",
+        devices=device_info,
+        canvas_update=canvas_update,
+    )
+
+@app.route("/setup", methods=("GET", "POST"))
+@login_required
+def setup():
+    err = ""
+    added = False
+
     try:
-        sheet.get_sheet_data(limited=False)
-        print("Successfully retrieved sheet data")
+        if request.method == "POST":
+            if request.form["label"] == "uidsetup" and not sheet.canvas_is_updating:
+                cruzid = request.form.get("cruzid")
+                overwritecheck = (
+                    True if request.form.get("overwrite") == "overwrite" else False
+                )
+                uid = nfc.read_card()
+                if not cruzid:
+                    err = "Please enter a CruzID"
+                elif not uid:
+                    err = "Card not detected, please try again"
+                else:
+                    err, added = assign_uid(cruzid, overwritecheck, uid)
+            elif sheet.canvas_is_updating:
+                err = "Canvas is updating, please wait"
+            else:
+                err = "Invalid request"
 
-        keys = json.load(open("canvas.json"))
+    except Exception as e:
+        print(e)
 
-        token = keys["auth_token"]
-        course_id = keys["course_id"]
+    return render_template(
+        "setup.html",
+        err=err,
+        added=added,
+    )
 
-        url = f"https://canvas.ucsc.edu/api/v1/courses/{course_id}/"
-        endpoint = "users"
-        headers = {"Authorization": f"Bearer {token}"}
+@app.route("/identify", methods=("GET", "POST"))
+@login_required
+def identify():
+    cruzid = ""
+    uid = ""
+    err = ""
+    user_data = None
+    accesses = []
+    rooms = sheet.rooms
 
-        staff_json = []
-        students_json = []
+    try:
+        if request.method == "POST":
+            cruzid = ""
+            if request.form["label"] == "identifyuid":
+                cruzid = request.form.get("cruzid")
 
-        params = {
-            "enrollment_type[]": "teacher",
-            "per_page": 1000,
-        }
+                if cruzid != None and cruzid != "" and cruzid != "None":
+                    user_data = dict(
+                        zip(
+                            [
+                                "type",
+                                "cruzid",
+                                "uid",
+                                "first_name",
+                                "last_name",
+                            ],
+                            sheet.get_user_data(cruzid=cruzid),
+                        )
+                    )
+                    accesses = sheet.get_all_accesses(cruzid=cruzid)
+                else:
+                    uid = nfc.read_card()
+                    user_data = dict(
+                        zip(
+                            [
+                                "type",
+                                "cruzid",
+                                "uid",
+                                "first_name",
+                                "last_name",
+                            ],
+                            sheet.get_user_data(uid=uid),
+                        )
+                    )
+                    accesses = sheet.get_all_accesses(uid=uid)
 
-        staff_count = 0
+                if user_data["type"] is True:
+                    user_data["type"] = "Staff"
+                elif user_data["type"] is False:
+                    user_data["type"] = "Student"
+                else:
+                    user_data["type"] = "Unknown"
 
-        response = requests.request(
-            "GET", url + endpoint, headers=headers, params=params
-        )
-        staff_json = response.json()
-        print(f"Successfully retrieved staff data part {staff_count} from Canvas")
-        while "next" in response.links:
-            response = requests.request(
-                "GET", response.links["next"]["url"], headers=headers
-            )
-            staff_json += response.json()
-            staff_count += 1
-            print(f"Successfully retrieved staff data part {staff_count} from Canvas")
+    except Exception as e:
+        print(e)
 
-        params = {
-            "enrollment_type[]": "ta",
-            "per_page": 1000,
-        }
+    return render_template(
+        "identify.html",
+        err=err,
+        user_data=user_data,
+        accesses=accesses,
+        rooms=rooms,
+        length=0 if not rooms else len(rooms),
+    )
 
-        response = requests.request(
-            "GET", url + endpoint, headers=headers, params=params
-        )
-        staff_json += response.json()
-        if len(response.json()) > 0:
-            staff_count += 1
-            print(f"Successfully retrieved staff data part {staff_count} from Canvas")
-        while "next" in response.links:
-            response = requests.request(
-                "GET", response.links["next"]["url"], headers=headers
-            )
-            staff_json += response.json()
-            staff_count += 1
-            print(f"Successfully retrieved staff data part {staff_count} from Canvas")
-
-        params = {
-            "enrollment_type[]": "student",
-            "per_page": 1000,
-        }
-
-        student_count = 0
-
-        response = requests.request(
-            "GET", url + endpoint, headers=headers, params=params
-        )
-        students_json = response.json()
-        print(f"Successfully retrieved student data part {student_count} from Canvas")
-        while "next" in response.links:
-            response = requests.request(
-                "GET", response.links["next"]["url"], headers=headers
-            )
-            students_json += response.json()
-            student_count += 1
-            print(
-                f"Successfully retrieved student data part {student_count} from Canvas"
-            )
-
-        print("Successfully retrieved all staff and student data from Canvas")
-
-        staff = []
-        for s in staff_json:
-            if "login_id" not in s or "ucsc.edu" not in s["login_id"]:
-                continue
-
-            cruzid = s["login_id"].split("@ucsc.edu")[0]
-
-            if cruzid in staff:
-                continue
-
-            if not sheet.is_staff(cruzid=cruzid):
-                sn = s["sortable_name"].split(", ")
-                uid = None
-
-                if sheet.student_exists(cruzid):
-                    uid = sheet.get_uid(cruzid)
-                    sheet.remove_student(cruzid)
-
-                sheet.new_staff(sn[1], sn[0], cruzid, uid)
-
-            staff.append(cruzid)
-
-        sheet.clamp_staff(staff)
-
-        print("Successfully processed staff data")
-
-        students = {}
-        for s in students_json:
-            if "login_id" not in s or "ucsc.edu" not in s["login_id"]:
-                continue
-
-            cruzid = s["login_id"].split("@ucsc.edu")[0]
-
-            if cruzid in students or cruzid in staff:
-                print(f"Skipping {cruzid}")
-                continue
-
-            if not sheet.student_exists(cruzid):
-                sn = s["sortable_name"].split(", ")
-                students[cruzid] = s["id"]
-
-                sheet.new_student(sn[1], sn[0], cruzid, s["id"], None)
-
-            students[cruzid] = s["id"]
-
-        sheet.clamp_students(students.keys())
-
-        print("Successfully processed student data")
-
-        endpoint = "modules"
-
-        for i, cruzid in enumerate(students):
-            params = {"student_id": students[cruzid]}
-            response = requests.request(
-                "GET", url + endpoint, headers=headers, data=params
-            )
-            modules_json = json.loads(response.text)
-            completed_modules = []
-            for m in modules_json:
-                if m["state"] == "completed":
-                    completed_modules.append(int(m["position"]))
-
-            sheet.evaluate_modules(completed_modules, cruzid)
-            print(
-                f"Successfully evaluated modules for {cruzid}, ({i+1}/{len(students)})"
-            )
-
-        print("\nSuccessfully evaluated modules for all students")
-
-        if sheet.write_student_sheet():
-            print("Successfully wrote student sheet")
-        else:
-            print("Failed to write student sheet")
-            return False
-
-        if sheet.write_staff_sheet():
-            print("Successfully wrote staff sheet")
-        else:
-            print("Failed to write staff sheet")
-            return False
-
-        if sheet.log("Canvas Update", "", False, 0):
-            print("Successfully logged canvas update")
-        else:
-            print("Failed to log canvas update")
-            return False
-
-        return True
-    except KeyboardInterrupt:
-        print("Exiting...")
-        sheet.set_canvas_status_sheet(False)
-        exit(0)
-
-
-CANVAS_UPDATE_HOUR = 4  # 4am
-CHECKIN_TIMEOUT = 5  # 5 minutes
+@socketio.on('connect')
+def handle_connect():
+    global thread
+    if thread is None or not thread.is_alive():
+        print("Starting background thread...")
+        thread = Thread(target=background_thread)
+        thread.start()
 
 if __name__ == "__main__":
-    sheet.last_update_time = datetime.now()
-    try:
-        while True:
-            sheet.get_canvas_status_sheet()
-            if (
-                sheet.canvas_needs_update
-                or not sheet.last_update_time
-                or (
-                    (
-                        datetime.now().date() > sheet.last_update_time.date()
-                        and datetime.now().hour >= CANVAS_UPDATE_HOUR
-                    )
-                )
-            ):
-                print("Canvas update...")
-                sheet.set_canvas_status_sheet(True)
-                tmp_time = datetime.now()
-                update()
-                sheet.get_sheet_data()
-                sheet.check_in()
-                sheet.set_canvas_status_sheet(False, tmp_time)
-            elif (
-                not sheet.last_checkin_time
-                or datetime.now() - sheet.last_checkin_time
-                > timedelta(0, 0, 0, 0, CHECKIN_TIMEOUT, 0, 0)
-            ):
-                print("Checking in...")
-                sheet.check_in()
-            else:
-                print("Waiting for next update...")
-            time.sleep(60)
-    except KeyboardInterrupt:
-        print("Exiting...")
-        sheet.set_canvas_status_sheet(False)
-        exit(0)
+    socketio.run(app, host="0.0.0.0", port=5001, ssl_context="adhoc")
