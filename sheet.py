@@ -366,6 +366,7 @@ def get_canvas_status_sheet():
         last_canvas_update_time = datetime.datetime.strptime(
             values[0][1], "%Y-%m-%d %H:%M:%S"
         )
+        return True
     except HttpError as e:
         logger.error(e)
         return None
@@ -958,7 +959,7 @@ def write_student_staff_sheets():
     return write_student_sheet() and write_staff_sheet()
 
 
-def evaluate_modules(completed_modules, cruzid=None, uid=None):
+def evaluate_modules(completed_modules, cruzid=None, uid=None, num_modules=None):
     """
     Evaluate a student's completed modules and update their room accesses.
 
@@ -967,6 +968,9 @@ def evaluate_modules(completed_modules, cruzid=None, uid=None):
     uid: str: the student's card UID.
     """
 
+    if not num_modules:
+        num_modules = 1000
+
     for i in range(len(module_data)):
         exp = str(module_data.loc[i, "Modules"])
         exp = exp.lower()
@@ -974,8 +978,12 @@ def evaluate_modules(completed_modules, cruzid=None, uid=None):
         exp = exp.replace("or", "|")
         exp = exp.replace(" ", "")
 
-        for m in range(module_count, 0, -1):
+        for m in range(num_modules, 0, -1):
             exp = exp.replace(str(m), "t" if m in completed_modules else "f")
+
+        for l in exp:
+            if l not in "tf&|()":
+                exp = exp.replace(l, "")
 
         if (
             set_access(
@@ -1509,8 +1517,8 @@ if __name__ == "__main__":
     # print(get_all_accesses(cruzid="tstudent"))
     # print(evaluate_modules([1, 2, 5, 6, 7, 8, 9, 10], cruzid="tstudent"))
 
-    write_student_sheet()
-    write_staff_sheet()
+    # write_student_sheet()
+    # write_staff_sheet()
 
     # set_uid("ewachtel", "63B104FF")
     # set_uid("cchartie", "63B104FF")
@@ -1524,13 +1532,20 @@ if __name__ == "__main__":
     # print(get_user_data(cruzid="ewachtel"))
     # print(get_user_data(cruzid="cchartie"))
 
+    # print(
+    #     student_data.loc[
+    #         student_data["3D Printing"].isin(["Access", "Override Access"])
+    #     ]["CruzID"].values.tolist()
+    # )
+    # print(staff_data["CruzID"].values.tolist())
+
     # print()
     # print(student_data)
     # print()
     # print(staff_data)
     # print()
     # print(access_data)
-    # # print()
-    # # print(module_data)
+    # print()
+    # print(module_data)
     # print()
     # print(reader_data)

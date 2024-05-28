@@ -20,7 +20,6 @@ def read_card():
     """
     try:
         id, _ = reader.read()
-        print("Card read: ", id)
         id = hex(id)[2:-2]
         return id
     except:
@@ -49,7 +48,6 @@ def read_card_queue_timeout(time):
         p.join(time)
         if p.is_alive():
             p.terminate()
-            print("timeout")
             return None
 
         val = q.get()

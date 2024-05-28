@@ -18,8 +18,7 @@ from flask_socketio import SocketIO, emit
 from oauthlib.oauth2 import WebApplicationClient
 from threading import Thread, Event
 
-# import control_nfc as nfc
-import fake_nfc as nfc
+import nfc_control as nfc
 import sheet
 from db import init_db_command
 from user import User
@@ -130,7 +129,6 @@ CHECKIN_TIMEOUT = 30  # seconds
 
 
 def update_data():
-    sheet.get_canvas_status_sheet()
     if (
         not sheet.last_update_time
         or sheet.last_canvas_update_time > sheet.last_update_time
