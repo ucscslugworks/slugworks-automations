@@ -30,8 +30,36 @@ GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", sheet.creds.client
 GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
 ALLOWED_EMAILS = {"chartier@ucsc.edu", "imadan1@ucsc.edu", "nkouatli@ucsc.edu"}
 
+# Change directory to current file location
+path = os.path.dirname(os.path.abspath(__file__))
+os.chdir(path)
+
+# Create a new directory for logs if it doesn't exist
+if not os.path.exists(path + "/logs"):
+    os.makedirs(path + "/logs")
+
+# create new logger with all levels
+logger = logging.getLogger("root")
+logger.setLevel(logging.DEBUG)
+
+# create file handler which logs debug messages (and above - everything)
+fh = logging.FileHandler(f"logs/{str(datetime.now())}.log")
+fh.setLevel(logging.DEBUG)
+
+# create console handler which only logs warnings (and above)
+ch = logging.StreamHandler()
+ch.setLevel(logging.WARNING)
+
+# create formatter and add it to the handlers
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s: %(message)s")
+fh.setFormatter(formatter)
+ch.setFormatter(formatter)
+
+# add the handlers to the logger
+logger.addHandler(fh)
+logger.addHandler(ch)
+
 # Initialize Flask app
-os.chdir(os.path.dirname(os.path.realpath(__file__)))
 app = Flask(__name__)
 app.secret_key = os.urandom(12).hex()
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -48,27 +76,6 @@ alarm_status_colors = ["#3CBC8D", "red", "yellow", "gray", ""]
 login_manager = LoginManager()
 login_manager.init_app(app)
 
-# Logging setup
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-# Create handlers
-console_handler = logging.StreamHandler()
-file_handler = logging.FileHandler('app.log')
-
-# Set level for handlers
-console_handler.setLevel(logging.DEBUG)
-file_handler.setLevel(logging.INFO)
-
-# Create formatter and add it to the handlers
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-console_handler.setFormatter(formatter)
-file_handler.setFormatter(formatter)
-
-# Add handlers to the logger
-logger.addHandler(console_handler)
-logger.addHandler(file_handler)
-
 # Naive database setup
 try:
     init_db_command()
@@ -80,15 +87,18 @@ except sqlite3.OperationalError:
 # OAuth 2 client setup
 client = WebApplicationClient(GOOGLE_CLIENT_ID)
 
+
 # Flask-Login helper to retrieve a user from our db
 @login_manager.user_loader
 def load_user(user_id):
     return User.get(user_id)
 
+
 @login_manager.unauthorized_handler
 def unauthorized():
     logger.warning("Unauthorized access attempt.")
     return redirect("/login")
+
 
 def assign_uid(cruzid, overwrite, uid):
     added = False
@@ -115,7 +125,9 @@ def assign_uid(cruzid, overwrite, uid):
         logger.info(carderror)
     return carderror, added
 
+
 CHECKIN_TIMEOUT = 30  # seconds
+
 
 def update_data():
     sheet.get_canvas_status_sheet()
@@ -128,16 +140,18 @@ def update_data():
         logger.info("Getting sheet data...")
         sheet.get_sheet_data()
 
+
 def background_thread():
     while not thread_stop_event.is_set():
         try:
             logger.debug("Background thread updating data...")
             update_data()
-            socketio.emit('update', {'message': 'Data updated'})
+            socketio.emit("update", {"message": "Data updated"})
             logger.info("Data updated and event emitted.")
             time.sleep(30)  # 30 seconds interval
         except Exception as e:
             logger.error(f"Error during background update: {e}")
+
 
 @app.route("/")
 def index():
@@ -154,9 +168,11 @@ def index():
         logger.debug("Rendering index page for unauthenticated user.")
         return '<a class="button" href="/login">Google Login</a>'
 
+
 def get_google_provider_cfg():
     logger.debug("Fetching Google provider configuration.")
     return requests.get(GOOGLE_DISCOVERY_URL).json()
+
 
 @app.route("/login")
 def login():
@@ -170,6 +186,7 @@ def login():
     )
     logger.debug("Redirecting to Google's OAuth 2.0 authorization endpoint.")
     return redirect(request_uri)
+
 
 @app.route("/login/callback")
 def callback():
@@ -222,12 +239,14 @@ def callback():
 
     return redirect(url_for("dashboard"))
 
+
 @app.route("/logout")
 @login_required
 def logout():
     logout_user()
     logger.info(f"User {current_user.email} logged out.")
     return redirect(url_for("index"))
+
 
 @app.route("/dashboard", methods=("GET", "POST"))
 @login_required
@@ -337,6 +356,7 @@ def dashboard():
         canvas_update=canvas_update,
     )
 
+
 @app.route("/setup", methods=("GET", "POST"))
 @login_required
 def setup():
@@ -374,6 +394,7 @@ def setup():
         err=err,
         added=added,
     )
+
 
 @app.route("/identify", methods=("GET", "POST"))
 @login_required
@@ -440,13 +461,15 @@ def identify():
         length=0 if not rooms else len(rooms),
     )
 
-@socketio.on('connect')
+
+@socketio.on("connect")
 def handle_connect():
     global thread
     if thread is None or not thread.is_alive():
         logger.info("Starting background thread...")
         thread = Thread(target=background_thread)
         thread.start()
+
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5001, ssl_context="adhoc")
