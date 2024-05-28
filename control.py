@@ -1,7 +1,7 @@
 import json
 import os
 import sqlite3
-from datetime import datetime, timedelta
+import datetime
 import time
 import logging
 
@@ -43,7 +43,7 @@ logger = logging.getLogger("root")
 logger.setLevel(logging.DEBUG)
 
 # create file handler which logs debug messages (and above - everything)
-fh = logging.FileHandler(f"logs/control/{str(datetime.now())}.log")
+fh = logging.FileHandler(f"logs/control/{str(datetime.datetime.now())}.log")
 fh.setLevel(logging.DEBUG)
 
 # create console handler which only logs warnings (and above)
@@ -134,8 +134,8 @@ def update_data():
     if (
         not sheet.last_update_time
         or sheet.last_canvas_update_time > sheet.last_update_time
-        or datetime.now() - sheet.last_update_time
-        > timedelta(0, CHECKIN_TIMEOUT, 0, 0, 0, 0, 0)
+        or datetime.datetime.now() - sheet.last_update_time
+        > datetime.timedelta(0, CHECKIN_TIMEOUT, 0, 0, 0, 0, 0)
     ):
         logger.info("Getting sheet data...")
         sheet.get_sheet_data()

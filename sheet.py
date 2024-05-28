@@ -1,5 +1,6 @@
 import datetime
 import json
+import logging
 import os.path
 from threading import Thread
 from typing import Any, Callable, Iterable, Mapping
@@ -11,11 +12,19 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+# Change directory to current file location
+path = os.path.dirname(os.path.abspath(__file__))
+os.chdir(path)
+
+# create new logger with all levels
+logger = logging.getLogger("sheet")
+logger.setLevel(logging.DEBUG)
+
 # get reader id (0 is the control pi, any other number is a reader pi zero)
 try:
     reader_file = json.load(open("ID.json"))
 except FileNotFoundError:
-    print("No ID.json file found.")
+    logger.error("No ID.json file found.")
     exit(1)
 reader_id = reader_file["id"]
 
@@ -34,7 +43,7 @@ READERS_SHEET = "Readers"  # contains statuses of the readers
 LOG_SHEET = "Log"  # contains a log of all card reads
 CANVAS_STATUS_SHEET = "Canvas Status"  # contains the last update time of the Canvas data & the current status of the update
 
-SEND_BLOCK = 100
+SEND_BLOCK = 1000
 
 ENABLE_SCAN_LOGS = False  # disable scan logs - considered P3 data due to tracking locations of students (can add back in for testing or when a secure logging system is implemented)
 
@@ -73,6 +82,35 @@ canvas_needs_update = None
 student_sheet_read_len = 0
 staff_sheet_read_len = 0
 
+# Change directory to current file location
+path = os.path.dirname(os.path.abspath(__file__))
+os.chdir(path)
+
+# Create a new directory for logs if it doesn't exist
+if not os.path.exists(path + "/logs/sheet"):
+    os.makedirs(path + "/logs/sheet")
+
+# create new logger with all levels
+logger = logging.getLogger("sheet")
+logger.setLevel(logging.DEBUG)
+
+# # create file handler which logs debug messages (and above - everything)
+# fh = logging.FileHandler(f"logs/sheet/{str(datetime.datetime.now())}.log")
+# fh.setLevel(logging.DEBUG)
+
+# # create console handler which only logs warnings (and above)
+# ch = logging.StreamHandler()
+# ch.setLevel(logging.WARNING)
+
+# # create formatter and add it to the handlers
+# formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s: %(message)s")
+# fh.setFormatter(formatter)
+# ch.setFormatter(formatter)
+
+# # add the handlers to the logger
+# logger.addHandler(fh)
+# logger.addHandler(ch)
+
 creds = None
 # The file token.json stores the user's access and refresh tokens, and is
 # created automatically when the authorization flow completes for the first
@@ -80,7 +118,7 @@ creds = None
 if os.path.exists("token.json"):
     creds = Credentials.from_authorized_user_file("token.json", SCOPES)
 elif not os.path.exists("credentials.json"):
-    print("No credentials.json file found.")
+    logger.error("No credentials.json file found.")
     exit(1)
 # If there are no (valid) credentials available, let the user log in (assuming credentials.json exists).
 if not creds or not creds.valid:
@@ -100,7 +138,7 @@ try:
     g_sheets = service.spreadsheets()
 
 except HttpError as e:
-    print(e)
+    logger.error(e)
     exit(1)
 
 
@@ -130,7 +168,7 @@ def get_sheet_data(limited=None):
         values = students.get("values", [])
 
         if not values:
-            print("No data found.")
+            logger.error("No data found.")
             exit()
 
         values = [r + [""] * (len(values[0]) - len(r)) for r in values]
@@ -207,7 +245,7 @@ def get_sheet_data(limited=None):
 
         return True and get_reader_data()
     except HttpError as e:
-        print(e)
+        logger.error(e)
         return False
 
 
@@ -254,7 +292,7 @@ def get_reader_data():
 
         return True
     except HttpError as e:
-        print(e)
+        logger.error(e)
         return False
 
 
@@ -284,7 +322,7 @@ def check_in(alarm_status=False):
     last_checkin_time = datetime.datetime.now()
     this_reader["last_checked_in"] = str(last_checkin_time)
     if this_reader["needs_update"]:
-        print("Update needed...")
+        logger.info("Update needed...")
         get_sheet_data()
     this_reader["needs_update"] = "DONE"
 
@@ -300,7 +338,7 @@ def check_in(alarm_status=False):
             .execute()
         )
     except HttpError as e:
-        print(e)
+        logger.error(e)
         return False
     return True
 
@@ -329,7 +367,7 @@ def get_canvas_status_sheet():
             values[0][1], "%Y-%m-%d %H:%M:%S"
         )
     except HttpError as e:
-        print(e)
+        logger.error(e)
         return None
 
 
@@ -367,7 +405,7 @@ def set_canvas_status_sheet(updating_now, update_time=None):
         last_canvas_update_time = update_time
         return True
     except HttpError as e:
-        print(e)
+        logger.error(e)
         return False
 
 
@@ -394,7 +432,7 @@ def update_canvas():
         )
         return True
     except HttpError as e:
-        print(e)
+        logger.error(e)
         return False
 
 
@@ -842,16 +880,11 @@ def write_student_sheet():
         length = len(vals)
         blank_filled = 0
 
-        # print(vals)
-
         if student_sheet_read_len > length:
             blank_filled = student_sheet_read_len - length
             vals = vals + [[""] * len(student_data.columns)] * (blank_filled)
         else:
             student_sheet_read_len = length
-
-        # print(student_sheet_read_len)
-        # print(vals)
 
         for i in range(0, student_sheet_read_len, SEND_BLOCK):
             _ = (
@@ -870,7 +903,7 @@ def write_student_sheet():
         student_sheet_read_len -= blank_filled
         return True
     except HttpError as e:
-        print(e)
+        logger.error(e)
         return False
 
 
@@ -911,7 +944,7 @@ def write_staff_sheet():
         staff_sheet_read_len = length
         return True
     except HttpError as e:
-        print(e)
+        logger.error(e)
         return False
 
 
@@ -1091,14 +1124,11 @@ def remove_student(cruzid):
     """
 
     if not student_exists(cruzid=cruzid):
-        # print("not found")
         return False
 
     row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
-    # print(row)
     student_data.drop(row, inplace=True)  # TODO: move to archive sheet instead
     student_data.reset_index(drop=True, inplace=True)
-    # print(student_data)
 
     return True
 
@@ -1153,7 +1183,6 @@ def clamp_students(student_list):
 
     for i in range(student_data.shape[0]):
         if student_data.loc[i, "CruzID"] not in student_list:
-            # print("drop")
             student_data.drop(i, inplace=True)  # TODO: move to archive sheet instead
 
 
@@ -1197,7 +1226,7 @@ def log(uid, access, alarm_status, disarm_time):
         )
         return True
     except HttpError as e:
-        print(e)
+        logger.error(e)
         return False
 
 
@@ -1298,7 +1327,7 @@ def update_all_readers():
             .execute()
         )
     except HttpError as e:
-        print(e)
+        logger.error(e)
 
 
 def update_reader(id, location=None, alarm=None, alarm_delay=None):
@@ -1326,7 +1355,7 @@ def update_reader(id, location=None, alarm=None, alarm_delay=None):
             .execute()
         )
     except HttpError as e:
-        print(e)
+        logger.error(e)
         return False
 
     return True
@@ -1390,11 +1419,35 @@ def set_reader_properties(id, location=None, alarm=None, alarm_delay=None):
         )
         return True
     except HttpError as e:
-        print(e)
+        logger.error(e)
         return False
 
 
 if __name__ == "__main__":
+    # Create a new directory for logs if it doesn't exist
+    if not os.path.exists(path + "/logs/sheet"):
+        os.makedirs(path + "/logs/sheet")
+
+    # create new logger with all levels
+    root_logger = logging.getLogger("root")
+    root_logger.setLevel(logging.DEBUG)
+
+    # create file handler which logs debug messages (and above - everything)
+    fh = logging.FileHandler(f"logs/sheet/{str(datetime.datetime.now())}.log")
+    fh.setLevel(logging.DEBUG)
+
+    # create console handler which only logs warnings (and above)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.WARNING)
+
+    # create formatter and add it to the handlers
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s: %(message)s")
+    fh.setFormatter(formatter)
+    ch.setFormatter(formatter)
+
+    # add the handlers to the logger
+    root_logger.addHandler(fh)
+    root_logger.addHandler(ch)
     get_sheet_data(limited=False)
     # print(student_data)
     # print()
@@ -1471,8 +1524,8 @@ if __name__ == "__main__":
     # print(get_user_data(cruzid="ewachtel"))
     # print(get_user_data(cruzid="cchartie"))
 
-    print()
-    print(student_data)
+    # print()
+    # print(student_data)
     # print()
     # print(staff_data)
     # print()

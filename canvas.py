@@ -13,15 +13,15 @@ path = os.path.dirname(os.path.abspath(__file__))
 os.chdir(path)
 
 # Create a new directory for logs if it doesn't exist
-if not os.path.exists(path + "/logs/control"):
-    os.makedirs(path + "/logs/control")
+if not os.path.exists(path + "/logs/canvas"):
+    os.makedirs(path + "/logs/canvas")
 
 # create new logger with all levels
 logger = logging.getLogger("root")
 logger.setLevel(logging.DEBUG)
 
 # create file handler which logs debug messages (and above - everything)
-fh = logging.FileHandler(f"logs/control/{str(datetime.now())}.log")
+fh = logging.FileHandler(f"logs/canvas/{str(datetime.now())}.log")
 fh.setLevel(logging.DEBUG)
 
 # create console handler which only logs warnings (and above)
