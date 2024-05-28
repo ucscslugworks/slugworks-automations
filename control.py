@@ -3,6 +3,7 @@ import os
 import sqlite3
 from datetime import datetime, timedelta
 import time
+import logging
 
 import requests
 from flask import Flask, redirect, render_template, request, url_for
@@ -46,12 +47,34 @@ alarm_status_colors = ["#3CBC8D", "red", "yellow", "gray", ""]
 login_manager = LoginManager()
 login_manager.init_app(app)
 
+# Logging setup
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Create handlers
+console_handler = logging.StreamHandler()
+file_handler = logging.FileHandler('app.log')
+
+# Set level for handlers
+console_handler.setLevel(logging.DEBUG)
+file_handler.setLevel(logging.INFO)
+
+# Create formatter and add it to the handlers
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+file_handler.setFormatter(formatter)
+
+# Add handlers to the logger
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
+
 # Naive database setup
 try:
     init_db_command()
+    logger.info("Database initialized successfully.")
 except sqlite3.OperationalError:
     # Assume it's already been created
-    pass
+    logger.warning("Database already exists. Skipping initialization.")
 
 # OAuth 2 client setup
 client = WebApplicationClient(GOOGLE_CLIENT_ID)
@@ -63,6 +86,7 @@ def load_user(user_id):
 
 @login_manager.unauthorized_handler
 def unauthorized():
+    logger.warning("Unauthorized access attempt.")
     return redirect("/login")
 
 def assign_uid(cruzid, overwrite, uid):
@@ -70,19 +94,24 @@ def assign_uid(cruzid, overwrite, uid):
     carderror = ""
     if sheet.get_uid(cruzid) == uid:
         carderror = f"Card is already assigned to {cruzid}"
+        logger.debug(carderror)
     elif sheet.get_uid(cruzid) and sheet.get_cruzid(uid) and not overwrite:
         carderror = f"Card is already assigned to {sheet.get_cruzid(uid)}, and {cruzid} already has a card. If you would like to reassign the card to {cruzid} and replace {cruzid}'s existing card, please overwrite."
+        logger.debug(carderror)
     elif sheet.get_uid(cruzid) and not overwrite:
         carderror = (
             f"{cruzid} already has a card, please overwrite to replace with this card"
         )
+        logger.debug(carderror)
     elif sheet.get_cruzid(uid) and not overwrite:
         carderror = f"Card is already assigned to {sheet.get_cruzid(uid)}. If you would like to reassign the card to {cruzid}, please overwrite."
+        logger.debug(carderror)
     else:
         sheet.set_uid(cruzid, uid, overwrite)
         sheet.run_in_thread(f=sheet.write_student_staff_sheets)
         carderror = f"Card added to database for {cruzid}"
         added = True
+        logger.info(carderror)
     return carderror, added
 
 CHECKIN_TIMEOUT = 30  # seconds
@@ -95,23 +124,24 @@ def update_data():
         or datetime.now() - sheet.last_update_time
         > timedelta(0, CHECKIN_TIMEOUT, 0, 0, 0, 0, 0)
     ):
-        print("Getting sheet data...")
+        logger.info("Getting sheet data...")
         sheet.get_sheet_data()
 
 def background_thread():
     while not thread_stop_event.is_set():
         try:
-            print("Background thread updating data...")
+            logger.debug("Background thread updating data...")
             update_data()
             socketio.emit('update', {'message': 'Data updated'})
-            print("Data updated and event emitted.")
+            logger.info("Data updated and event emitted.")
             time.sleep(30)  # 30 seconds interval
         except Exception as e:
-            print(f"Error during background update: {e}")
+            logger.error(f"Error during background update: {e}")
 
 @app.route("/")
 def index():
     if current_user.is_authenticated:
+        logger.debug("Rendering index page for authenticated user.")
         return (
             "<p>Hello, you're logged in as {}! Email: {}</p>"
             "<a class='button' href='/dashboard'>Dashboard</a><br>"
@@ -120,9 +150,11 @@ def index():
             )
         )
     else:
+        logger.debug("Rendering index page for unauthenticated user.")
         return '<a class="button" href="/login">Google Login</a>'
 
 def get_google_provider_cfg():
+    logger.debug("Fetching Google provider configuration.")
     return requests.get(GOOGLE_DISCOVERY_URL).json()
 
 @app.route("/login")
@@ -135,6 +167,7 @@ def login():
         redirect_uri=request.base_url + "/callback",
         scope=["openid", "email", "profile"],
     )
+    logger.debug("Redirecting to Google's OAuth 2.0 authorization endpoint.")
     return redirect(request_uri)
 
 @app.route("/login/callback")
@@ -167,13 +200,16 @@ def callback():
         users_email = userinfo_response.json()["email"]
         picture = userinfo_response.json()["picture"]
         users_name = userinfo_response.json()["given_name"]
+        logger.info(f"User {users_email} authenticated successfully.")
     else:
+        logger.error("User email not available or not verified by Google.")
         return "User email not available or not verified by Google.", 400
 
     user = User(id_=unique_id, name=users_name, email=users_email, profile_pic=picture)
 
     if not User.get(unique_id):
         User.create(unique_id, users_name, users_email, picture)
+        logger.info(f"Created new user {users_email} in the database.")
 
     login_user(user)
 
@@ -183,6 +219,7 @@ def callback():
 @login_required
 def logout():
     logout_user()
+    logger.info(f"User {current_user.email} logged out.")
     return redirect(url_for("index"))
 
 @app.route("/dashboard", methods=("GET", "POST"))
@@ -273,17 +310,19 @@ def dashboard():
                         "alarm_delay": req_delay,
                     },
                 )
+                logger.info(f"Updated device {req_id} with new settings.")
                 return redirect("/dashboard")
             elif request.form["label"] == "update-canvas":
                 sheet.update_canvas()
-                print("Updating canvas")
+                logger.info("Updating canvas")
                 return redirect("/dashboard")
             elif request.form["label"] == "update-all":
                 sheet.run_in_thread(f=sheet.update_all_readers)
+                logger.info("Updating all readers")
                 return redirect("/dashboard")
 
     except Exception as e:
-        print(e)
+        logger.error(e)
 
     return render_template(
         "dashboard.html",
@@ -307,17 +346,21 @@ def setup():
                 uid = nfc.read_card()
                 if not cruzid:
                     err = "Please enter a CruzID"
+                    logger.warning("No CruzID provided during UID setup.")
                 elif not uid:
                     err = "Card not detected, please try again"
+                    logger.warning("Card not detected during UID setup.")
                 else:
                     err, added = assign_uid(cruzid, overwritecheck, uid)
             elif sheet.canvas_is_updating:
                 err = "Canvas is updating, please wait"
+                logger.info("Canvas update in progress during UID setup.")
             else:
                 err = "Invalid request"
+                logger.warning("Invalid request during UID setup.")
 
     except Exception as e:
-        print(e)
+        logger.error(e)
 
     return render_template(
         "setup.html",
@@ -379,7 +422,7 @@ def identify():
                     user_data["type"] = "Unknown"
 
     except Exception as e:
-        print(e)
+        logger.error(e)
 
     return render_template(
         "identify.html",
@@ -394,7 +437,7 @@ def identify():
 def handle_connect():
     global thread
     if thread is None or not thread.is_alive():
-        print("Starting background thread...")
+        logger.info("Starting background thread...")
         thread = Thread(target=background_thread)
         thread.start()
 
