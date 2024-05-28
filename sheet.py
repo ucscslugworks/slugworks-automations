@@ -43,7 +43,7 @@ READERS_SHEET = "Readers"  # contains statuses of the readers
 LOG_SHEET = "Log"  # contains a log of all card reads
 CANVAS_STATUS_SHEET = "Canvas Status"  # contains the last update time of the Canvas data & the current status of the update
 
-SEND_BLOCK = 1000
+SEND_BLOCK = 500
 
 ENABLE_SCAN_LOGS = False  # disable scan logs - considered P3 data due to tracking locations of students (can add back in for testing or when a secure logging system is implemented)
 
