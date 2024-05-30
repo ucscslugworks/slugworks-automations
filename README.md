@@ -41,3 +41,7 @@ This should light up the NeoPixels connected to the reader with a rainbow patter
 *"X" is the reader ID as used in the database Sheet, where 0 is the control device*
 - token.json
   - Google login token, if this does not exist you will need an OAuth `credentials.json` from Google Cloud Console and a browser to authenticate the application. Run `python sheet.py` with the `credentials.json` file in the directory, and a browser window should open to ask for a Google login. Here, use an account with read/write access to the database Sheet. If running on a device with no GUI, create the token file on a different device with an available browser then copy it to the correct device.
+
+
+For krb5 auth copy the krb5.conf file into your /etc/ folder and run kinit with the service account cruzID
+Remember to update keytab before it expires!

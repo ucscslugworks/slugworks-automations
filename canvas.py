@@ -1,10 +1,41 @@
 import json
+import logging
+import os
 import time
 from datetime import datetime, timedelta
 
 import requests
 
 import sheet
+
+# Change directory to current file location
+path = os.path.dirname(os.path.abspath(__file__))
+os.chdir(path)
+
+# Create a new directory for logs if it doesn't exist
+if not os.path.exists(path + "/logs/canvas"):
+    os.makedirs(path + "/logs/canvas")
+
+# create new logger with all levels
+logger = logging.getLogger("root")
+logger.setLevel(logging.DEBUG)
+
+# create file handler which logs debug messages (and above - everything)
+fh = logging.FileHandler(f"logs/canvas/{str(datetime.now())}.log")
+fh.setLevel(logging.DEBUG)
+
+# create console handler which only logs warnings (and above)
+ch = logging.StreamHandler()
+ch.setLevel(logging.WARNING)
+
+# create formatter and add it to the handlers
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s: %(message)s")
+fh.setFormatter(formatter)
+ch.setFormatter(formatter)
+
+# add the handlers to the logger
+logger.addHandler(fh)
+logger.addHandler(ch)
 
 
 def list_modules():
@@ -30,7 +61,7 @@ def list_modules():
 def update():
     try:
         sheet.get_sheet_data(limited=False)
-        print("Successfully retrieved sheet data")
+        logger.info("Successfully retrieved sheet data")
 
         keys = json.load(open("canvas.json"))
 
@@ -55,14 +86,16 @@ def update():
             "GET", url + endpoint, headers=headers, params=params
         )
         staff_json = response.json()
-        print(f"Successfully retrieved staff data part {staff_count} from Canvas")
+        logger.info(f"Successfully retrieved staff data part {staff_count} from Canvas")
         while "next" in response.links:
             response = requests.request(
                 "GET", response.links["next"]["url"], headers=headers
             )
             staff_json += response.json()
             staff_count += 1
-            print(f"Successfully retrieved staff data part {staff_count} from Canvas")
+            logger.info(
+                f"Successfully retrieved staff data part {staff_count} from Canvas"
+            )
 
         params = {
             "enrollment_type[]": "ta",
@@ -75,14 +108,18 @@ def update():
         staff_json += response.json()
         if len(response.json()) > 0:
             staff_count += 1
-            print(f"Successfully retrieved staff data part {staff_count} from Canvas")
+            logger.info(
+                f"Successfully retrieved staff data part {staff_count} from Canvas"
+            )
         while "next" in response.links:
             response = requests.request(
                 "GET", response.links["next"]["url"], headers=headers
             )
             staff_json += response.json()
             staff_count += 1
-            print(f"Successfully retrieved staff data part {staff_count} from Canvas")
+            logger.info(
+                f"Successfully retrieved staff data part {staff_count} from Canvas"
+            )
 
         params = {
             "enrollment_type[]": "student",
@@ -95,18 +132,20 @@ def update():
             "GET", url + endpoint, headers=headers, params=params
         )
         students_json = response.json()
-        print(f"Successfully retrieved student data part {student_count} from Canvas")
+        logger.info(
+            f"Successfully retrieved student data part {student_count} from Canvas"
+        )
         while "next" in response.links:
             response = requests.request(
                 "GET", response.links["next"]["url"], headers=headers
             )
             students_json += response.json()
             student_count += 1
-            print(
+            logger.info(
                 f"Successfully retrieved student data part {student_count} from Canvas"
             )
 
-        print("Successfully retrieved all staff and student data from Canvas")
+        logger.info("Successfully retrieved all staff and student data from Canvas")
 
         staff = []
         for s in staff_json:
@@ -132,7 +171,7 @@ def update():
 
         sheet.clamp_staff(staff)
 
-        print("Successfully processed staff data")
+        logger.info("Successfully processed staff data")
 
         students = {}
         for s in students_json:
@@ -142,7 +181,7 @@ def update():
             cruzid = s["login_id"].split("@ucsc.edu")[0]
 
             if cruzid in students or cruzid in staff:
-                print(f"Skipping {cruzid}")
+                logger.info(f"Skipping {cruzid}")
                 continue
 
             if not sheet.student_exists(cruzid):
@@ -155,7 +194,7 @@ def update():
 
         sheet.clamp_students(students.keys())
 
-        print("Successfully processed student data")
+        logger.info("Successfully processed student data")
 
         endpoint = "modules"
 
@@ -180,28 +219,28 @@ def update():
             sheet.evaluate_modules(
                 completed_modules, cruzid=cruzid, num_modules=num_modules
             )
-            print(
+            logger.info(
                 f"Successfully evaluated modules for {cruzid}, ({i+1}/{len(students)})"
             )
 
-        print("\nSuccessfully evaluated modules for all students")
+        logger.info("\nSuccessfully evaluated modules for all students")
 
         if sheet.write_student_sheet():
-            print("Successfully wrote student sheet")
+            logger.info("Successfully wrote student sheet")
         else:
-            print("Failed to write student sheet")
+            logger.error("Failed to write student sheet")
             return False
 
         if sheet.write_staff_sheet():
-            print("Successfully wrote staff sheet")
+            logger.info("Successfully wrote staff sheet")
         else:
-            print("Failed to write staff sheet")
+            logger.error("Failed to write staff sheet")
             return False
 
         if sheet.log("Canvas Update", "", False, 0):
-            print("Successfully logged canvas update")
+            logger.info("Successfully logged canvas update")
         else:
-            print("Failed to log canvas update")
+            logger.error("Failed to log canvas update")
             return False
 
         return True
@@ -229,7 +268,7 @@ if __name__ == "__main__":
                         )
                     )
                 ):
-                    print("Canvas update...")
+                    logger.info("Canvas update...")
                     sheet.set_canvas_status_sheet(True)
                     tmp_time = datetime.now()
                     update()
@@ -241,16 +280,19 @@ if __name__ == "__main__":
                     or datetime.now() - sheet.last_checkin_time
                     > timedelta(0, 0, 0, 0, CHECKIN_TIMEOUT, 0, 0)
                 ):
-                    print("Checking in...")
+                    logger.info("Checking in...")
                     sheet.check_in()
                 else:
-                    print("Waiting for next update...")
+                    logger.info("Waiting for next update...")
                 time.sleep(60)
+            
             except Exception as e:
                 if type(e) == KeyboardInterrupt:
                     raise e
-                print(f"Error: {e}")
+                logger.error(f"Error: {e}")
                 time.sleep(60)
+                sheet.set_canvas_status_sheet(False)
+    
     except KeyboardInterrupt:
         print("Exiting...")
         sheet.set_canvas_status_sheet(False)

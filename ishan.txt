@@ -1,0 +1,3139 @@
+diff --git a/README.md b/README.md
+index 783b2d2..6c6b47a 100644
+--- a/README.md
++++ b/README.md
+@@ -1,43 +1 @@
+-# slugworks-id-cards
+-
+-**IMPORTANT:** Please use a virtual environment to install the required packages. You can use the following commands to do so on a Linux system:
+-
+-```bash
+-sudo apt install --upgrade python3-pip python3-venv
+-python3 -m venv venv
+-source venv/bin/activate
+-pip install -r requirements-[device].txt
+-```
+-Where `[device]` is the device you are using (`control` or `reader`). Additionally, pip must be run as sudo for the `reader` devices so the NeoPixel library has the proper permissions to control the GPIO pins.
+-
+-### NeoPixel Setup on Readers (Pi Zero)
+-(run from the `slugworks-access-cards` directory)
+-```bash
+-sudo apt install --upgrade python3-setuptools
+-source venv/bin/activate
+-cd ~
+-pip install --upgrade adafruit-python-shell
+-wget https://raw.githubusercontent.com/adafruit/Raspberry-Pi-Installer-Scripts/master/raspi-blinka.py
+-sudo -E env PATH=$PATH python3 raspi-blinka.py
+-```
+-Then, cd (change directory) to the `slugworks-access-cards` directory and run the following command:
+-```bash
+-sudo python3 blinkatest.py
+-```
+-This should return a series of "ok!" messages. Next, run the following command to install and test the NeoPixel library:
+-```bash
+-sudo pip install --upgrade adafruit-circuitpython-neopixel
+-sudo python3 neopixeltest.py
+-```
+-This should light up the NeoPixels connected to the reader with a rainbow pattern. If this works, the NeoPixel library is set up correctly. (You may need to adjust the num_pixels and pixel_pin variables in the `neopixeltest.py` file to match the number of NeoPixels and the GPIO pin they are connected to.)
+-
+-### Required JSON Files
+-- ID.json
+-```json
+-{
+-    "id": X
+-}
+-```
+-*"X" is the reader ID as used in the database Sheet, where 0 is the control device*
+-- token.json
+-  - Google login token, if this does not exist you will need an OAuth `credentials.json` from Google Cloud Console and a browser to authenticate the application. Run `python sheet.py` with the `credentials.json` file in the directory, and a browser window should open to ask for a Google login. Here, use an account with read/write access to the database Sheet. If running on a device with no GUI, create the token file on a different device with an available browser then copy it to the correct device.
++# slugworks-id-cards
+\ No newline at end of file
+diff --git a/app.py b/app.py
+deleted file mode 120000
+index 1bc304a..0000000
+--- a/app.py
++++ /dev/null
+@@ -1 +0,0 @@
+-control.py
+\ No newline at end of file
+diff --git a/blinkatest.py b/blinkatest.py
+deleted file mode 100644
+index 68ab218..0000000
+--- a/blinkatest.py
++++ /dev/null
+@@ -1,19 +0,0 @@
+-import board
+-import busio
+-import digitalio
+-
+-print("Hello, blinka!")
+-
+-# Try to create a Digital input
+-pin = digitalio.DigitalInOut(board.D4)
+-print("Digital IO ok!")
+-
+-# Try to create an I2C device
+-i2c = busio.I2C(board.SCL, board.SDA)
+-print("I2C ok!")
+-
+-# Try to create an SPI device
+-spi = busio.SPI(board.SCLK, board.MOSI, board.MISO)
+-print("SPI ok!")
+-
+-print("done!")
+diff --git a/canvas.json b/canvas.json
+new file mode 100644
+index 0000000..4a8df41
+--- /dev/null
++++ b/canvas.json
+@@ -0,0 +1,4 @@
++{
++     "canvas_auth_token": "9270~4gDC188zskI0sdkFc2Zmf4E7TkgbSG7JhXrgh4P3pSe95ZMmmYvk8F2BqURHInrH",
++  "canvas_course_id": "67429"
++}
+\ No newline at end of file
+diff --git a/canvas.py b/canvas.py
+index 05ed278..98b0b17 100644
+--- a/canvas.py
++++ b/canvas.py
+@@ -1,252 +1,80 @@
+ import json
+-import time
+-from datetime import datetime, timedelta
+ 
+ import requests
+ 
+ import sheet
+ 
+ 
+-def list_modules():
++def update():
++    sheet.get_sheet_data(limited=False)
++    print("Successfully retrieved sheet data")
++
+     keys = json.load(open("canvas.json"))
+ 
+-    token = keys["auth_token"]
+-    course_id = keys["course_id"]
++    token = keys["canvas_auth_token"]
++    course_id = keys["canvas_course_id"]
+ 
+     url = f"https://canvas.ucsc.edu/api/v1/courses/{course_id}/"
++    endpoint = "students"
+     headers = {"Authorization": f"Bearer {token}"}
+ 
+-    endpoint = "modules"
+-
+-    params = {
+-        "per_page": 1000,
+-    }
+-
+-    response = requests.request("GET", url + endpoint, headers=headers, params=params)
++    response = requests.request("GET", url + endpoint, headers=headers)
+ 
+-    print(json.dumps(response.json(), indent=4))
++    students_json = json.loads(response.text)
++    students = {}
++    for s in students_json:
++        # TODO: check if student is a staff member, and if so, skip them
++        if (
++            "login_id" not in s
++            or "ucsc.edu" not in s["login_id"]
++            or s["login_id"] in students
++        ):
++            continue
+ 
++        cruzid = s["login_id"].split("@ucsc.edu")[0]
+ 
+-def update():
+-    try:
+-        sheet.get_sheet_data(limited=False)
+-        print("Successfully retrieved sheet data")
+-
+-        keys = json.load(open("canvas.json"))
+-
+-        token = keys["auth_token"]
+-        course_id = keys["course_id"]
+-
+-        url = f"https://canvas.ucsc.edu/api/v1/courses/{course_id}/"
+-        endpoint = "users"
+-        headers = {"Authorization": f"Bearer {token}"}
+-
+-        staff_json = []
+-        students_json = []
+-
+-        params = {
+-            "enrollment_type[]": "teacher",
+-            "per_page": 1000,
+-        }
+-
+-        staff_count = 0
+-
+-        response = requests.request(
+-            "GET", url + endpoint, headers=headers, params=params
+-        )
+-        staff_json = response.json()
+-        print(f"Successfully retrieved staff data part {staff_count} from Canvas")
+-        while "next" in response.links:
+-            response = requests.request(
+-                "GET", response.links["next"]["url"], headers=headers
+-            )
+-            staff_json += response.json()
+-            staff_count += 1
+-            print(f"Successfully retrieved staff data part {staff_count} from Canvas")
+-
+-        params = {
+-            "enrollment_type[]": "ta",
+-            "per_page": 1000,
+-        }
+-
+-        response = requests.request(
+-            "GET", url + endpoint, headers=headers, params=params
+-        )
+-        staff_json += response.json()
+-        if len(response.json()) > 0:
+-            staff_count += 1
+-            print(f"Successfully retrieved staff data part {staff_count} from Canvas")
+-        while "next" in response.links:
+-            response = requests.request(
+-                "GET", response.links["next"]["url"], headers=headers
+-            )
+-            staff_json += response.json()
+-            staff_count += 1
+-            print(f"Successfully retrieved staff data part {staff_count} from Canvas")
+-
+-        params = {
+-            "enrollment_type[]": "student",
+-            "per_page": 1000,
+-        }
+-
+-        student_count = 0
+-
+-        response = requests.request(
+-            "GET", url + endpoint, headers=headers, params=params
+-        )
+-        students_json = response.json()
+-        print(f"Successfully retrieved student data part {student_count} from Canvas")
+-        while "next" in response.links:
+-            response = requests.request(
+-                "GET", response.links["next"]["url"], headers=headers
+-            )
+-            students_json += response.json()
+-            student_count += 1
+-            print(
+-                f"Successfully retrieved student data part {student_count} from Canvas"
+-            )
+-
+-        print("Successfully retrieved all staff and student data from Canvas")
+-
+-        staff = []
+-        for s in staff_json:
+-            if "login_id" not in s or "ucsc.edu" not in s["login_id"]:
+-                continue
+-
+-            cruzid = s["login_id"].split("@ucsc.edu")[0]
+-
+-            if cruzid in staff:
+-                continue
+-
+-            if not sheet.is_staff(cruzid=cruzid):
+-                sn = s["sortable_name"].split(", ")
+-                uid = None
+-
+-                if sheet.student_exists(cruzid):
+-                    uid = sheet.get_uid(cruzid)
+-                    sheet.remove_student(cruzid)
+-
+-                sheet.new_staff(sn[1], sn[0], cruzid, uid)
+-
+-            staff.append(cruzid)
+-
+-        sheet.clamp_staff(staff)
+-
+-        print("Successfully processed staff data")
+-
+-        students = {}
+-        for s in students_json:
+-            if "login_id" not in s or "ucsc.edu" not in s["login_id"]:
+-                continue
+-
+-            cruzid = s["login_id"].split("@ucsc.edu")[0]
+-
+-            if cruzid in students or cruzid in staff:
+-                print(f"Skipping {cruzid}")
+-                continue
+-
+-            if not sheet.student_exists(cruzid):
+-                sn = s["sortable_name"].split(", ")
+-                students[cruzid] = s["id"]
+-
+-                sheet.new_student(sn[1], sn[0], cruzid, s["id"], None)
++        if sheet.is_staff(cruzid):
++            continue
+ 
++        if not sheet.student_exists(cruzid):
++            sn = s["sortable_name"].split(", ")
+             students[cruzid] = s["id"]
++            sheet.new_student(sn[1], sn[0], cruzid, s["id"])
+ 
+-        sheet.clamp_students(students.keys())
++        students[cruzid] = s["id"]
+ 
+-        print("Successfully processed student data")
++    print("Successfully retrieved student data from Canvas")
+ 
+-        endpoint = "modules"
+-
+-        num_modules = -1
+-
+-        for i, cruzid in enumerate(students):
+-            data = {"student_id": students[cruzid]}
+-            params = {"per_page": 1000}
+-            response = requests.request(
+-                "GET", url + endpoint, headers=headers, data=data, params=params
+-            )
+-            modules_json = json.loads(response.text)
+-
+-            if num_modules == -1:
+-                num_modules = len(modules_json)
+-
+-            completed_modules = []
+-            for m in modules_json:
+-                if m["state"] == "completed":
+-                    completed_modules.append(int(m["position"]))
+-
+-            sheet.evaluate_modules(
+-                completed_modules, cruzid=cruzid, num_modules=num_modules
+-            )
+-            print(
+-                f"Successfully evaluated modules for {cruzid}, ({i+1}/{len(students)})"
+-            )
++    endpoint = "modules"
+ 
+-        print("\nSuccessfully evaluated modules for all students")
++    for cruzid in students:
++        data = {"student_id": students[cruzid]}
++        response = requests.request("GET", url + endpoint, headers=headers, data=data)
++        modules_json = json.loads(response.text)
++        completed_modules = []
++        for m in modules_json:
++            if m["state"] == "completed":
++                completed_modules.append(int(m["position"]))
+ 
+-        if sheet.write_student_sheet():
+-            print("Successfully wrote student sheet")
+-        else:
+-            print("Failed to write student sheet")
+-            return False
++        sheet.evaluate_modules(completed_modules, cruzid)
++        print(f"Successfully evaluated modules for {cruzid}")
+ 
+-        if sheet.write_staff_sheet():
+-            print("Successfully wrote staff sheet")
+-        else:
+-            print("Failed to write staff sheet")
+-            return False
++    print("\nSuccessfully evaluated modules for all students")
+ 
+-        if sheet.log("Canvas Update", "", False, 0):
+-            print("Successfully logged canvas update")
+-        else:
+-            print("Failed to log canvas update")
+-            return False
++    if sheet.write_student_sheet():
++        print("Successfully wrote student sheet")
++    else:
++        print("Failed to write student sheet")
++        return False
+ 
+-        return True
+-    except KeyboardInterrupt:
+-        print("Exiting...")
+-        sheet.set_canvas_status_sheet(False)
+-        exit(0)
++    if sheet.log("Canvas Update", "", False, 0):
++        print("Successfully logged canvas update")
++    else:
++        print("Failed to log canvas update")
++        return False
+ 
++    return True
+ 
+-CANVAS_UPDATE_HOUR = 4  # 4am
+-CHECKIN_TIMEOUT = 5  # 5 minutes
+ 
+ if __name__ == "__main__":
+-    sheet.last_update_time = datetime.now()
+-    try:
+-        while True:
+-            sheet.get_canvas_status_sheet()
+-            if (
+-                sheet.canvas_needs_update
+-                or not sheet.last_update_time
+-                or (
+-                    (
+-                        datetime.now().date() > sheet.last_update_time.date()
+-                        and datetime.now().hour >= CANVAS_UPDATE_HOUR
+-                    )
+-                )
+-            ):
+-                print("Canvas update...")
+-                sheet.set_canvas_status_sheet(True)
+-                tmp_time = datetime.now()
+-                update()
+-                sheet.get_sheet_data()
+-                sheet.check_in()
+-                sheet.set_canvas_status_sheet(False, tmp_time)
+-            elif (
+-                not sheet.last_checkin_time
+-                or datetime.now() - sheet.last_checkin_time
+-                > timedelta(0, 0, 0, 0, CHECKIN_TIMEOUT, 0, 0)
+-            ):
+-                print("Checking in...")
+-                sheet.check_in()
+-            else:
+-                print("Waiting for next update...")
+-            time.sleep(60)
+-    except KeyboardInterrupt:
+-        print("Exiting...")
+-        sheet.set_canvas_status_sheet(False)
+-        exit(0)
++    update()
+diff --git a/canvas.sh b/canvas.sh
+deleted file mode 100644
+index caa2195..0000000
+--- a/canvas.sh
++++ /dev/null
+@@ -1,4 +0,0 @@
+-#!/bin/bash
+-
+-source /home/slugworks/slugworks-access-cards/venv/bin/activate
+-python3 /home/slugworks/slugworks-access-cards/canvas.py
+\ No newline at end of file
+diff --git a/control.py b/control.py
+index 7b43293..1ed4756 100644
+--- a/control.py
++++ b/control.py
+@@ -1,210 +1,128 @@
+-import json
++# https://www.digitalocean.com/community/tutorials/how-to-make-a-web-application-using-flask-in-python-3
++# force update button for pi5 funcheck
++# force update button for pizero funcheck
++# button to update both funcheck
++# status of reader funcheck
++# status of last update funcheck
++# format student id  funcheck
++# enter cruzid
++# prompt button to start reader
++# show warning if card already exists and if they want to overwrite funkcheck
++# show a warning if the cruzid is not in the database funkcheck
++# once button is pressed, show a message that the card is being written funkcheck
++# write to the sheet funcheck
++# show a message that the card has been written and added to sheet funkcheck
++
++
+ import os
+-import sqlite3
+-from datetime import datetime, timedelta
+-
+-import requests
+-from flask import Flask, flash, redirect, render_template, request, url_for
+-from flask_login import (
+-    LoginManager,
+-    current_user,
+-    login_required,
+-    login_user,
+-    logout_user,
+-)
+-from oauthlib.oauth2 import WebApplicationClient
+-
+-import nfc_control as nfc
+-import sheet
+-from db import init_db_command
+-from user import User
++import random
++from datetime import datetime
++from threading import Thread
+ 
+-# Configuration
+-GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", sheet.creds.client_id)
+-GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", sheet.creds.client_secret)
+-GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
++from flask import Flask, flash, render_template, request
+ 
++import canvas
++import sheet
+ 
+ # initialize flask app
+ os.chdir(os.path.dirname(os.path.realpath(__file__)))
+ app = Flask(__name__)
+ app.secret_key = os.urandom(12).hex()
+-
+ sheet.get_sheet_data(limited=False)
+ alarm_enable_names = ["ENABLE", "DISABLE"]
+ device_status_names = ["ONLINE", "OFFLINE"]
+ status_colors = ["#3CBC8D", "red", ""]
+ alarm_status_names = ["OK", "ALARM", "TAGGED OUT", "DISABLED"]
+-alarm_status_colors = ["#3CBC8D", "red", "yellow", "gray", ""]
+-
+-
+-login_manager = LoginManager()
+-login_manager.init_app(app)
+-
+-# Naive database setup
+-try:
+-    init_db_command()
+-except sqlite3.OperationalError:
+-    # Assume it's already been created
+-    pass
+-
+-# OAuth 2 client setup
+-client = WebApplicationClient(GOOGLE_CLIENT_ID)
+-
+-
+-# Flask-Login helper to retrieve a user from our db
+-@login_manager.user_loader
+-def load_user(user_id):
+-    return User.get(user_id)
+-
+-
+-@login_manager.unauthorized_handler
+-def unauthorized():
+-    return redirect("/login")
+-
+-
+-def assign_uid(cruzid, overwrite, uid):
+-    added = False
+-    carderror = ""
+-    if sheet.get_uid(cruzid) == uid:
+-        carderror = f"Card is already assigned to {cruzid}"
+-    elif sheet.get_uid(cruzid) and sheet.get_cruzid(uid) and not overwrite:
+-        carderror = f"Card is already assigned to {sheet.get_cruzid(uid)}, and {cruzid} already has a card. If you would like to reassign the card to {cruzid} and replace {cruzid}'s existing card, please overwrite."
+-    elif sheet.get_uid(cruzid) and not overwrite:
+-        carderror = (
+-            f"{cruzid} already has a card, please overwrite to replace with this card"
+-        )
+-    elif sheet.get_cruzid(uid) and not overwrite:
+-        carderror = f"Card is already assigned to {sheet.get_cruzid(uid)}. If you would like to reassign the card to {cruzid}, please overwrite."
++alarm_status_colors = ["#3CBC8D", "red", "yellow", "gray"]
++
++
++# TODO: this just needs canvas.update() and then sheet.check_in(alarm_status=False)
++def updateme():  # updates the pi5
++    print("Updating")
++    # if pi5update < datetime.now()
++    # if time > 3am and time < 5am
++    # update the pi5 with canvas
++    canvas.update()
++
++    # update the pizero
++    pi5update = datetime.now()
++    print("Updated")
++
++
++# TODO: use sheet.update_all_readers() to set all readers to need updating
++def updatemyfriends():  # updates the pizero
++    print("Updating")
++    pizeroupdate = datetime.now()
++    # update the pizero
++    print("Updated")
++
++
++# TODO: just call updateme() then updatemyfriends()
++def updateall():  # updates both
++    print("Updating")
++    pitupdateall = datetime.now()
++    canvas.update()
++    # update the pizero
++    print("Updated")
++
++
++def status():  # status of reader
++    print("Status")
++    # status of reader
++
++
++def formatid(cruzid, overwritecheck):  # format student id
++    print("Formatting")
++    carderror = uidread(cruzid, overwritecheck)
++    sheet.write_student_sheet()
++
++    return carderror
++
++    # format student id
++
++
++def uidread(cruzid, overwritecheck):  # set uid
++    print("reading UID", cruzid, overwritecheck)
++    # read uid function
++
++    uid = "73B104FF"
++
++    # if cruzid does not exist
++    # add student to canvas
++    # elif uid exists
++    # if uid belongs to this cruzid
++    # do you want to overwrite?
++    # else
++    # another student already has this uid
++    # else
++    # set uid to cruzid
++
++    if sheet.student_exists(uid=uid):
++        if overwritecheck == None:
++            carderror = "Card already exists would you like to overwrite?"
++        else:
++            sheet.set_uid(cruzid, uid, overwritecheck)
++            success = "Card added to database"
++    elif not sheet.student_exists(cruzid=cruzid):
++        carderror = "Cruzid not in database please add student to canvas first, and update database"
++        print(cruzid)
++    elif not sheet.get_uid(cruzid):
++        # carderror = "success"
++        sheet.set_uid(cruzid, uid, overwritecheck)
++        success = "Card added to database"
+     else:
+-        sheet.set_uid(cruzid, uid, overwrite)
+-        sheet.run_in_thread(f=sheet.write_student_staff_sheets)
+-        carderror = f"Card added to database for {cruzid}"
+-        added = True
+-    return carderror, added
+-
+-
+-CHECKIN_TIMEOUT = 30  # seconds
+-
+-
+-def update_data():
+-    if (
+-        not sheet.last_update_time
+-        or sheet.last_canvas_update_time > sheet.last_update_time
+-        or datetime.now() - sheet.last_update_time
+-        > timedelta(0, CHECKIN_TIMEOUT, 0, 0, 0, 0, 0)
+-    ):
+-        print("Getting sheet data...")
+-        sheet.get_sheet_data()
+-
+-
+-@app.route("/")
+-def index():
+-    if current_user.is_authenticated:
+-        return (
+-            "<p>Hello, you're logged in as {}! Email: {}</p>"
+-            "<a class='button' href='/dashboard'>Dashboard</a><br>"
+-            '<a class="button" href="/logout">Logout</a>'.format(
+-                current_user.name, current_user.email
+-            )
+-        )
+-    else:
+-        return '<a class="button" href="/login">Google Login</a>'
+-
+-
+-def get_google_provider_cfg():
+-    return requests.get(GOOGLE_DISCOVERY_URL).json()
+-
+-
+-@app.route("/login")
+-def login():
+-    # Find out what URL to hit for Google login
+-    google_provider_cfg = get_google_provider_cfg()
+-    authorization_endpoint = google_provider_cfg["authorization_endpoint"]
+-
+-    # Use library to construct the request for Google login and provide
+-    # scopes that let you retrieve user's profile from Google
+-    request_uri = client.prepare_request_uri(
+-        authorization_endpoint,
+-        redirect_uri=request.base_url + "/callback",
+-        scope=["openid", "email", "profile"],
+-    )
+-    return redirect(request_uri)
+-
+-
+-@app.route("/login/callback")
+-def callback():
+-    # Get authorization code Google sent back to you
+-    code = request.args.get("code")
+-    # Find out what URL to hit to get tokens that allow you to ask for
+-    # things on behalf of a user
+-    google_provider_cfg = get_google_provider_cfg()
+-    token_endpoint = google_provider_cfg["token_endpoint"]
+-
+-    # Prepare and send a request to get tokens! Yay tokens!
+-    token_url, headers, body = client.prepare_token_request(
+-        token_endpoint,
+-        authorization_response=request.url,
+-        redirect_url=request.base_url,
+-        code=code,
+-    )
+-    token_response = requests.post(
+-        token_url,
+-        headers=headers,
+-        data=body,
+-        auth=(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET),
+-    )
+-
+-    # Parse the tokens!
+-    client.parse_request_body_response(json.dumps(token_response.json()))
+-
+-    # Now that you have tokens (yay) let's find and hit the URL
+-    # from Google that gives you the user's profile information,
+-    # including their Google profile image and email
+-    userinfo_endpoint = google_provider_cfg["userinfo_endpoint"]
+-    uri, headers, body = client.add_token(userinfo_endpoint)
+-    userinfo_response = requests.get(uri, headers=headers, data=body)
+-
+-    # You want to make sure their email is verified.
+-    # The user authenticated with Google, authorized your
+-    # app, and now you've verified their email through Google!
+-    if userinfo_response.json().get("email_verified"):
+-        unique_id = userinfo_response.json()["sub"]
+-        users_email = userinfo_response.json()["email"]
+-        picture = userinfo_response.json()["picture"]
+-        users_name = userinfo_response.json()["given_name"]
+-    else:
+-        return "User email not available or not verified by Google.", 400
+-
+-    # Create a user in your db with the information provided
+-    # by Google
+-    user = User(id_=unique_id, name=users_name, email=users_email, profile_pic=picture)
++        if overwritecheck == None:
++            carderror = "Student already has an id would you like to overwrite?"
++        else:
++            sheet.set_uid(cruzid, uid, overwritecheck)
++            success = "Card added to database"
+ 
+-    # Doesn't exist? Add it to the database.
+-    if not User.get(unique_id):
+-        User.create(unique_id, users_name, users_email, picture)
++    return carderror
+ 
+-    # Begin user session by logging the user in
+-    login_user(user)
+ 
+-    # Send user back to homepage
+-    return redirect(url_for("dashboard"))
+-
+-
+-@app.route("/logout")
+-@login_required
+-def logout():
+-    logout_user()
+-    return redirect(url_for("index"))
+-
+-
+-@app.route("/dashboard", methods=("GET", "POST"))
+-@login_required
+-def dashboard():
+-    update_data()
+-    canvas_update = sheet.last_canvas_update_time
+-    if sheet.canvas_is_updating:
+-        canvas_update = "Updating..."
++@app.route("/", methods=("GET", "POST"))
++def server():
++    err = ""
+     devices = sheet.reader_data.loc[
+         :,
+         [
+@@ -218,6 +136,21 @@ def dashboard():
+         ],
+     ]  # Pull device data from sheet.py
+ 
++    try:
++        if request.method == "POST":
++            flash("You are using POST")
++            if request.form["label"] == "update-device":
++                request_data = request.form.get("device.name")
++
++                print("update this data")
++                location = request.form.get("location")
++                alarm = request.form.get("alarm_power")
++                delay = request.form.get("delay")
++                print(location, alarm, delay, "hi")
++
++    except Exception as e:
++        print(e)
++
+     # Extract name, colour, and status attributes from devices
+     device_info = []
+     for _, device in devices.iterrows():
+@@ -246,7 +179,7 @@ def dashboard():
+ 
+         device_info.append(
+             {
+-                "id": int(device["id"]),
++                "name": device["id"],
+                 "status": device["status"],
+                 "alarm_power": device["alarm"],
+                 "alarm_enable_names": alarm_enable_names,
+@@ -260,161 +193,31 @@ def dashboard():
+             }
+         )
+ 
+-    try:
+-        if request.method == "POST":
+-            # flash("You are using POST")
+-
+-            if request.form["label"] == "update-device":
+-
+-                req_id = int(request.form.get("id"))
+-                req_location = request.form.get("location")
+-                req_alarm = request.form.get("alarm_power")
+-                req_delay = request.form.get("delay")
+-
+-                if req_alarm:
+-                    device_info[req_id]["alarm_power"] = req_alarm
+-                    device_info[req_id]["alarm_power_color"] = status_colors[
+-                        (
+-                            -1
+-                            if req_alarm not in alarm_enable_names
+-                            else alarm_enable_names.index(req_alarm)
+-                        )
+-                    ]
+-                device_info[req_id]["location"] = req_location
+-                device_info[req_id]["alarm_delay_min"] = req_delay
+-
+-                sheet.run_in_thread(
+-                    f=sheet.update_reader,
+-                    kwargs={
+-                        "id": req_id,
+-                        "location": req_location,
+-                        "alarm": req_alarm,
+-                        "alarm_delay": req_delay,
+-                    },
+-                )
+-                return redirect("/dashboard")
+-            elif request.form["label"] == "update-canvas":
+-                sheet.update_canvas()
+-                print("Updating canvas")
+-                return redirect("/dashboard")
+-            elif request.form["label"] == "update-all":
+-                sheet.run_in_thread(f=sheet.update_all_readers)
+-                return redirect("/dashboard")
+-
+-    except Exception as e:
+-        print(e)
+-
+     return render_template(
+-        "dashboard.html",
+-        devices=device_info,
+-        canvas_update=canvas_update,
++        "dashboard.html", devices=device_info
+     )  # Pass devices to the template
+ 
+ 
+-@app.route("/setup", methods=("GET", "POST"))
+-@login_required
+-def setup():
+-    update_data()
++@app.route("/student", methods=("GET", "POST"))
++def student():
+     err = ""
+-    added = False
+ 
+     try:
+         if request.method == "POST":
+-            # flash("You are using POST")
+-            if request.form["label"] == "uidsetup" and not sheet.canvas_is_updating:
++            flash("You are using POST")
++            if request.form["label"] == "uidsetup":
++                print("reading UID")
+                 cruzid = request.form.get("cruzid")
+-                overwritecheck = (
+-                    True if request.form.get("overwrite") == "overwrite" else False
+-                )
+-                uid = nfc.read_card()
+-                if not cruzid:
+-                    err = "Please enter a CruzID"
+-                elif not uid:
+-                    err = "Card not detected, please try again"
+-                else:
+-                    err, added = assign_uid(cruzid, overwritecheck, uid)
+-            elif sheet.canvas_is_updating:
+-                err = "Canvas is updating, please wait"
+-            else:
+-                err = "Invalid request"
++                overwritecheck = request.form.get("overwrite")
++                print(cruzid, overwritecheck)
+ 
+-    except Exception as e:
+-        print(e)
+-
+-    return render_template(
+-        "setup.html",
+-        err=err,
+-        added=added,
+-    )
+-
+-
+-@app.route("/identify", methods=("GET", "POST"))
+-@login_required
+-def identify():
+-    update_data()
+-    cruzid = ""
+-    uid = ""
+-    err = ""
+-    user_data = None
+-    accesses = []
+-    rooms = sheet.rooms
+-
+-    try:
+-        if request.method == "POST":
+-            cruzid = ""
+-            # flash("You are using POST")
+-            if request.form["label"] == "identifyuid":
+-                cruzid = request.form.get("cruzid")
+-
+-                if cruzid != None and cruzid != "" and cruzid != "None":
+-                    user_data = dict(
+-                        zip(
+-                            [
+-                                "type",
+-                                "cruzid",
+-                                "uid",
+-                                "first_name",
+-                                "last_name",
+-                            ],
+-                            sheet.get_user_data(cruzid=cruzid),
+-                        )
+-                    )
+-                    accesses = sheet.get_all_accesses(cruzid=cruzid)
+-                else:
+-                    uid = nfc.read_card()
+-                    user_data = dict(
+-                        zip(
+-                            [
+-                                "type",
+-                                "cruzid",
+-                                "uid",
+-                                "first_name",
+-                                "last_name",
+-                            ],
+-                            sheet.get_user_data(uid=uid),
+-                        )
+-                    )
+-                    accesses = sheet.get_all_accesses(uid=uid)
+-
+-                if user_data["type"] is True:
+-                    user_data["type"] = "Staff"
+-                elif user_data["type"] is False:
+-                    user_data["type"] = "Student"
+-                else:
+-                    user_data["type"] = "Unknown"
++                err = formatid(cruzid, overwritecheck)
+ 
+     except Exception as e:
+         print(e)
+ 
+-    return render_template(
+-        "identify.html",
+-        err=err,
+-        user_data=user_data,
+-        accesses=accesses,
+-        rooms=rooms,
+-        length=0 if not rooms else len(rooms),
+-    )
++    return render_template("student.html", err=err)
+ 
+ 
+ if __name__ == "__main__":
+-    app.run(host="0.0.0.0", port=5001, ssl_context="adhoc")
++    app.run(host="0.0.0.0", port=5001)
+diff --git a/control.sh b/control.sh
+deleted file mode 100644
+index 54c4ef3..0000000
+--- a/control.sh
++++ /dev/null
+@@ -1,4 +0,0 @@
+-#!/bin/bash
+-
+-source /home/slugworks/slugworks-access-cards/venv/bin/activate
+-python3 /home/slugworks/slugworks-access-cards/control.py
+\ No newline at end of file
+diff --git a/db.py b/db.py
+deleted file mode 100644
+index 4ca332b..0000000
+--- a/db.py
++++ /dev/null
+@@ -1,38 +0,0 @@
+-# http://flask.pocoo.org/docs/1.0/tutorial/database/
+-import sqlite3
+-
+-import click
+-from flask import current_app, g
+-from flask.cli import with_appcontext
+-
+-def get_db():
+-    if "db" not in g:
+-        g.db = sqlite3.connect(
+-            "users.db", detect_types=sqlite3.PARSE_DECLTYPES
+-        )
+-        g.db.row_factory = sqlite3.Row
+-
+-    return g.db
+-
+-def close_db(e=None):
+-    db = g.pop("db", None)
+-
+-    if db is not None:
+-        db.close()
+-
+-def init_db():
+-    db = get_db()
+-
+-    with current_app.open_resource("schema.sql") as f:
+-        db.executescript(f.read().decode("utf8"))
+-
+-@click.command("init-db")
+-@with_appcontext
+-def init_db_command():
+-    """Clear the existing data and create new tables."""
+-    init_db()
+-    click.echo("Initialized the database.")
+-
+-def init_app(app):
+-    app.teardown_appcontext(close_db)
+-    app.cli.add_command(init_db_command)
+diff --git a/neopixeltest.py b/neopixeltest.py
+deleted file mode 100644
+index 71165c9..0000000
+--- a/neopixeltest.py
++++ /dev/null
+@@ -1,77 +0,0 @@
+-# SPDX-FileCopyrightText: 2021 ladyada for Adafruit Industries
+-# SPDX-License-Identifier: MIT
+-
+-import time
+-
+-import board
+-import neopixel
+-
+-# The number of NeoPixels
+-num_pixels = 30
+-
+-# On a Raspberry pi, use this instead, not all pins are supported
+-pixel_pin = board.D18
+-
+-# The order of the pixel colors - RGB or GRB. Some NeoPixels have red and green reversed!
+-# For RGBW NeoPixels, simply change the ORDER to RGBW or GRBW.
+-ORDER = neopixel.GRB
+-
+-pixels = neopixel.NeoPixel(
+-    pixel_pin, num_pixels, brightness=0.2, auto_write=False, pixel_order=ORDER
+-)
+-
+-
+-def wheel(pos):
+-    # Input a value 0 to 255 to get a color value.
+-    # The colours are a transition r - g - b - back to r.
+-    if pos < 0 or pos > 255:
+-        r = g = b = 0
+-    elif pos < 85:
+-        r = int(pos * 3)
+-        g = int(255 - pos * 3)
+-        b = 0
+-    elif pos < 170:
+-        pos -= 85
+-        r = int(255 - pos * 3)
+-        g = 0
+-        b = int(pos * 3)
+-    else:
+-        pos -= 170
+-        r = 0
+-        g = int(pos * 3)
+-        b = int(255 - pos * 3)
+-    return (r, g, b) if ORDER in (neopixel.RGB, neopixel.GRB) else (r, g, b, 0)
+-
+-
+-def rainbow_cycle(wait):
+-    for j in range(255):
+-        for i in range(num_pixels):
+-            pixel_index = (i * 256 // num_pixels) + j
+-            pixels[i] = wheel(pixel_index & 255)
+-        pixels.show()
+-        time.sleep(wait)
+-
+-
+-while True:
+-    # Comment this line out if you have RGBW/GRBW NeoPixels
+-    pixels.fill((255, 0, 0))
+-    # Uncomment this line if you have RGBW/GRBW NeoPixels
+-    # pixels.fill((255, 0, 0, 0))
+-    pixels.show()
+-    time.sleep(1)
+-
+-    # Comment this line out if you have RGBW/GRBW NeoPixels
+-    pixels.fill((0, 255, 0))
+-    # Uncomment this line if you have RGBW/GRBW NeoPixels
+-    # pixels.fill((0, 255, 0, 0))
+-    pixels.show()
+-    time.sleep(1)
+-
+-    # Comment this line out if you have RGBW/GRBW NeoPixels
+-    pixels.fill((0, 0, 255))
+-    # Uncomment this line if you have RGBW/GRBW NeoPixels
+-    # pixels.fill((0, 0, 255, 0))
+-    pixels.show()
+-    time.sleep(1)
+-
+-    rainbow_cycle(0.001)  # rainbow cycle with 1ms delay per step
+diff --git a/nfc/command b/nfc/command
+deleted file mode 100755
+index dc037f1..0000000
+Binary files a/nfc/command and /dev/null differ
+diff --git a/nfc_fake.py b/nfc_fake.py
+deleted file mode 100644
+index a4f3130..0000000
+--- a/nfc_fake.py
++++ /dev/null
+@@ -1,48 +0,0 @@
+-import random
+-import string
+-import time
+-from multiprocessing import Process, Queue
+-
+-
+-def read_card():
+-    # # delay = random.randint(0, 20)
+-    # # print('delay', delay)
+-    # # time.sleep(delay)
+-    # if (random.random() > 2/3):
+-    #     return "".join(
+-    #         random.choice(string.ascii_lowercase + string.digits) for _ in range(8)
+-    #     )
+-    # elif (random.random() > 1/3):
+-    #     return random.choice(["63B104FF", "73B104FF", "83B104FF"])
+-    # else:
+-    #     return random.choice([None, False])
+-    # return "B5F1BF2D"
+-    return input("Enter card ID: ")
+-
+-
+-def read_card_queue(q):
+-    q.put(read_card())
+-
+-
+-def read_card_queue_timeout(time):
+-    """
+-    Call read_card() with a timeout
+-
+-    time: float: the time limit in seconds
+-
+-    Returns None if there was an error, or passes through the return value of read_card()
+-    """
+-    q = Queue()
+-    p = Process(target=read_card_queue, args=(q,))
+-    p.start()
+-    p.join(time)
+-    if p.is_alive():
+-        p.terminate()
+-        return None
+-
+-    r = q.get()
+-    return r if not r else r.upper()
+-
+-
+-def close():
+-    pass
+diff --git a/nfc_reader.py b/nfc_reader.py
+deleted file mode 100644
+index a027ae2..0000000
+--- a/nfc_reader.py
++++ /dev/null
+@@ -1,75 +0,0 @@
+-from time import sleep, time
+-from multiprocessing import Queue, Process
+-
+-import RPi.GPIO as GPIO  # type: ignore
+-from mfrc522 import SimpleMFRC522  # type: ignore
+-
+-# delay between reads for the same card
+-DELAY = 1
+-
+-reader = SimpleMFRC522()
+-
+-# TODO: when refreshing the database from the sheet, clear the timestamps (otherwise this will fill up & take a lot of memory)
+-# maintain the last scanned time for each card id so that we can prevent multiple scans within a short time
+-# timestamps = {}
+-
+-
+-def read_card():
+-    """
+-    read a card and return its id, or None if there was an error, or False if the card was scanned too soon
+-    """
+-    try:
+-        id, _ = reader.read()
+-        id = hex(id)[2:-2]
+-        return id
+-    except:
+-        return None
+-
+-
+-def read_card_queue(q):
+-    try:
+-        q.put(read_card())
+-    except:
+-        q.put(None)
+-
+-
+-def read_card_queue_timeout(time):
+-    """
+-    Call read_card() with a timeout
+-
+-    time: float: the time limit in seconds
+-
+-    Returns None if there was an error, or passes through the return value of read_card()
+-    """
+-    try:
+-        q = Queue()
+-        p = Process(target=read_card_queue, args=(q,))
+-        p.start()
+-        p.join(time)
+-        if p.is_alive():
+-            p.terminate()
+-            return None
+-
+-        val = q.get()
+-
+-        if val is None:
+-            return False
+-
+-        return val.upper()
+-    except:
+-        return False
+-
+-
+-def close():
+-    """clean up the GPIO pins"""
+-    GPIO.cleanup()
+-
+-
+-if __name__ == "__main__":
+-    try:
+-        while True:
+-            print("Hold a tag near the reader")
+-            print(read_card())
+-    except KeyboardInterrupt:
+-        close()
+-        raise
+diff --git a/nfc_testing/command b/nfc_testing/command
+new file mode 100755
+index 0000000..15da028
+Binary files /dev/null and b/nfc_testing/command differ
+diff --git a/nfc/command.c b/nfc_testing/command.c
+similarity index 99%
+rename from nfc/command.c
+rename to nfc_testing/command.c
+index 5ecad2b..402f0e7 100644
+--- a/nfc/command.c
++++ b/nfc_testing/command.c
+@@ -1,5 +1,4 @@
+ #include <stdlib.h>
+-#include <stdint.h>
+ #include <stdio.h>
+ #include <string.h>
+ 
+diff --git a/nfc_control.py b/nfc_testing/serial_test.py
+similarity index 67%
+rename from nfc_control.py
+rename to nfc_testing/serial_test.py
+index 66f133a..764392d 100644
+--- a/nfc_control.py
++++ b/nfc_testing/serial_test.py
+@@ -1,25 +1,17 @@
+ import subprocess
+ import time
+-from multiprocessing import Process, Queue
+ 
+-import serial  # type: ignore
+-
+-# delay between reads for the same card
+-DELAY = 0.1
++import serial
+ 
+ # open the serial port w/ 9600 baud rate and 0.1 second timeout
+-ser = serial.Serial("/dev/ttyUSB0", 9600, timeout=0.1)
+-
+-# TODO: when refreshing the database from the sheet, clear the timestamps (otherwise this will fill up & take a lot of memory)
+-# maintain the last scanned time for each card id so that we can prevent multiple scans within a short time
+-timestamps = {}
++ser = serial.Serial("/dev/tty.usbserial-DK0FCC7C", 9600, timeout=0.1)
+ 
+ 
+ def get_command(data):
+     # convert data to bytes (from hex-formatted string)
+     return bytes.fromhex(
+         subprocess.run(
+-            ["./nfc/command"] + data, capture_output=True
++            ["./command"] + data, capture_output=True
+         )  # run command.c with command data as the arguments
+         .stdout.decode("utf-8")  # decode the output from bytes to string
+         .strip()  # remove leading/trailing whitespace
+@@ -28,8 +20,6 @@ def get_command(data):
+ 
+ def get_response():
+     response_str = ser.read(1000).hex()
+-    if len(response_str) < 2:
+-        return []
+     response_split = []
+     for i in range(0, len(response_str), 2):
+         response_split.append(response_str[i : i + 2])
+@@ -72,11 +62,7 @@ def get_response():
+ 
+ 
+ def get_mifare_1k_uid(response):
+-    response = "".join(response[1][0:4])
+-    if response in timestamps and time.time() - timestamps[response] < DELAY:
+-        return False
+-    timestamps[response] = time.time()
+-    return response.upper()
++    return "".join(response[1][0:4])
+ 
+ 
+ def get_type(response):
+@@ -88,18 +74,15 @@ def send_command(data):
+     return get_response()
+ 
+ 
+-def check_connection():
++def read_card():
+     # dummy command to check if the device is connected - should return ACK
+     dummy = ["00"]
+     # check if the response is the expected ACK
+     r = send_command(dummy)
+     if len(r) != 1 or r[0][0] != "00" or len(r[0][1]) != 0:
+         # TODO: log NFC device not connected
+-        return False
+-    return True
+-
++        return None
+ 
+-def read_card():
+     read_card_data = ["01", "01", "00", "01", "00", "01"]
+     responses = send_command(read_card_data)
+     if len(responses) == 1 and responses[0][0] != "00":
+@@ -137,6 +120,7 @@ def read_card():
+                 time.sleep(0.1)
+ 
+             if responses[0][0] == "00":
++                # print("UID:", get_mifare_1k_uid(responses[0]))
+                 return get_mifare_1k_uid(responses[0])
+             else:
+                 # TODO log error
+@@ -153,40 +137,52 @@ def read_card():
+         return None
+ 
+ 
+-def read_card_queue(q):
+-    q.put(read_card())
+-
++if __name__ == "__main__":
++    # dummy command to check if the device is connected - should return ACK
++    dummy = ["00"]
++    # check if the response is the expected ACK
++    r = send_command(dummy)
++    if len(r) == 1 and r[0][0] == "00" and len(r[0][1]) == 0:
++        print("ACK received")
++    else:
++        print("ACK not received")
+ 
+-def read_card_queue_timeout(time):
+-    """
+-    Call read_card() with a timeout
++    # command to read card data
++    read_card_data = ["01", "01", "00", "01", "00", "01"]
++    responses = send_command(read_card_data)
++    if len(responses) == 1 and responses[0][0] != "00":
++        print("Error Code:", responses[0][0])
++        print("Error Data:", responses[0][1])
++    elif len(responses) == 1:
++        responses += get_response()
+ 
+-    time: float: the time limit in seconds
++    if (
++        len(responses) < 2
++        or responses[1][0] != "08"
++        or len(responses[1][1]) < 1
++        or responses[1][1][0] != "20"
++    ):
++        print("RFID Command did not end?", responses)
+ 
+-    Returns None if there was an error, or passes through the return value of read_card()
+-    """
+-    q = Queue()
+-    p = Process(target=read_card_queue, args=(q,))
+-    p.start()
+-    p.join(time)
+-    if p.is_alive():
+-        p.terminate()
+-        return None
++    # command to read the card type
++    read_type_data = ["02", "1E", "00", "01", "00"]
++    responses = send_command(read_type_data)
++    # print(responses)
++    # print(get_type(responses[0]))
+ 
+-    return q.get().upper()
++    if len(responses) > 0 and responses[0][0] == "00":
++        print("Card Type:", get_type(responses[0]))
++        if get_type(responses[0]) == "06":
++            # command to output UID of the scanned card
++            read_uid_data = ["02", "14", "00", "0A", "00"]
++            responses = send_command(read_uid_data)
++            while len(responses) < 1:
++                responses += get_response()
+ 
++            if responses[0][0] == "00":
++                print("UID:", get_mifare_1k_uid(responses[0]))
++            else:
++                print("Error Code:", responses[0][0])
++                print("Error Data:", responses[0][1])
+ 
+-def close():
+     ser.close()
+-
+-
+-if __name__ == "__main__":
+-    if not check_connection():
+-        print("NFC device not connected")
+-        exit(1)
+-    while True:
+-        try:
+-            print(read_card())
+-        except KeyboardInterrupt:
+-            close()
+-            raise
+diff --git a/reader.py b/reader.py
+index 164a1b7..e69de29 100644
+--- a/reader.py
++++ b/reader.py
+@@ -1,139 +0,0 @@
+-from datetime import datetime, timedelta
+-from multiprocessing import Process, Queue
+-from threading import Thread
+-from time import sleep, time
+-
+-import board  # type: ignore
+-import neopixel  # type: ignore
+-
+-import nfc_reader as nfc
+-import sheet
+-
+-SHEET_UPDATE_HOUR = 4  # 4am
+-CHECKIN_TIMEOUT = 30  # 30 seconds
+-
+-alarm_status = False
+-
+-num_pixels = 30  # 30 LEDs
+-pixel_pin = board.D18  # GPIO pin 18
+-ORDER = neopixel.GRB  # RGB color order
+-pixels = neopixel.NeoPixel(
+-    pixel_pin, num_pixels, brightness=0.2, auto_write=False, pixel_order=ORDER
+-)
+-
+-breathe = True
+-scan_time = None
+-SCAN_COLOR_HOLD = 2  # seconds
+-BREATHE_DELAY = 0.05  # seconds
+-EXIT = False
+-
+-
+-def breathe_leds():
+-    global breathe, scan_time, EXIT
+-    try:
+-        last_change_time = 0
+-        while not EXIT:
+-            if breathe:
+-                for i in range(0, 255, 5):
+-                    while time() - last_change_time < BREATHE_DELAY:
+-                        if not breathe:
+-                            break
+-                    if not breathe:
+-                        break
+-                    last_change_time = time()
+-                    pixels.fill((i, i, i))
+-                    pixels.show()
+-                for i in range(255, 0, -5):
+-                    while time() - last_change_time < BREATHE_DELAY:
+-                        if not breathe:
+-                            break
+-                    if not breathe:
+-                        break
+-                    last_change_time = time()
+-                    pixels.fill((i, i, i))
+-                    pixels.show()
+-            elif scan_time and datetime.now() - scan_time > timedelta(
+-                0, SCAN_COLOR_HOLD, 0, 0, 0, 0, 0
+-            ):
+-                breathe = True
+-                scan_time = None
+-                pixels.brightness = 0.2
+-    except KeyboardInterrupt:
+-        EXIT = True
+-
+-
+-if __name__ == "__main__":
+-    try:
+-        sheet.get_sheet_data(limited=True)
+-        sheet.check_in(alarm_status=alarm_status)
+-        Thread(target=breathe_leds).start()
+-    except Exception as e:
+-        print(e)
+-        pixels.fill((255, 0, 0))
+-        pixels.show()
+-        sleep(5)
+-        EXIT = True
+-
+-    try:
+-
+-        last_ids = [None] * 5
+-
+-        while not EXIT:
+-            if (
+-                not sheet.last_update_time
+-                or datetime.now().date() > sheet.last_update_time.date()
+-            ) and datetime.now().hour >= SHEET_UPDATE_HOUR:
+-                print("Updating sheet...")
+-                sheet.get_sheet_data()
+-                sheet.check_in(alarm_status=alarm_status)
+-            elif (
+-                not sheet.last_checkin_time
+-                or datetime.now() - sheet.last_checkin_time
+-                > timedelta(0, CHECKIN_TIMEOUT, 0, 0, 0, 0, 0)
+-            ):
+-                print("Checking in...")
+-                sheet.check_in(alarm_status=alarm_status)
+-
+-            print("Hold a tag near the reader")
+-            card_id = nfc.read_card_queue_timeout(1)
+-            print(card_id)
+-            if card_id and card_id not in last_ids:
+-                last_ids.append(card_id)
+-                last_ids.pop(0)
+-                response = sheet.scan_uid(card_id)
+-                if not response:
+-                    print("error - card not in database or something else")
+-                    # TODO: flash no access color
+-                    pass
+-                else:
+-                    color, timeout = response
+-                    print(color, timeout)
+-                    colors = tuple(
+-                        [int(color[i : i + 2], 16) for i in range(0, len(color), 2)]
+-                    )
+-                    print(colors)
+-                    breathe = False
+-                    scan_time = datetime.now()
+-                    sleep(BREATHE_DELAY * 2)
+-                    pixels.brightness = 0.5
+-                    pixels.fill(colors)
+-                    pixels.show()
+-            elif card_id is None:
+-                # print("error - scanned too soon or not scanned")
+-                last_ids.append(None)
+-                last_ids.pop(0)
+-            elif card_id is False:
+-                # False --> exception occurred
+-                EXIT = True
+-
+-    except KeyboardInterrupt:
+-        EXIT = True
+-
+-    if breathe:
+-        breathe = False
+-
+-    sleep(BREATHE_DELAY * 2)
+-
+-    pixels.fill((0, 0, 0))
+-    pixels.show()
+-    nfc.close()
+diff --git a/reader.sh b/reader.sh
+deleted file mode 100644
+index 66081c4..0000000
+--- a/reader.sh
++++ /dev/null
+@@ -1,14 +0,0 @@
+-#!/bin/bash
+-
+-if [[ "$EUID" != 0 ]]; then
+-    echo "(1) not root"
+-    sudo -k # make sure to ask for password on next sudo ✱
+-    if sudo true; then
+-        echo "(2) correct password"
+-    else
+-        echo "(3) wrong password"
+-        exit 1
+-    fi
+-fi
+-source /home/slugworks/slugworks-access-cards/venv/bin/activate
+-sudo python3 /home/slugworks/slugworks-access-cards/reader.py
+\ No newline at end of file
+diff --git a/requirements-control.txt b/requirements-control.txt
+deleted file mode 100644
+index 329751e..0000000
+--- a/requirements-control.txt
++++ /dev/null
+@@ -1,9 +0,0 @@
+-requests
+-pandas
+-google-api-python-client
+-google-auth-httplib2
+-google-auth-oauthlib
+-flask
+-flask-login
+-pyserial
+-pyopenssl
+\ No newline at end of file
+diff --git a/requirements-reader.txt b/requirements-reader.txt
+deleted file mode 100644
+index 73e2eab..0000000
+--- a/requirements-reader.txt
++++ /dev/null
+@@ -1,7 +0,0 @@
+-requests
+-pandas
+-google-api-python-client
+-google-auth-httplib2
+-google-auth-oauthlib
+-spidev
+-mfrc522
+\ No newline at end of file
+diff --git a/schema.sql b/schema.sql
+deleted file mode 100644
+index d52d847..0000000
+--- a/schema.sql
++++ /dev/null
+@@ -1,6 +0,0 @@
+-CREATE TABLE user (
+-  id TEXT PRIMARY KEY,
+-  name TEXT NOT NULL,
+-  email TEXT UNIQUE NOT NULL,
+-  profile_pic TEXT NOT NULL
+-);
+\ No newline at end of file
+diff --git a/sheet.py b/sheet.py
+index f88714c..316c814 100644
+--- a/sheet.py
++++ b/sheet.py
+@@ -2,7 +2,6 @@ import datetime
+ import json
+ import os.path
+ from threading import Thread
+-from typing import Any, Callable, Iterable, Mapping
+ 
+ import pandas as pd
+ from google.auth.transport.requests import Request
+@@ -32,11 +31,6 @@ ACCESSES_SHEET = (
+ )
+ READERS_SHEET = "Readers"  # contains statuses of the readers
+ LOG_SHEET = "Log"  # contains a log of all card reads
+-CANVAS_STATUS_SHEET = "Canvas Status"  # contains the last update time of the Canvas data & the current status of the update
+-
+-SEND_BLOCK = 100
+-
+-ENABLE_SCAN_LOGS = False  # disable scan logs - considered P3 data due to tracking locations of students (can add back in for testing or when a secure logging system is implemented)
+ 
+ student_data = None
+ staff_data = None
+@@ -63,16 +57,6 @@ this_reader = None
+ module_count = 0
+ rooms = list()
+ 
+-last_update_time = None
+-last_checkin_time = None
+-
+-last_canvas_update_time = None
+-canvas_is_updating = None
+-canvas_needs_update = None
+-
+-student_sheet_read_len = 0
+-staff_sheet_read_len = 0
+-
+ creds = None
+ # The file token.json stores the user's access and refresh tokens, and is
+ # created automatically when the authorization flow completes for the first
+@@ -88,7 +72,7 @@ if not creds or not creds.valid:
+         creds.refresh(Request())
+     else:
+         flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
+-        creds = flow.run_local_server(port=44649)
++        creds = flow.run_local_server(port=0)
+     # Save the credentials for the next run
+     with open("token.json", "w") as token:
+         token.write(creds.to_json())
+@@ -112,12 +96,11 @@ def get_sheet_data(limited=None):
+ 
+     Returns True if the data was retrieved, or False if it was not.
+     """
+-    global student_data, staff_data, module_data, access_data, rooms, module_count, limited_data, last_update_time, student_sheet_read_len, staff_sheet_read_len
++    global student_data, staff_data, module_data, access_data, rooms, module_count, limited_data
+ 
+     if limited is not None:
+         limited_data = limited
+     try:
+-        last_update_time = datetime.datetime.now()
+         # get the students sheet
+         students = (
+             g_sheets.values()
+@@ -134,14 +117,13 @@ def get_sheet_data(limited=None):
+             exit()
+ 
+         values = [r + [""] * (len(values[0]) - len(r)) for r in values]
+-        student_sheet_read_len = len(values)
+ 
+         student_data = pd.DataFrame(
+             values[1:] if len(values) > 1 else None,
+             columns=values[0],
+         )
+ 
+-        rooms = student_data.columns.tolist()[(1 if limited_data else 5) :]
++        rooms = student_data.columns.tolist()[5:]
+ 
+         # get the staff sheet
+         staff = (
+@@ -154,8 +136,6 @@ def get_sheet_data(limited=None):
+         )
+         values = staff.get("values", [])
+         values = [r + [""] * (len(values[0]) - len(r)) for r in values]
+-        staff_sheet_read_len = len(values)
+-
+         staff_data = pd.DataFrame(
+             values[1:] if len(values) > 1 else None,
+             columns=values[0],
+@@ -250,8 +230,6 @@ def get_reader_data():
+         )
+         this_reader["needs_update"] = this_reader["needs_update"] == "PENDING"
+ 
+-        get_canvas_status_sheet()
+-
+         return True
+     except HttpError as e:
+         print(e)
+@@ -259,7 +237,6 @@ def get_reader_data():
+ 
+ 
+ def check_in(alarm_status=False):
+-    global last_checkin_time, this_reader
+     """
+     Update the reader's last checked in time and needs update status.
+ 
+@@ -267,25 +244,17 @@ def check_in(alarm_status=False):
+ 
+     Returns True if the data was updated, or False if it was not.
+     """
+-    if not get_reader_data():
+-        return False
+     if this_reader["alarm"] == "DISABLE":
+         this_reader["alarm_status"] = "DISABLED"
+     else:
+-        if reader_id == 0:
+-            this_reader["alarm_status"] = ""
+-        elif alarm_status is None:
++        if alarm_status is None:
+             this_reader["alarm_status"] = "TAGGED OUT"
+         elif alarm_status:
+             this_reader["alarm_status"] = "ALARM"
+         else:
+             this_reader["alarm_status"] = "OK"
+ 
+-    last_checkin_time = datetime.datetime.now()
+-    this_reader["last_checked_in"] = str(last_checkin_time)
+-    if this_reader["needs_update"]:
+-        print("Update needed...")
+-        get_sheet_data()
++    this_reader["last_checked_in"] = str(datetime.datetime.now())
+     this_reader["needs_update"] = "DONE"
+ 
+     try:
+@@ -301,102 +270,8 @@ def check_in(alarm_status=False):
+         )
+     except HttpError as e:
+         print(e)
+-        return False
+-    return True
+-
+-
+-def get_canvas_status_sheet():
+-    global last_canvas_update_time, canvas_is_updating, canvas_needs_update
+-    """
+-    Get the time of the last Canvas update.
+-
+-    Returns the time of the last Canvas update.
+-    """
+-
+-    try:
+-        values = (
+-            g_sheets.values()
+-            .get(
+-                spreadsheetId=SPREADSHEET_ID,
+-                range=CANVAS_STATUS_SHEET + "!A2:B2",
+-            )
+-            .execute()
+-        ).get("values", [])
+-
+-        canvas_is_updating = True if values[0][0] == "UPDATING" else False
+-        canvas_needs_update = True if values[0][0] == "PENDING" else False
+-        last_canvas_update_time = datetime.datetime.strptime(
+-            values[0][1], "%Y-%m-%d %H:%M:%S"
+-        )
+-        return True
+-    except HttpError as e:
+-        print(e)
+-        return None
+-
+-
+-def set_canvas_status_sheet(updating_now, update_time=None):
+-    """
+-    Set the time of the last Canvas update.
+-
+-    updating_now: bool: True if Canvas is currently updating, False if it is not.
+ 
+-    Returns True if the data was set, or False if it was not.
+-    """
+-    global last_canvas_update_time
+-    try:
+-        _ = (
+-            g_sheets.values()
+-            .update(
+-                spreadsheetId=SPREADSHEET_ID,
+-                range=CANVAS_STATUS_SHEET + "!A2:B2",
+-                valueInputOption="USER_ENTERED",
+-                body={
+-                    "values": [
+-                        [
+-                            "UPDATING" if updating_now else "DONE",
+-                            (
+-                                str(update_time)
+-                                if not updating_now and update_time
+-                                else str(last_canvas_update_time)
+-                            ),
+-                        ]
+-                    ]
+-                },
+-            )
+-            .execute()
+-        )
+-        last_canvas_update_time = update_time
+-        return True
+-    except HttpError as e:
+-        print(e)
+-        return False
+-
+-
+-def update_canvas():
+-    """
+-    Set the Canvas update status to pending.
+-
+-    Returns True if the data was set, or False if it was not.
+-    """
+-    global canvas_is_updating
+-    get_canvas_status_sheet()
+-    if canvas_is_updating:
+-        return False
+-    try:
+-        _ = (
+-            g_sheets.values()
+-            .update(
+-                spreadsheetId=SPREADSHEET_ID,
+-                range=CANVAS_STATUS_SHEET + "!A2:A2",
+-                valueInputOption="USER_ENTERED",
+-                body={"values": [["PENDING"]]},
+-            )
+-            .execute()
+-        )
+-        return True
+-    except HttpError as e:
+-        print(e)
+-        return False
++    get_reader_data()
+ 
+ 
+ def student_exists(cruzid=None, canvas_id=None, uid=None):
+@@ -409,7 +284,7 @@ def student_exists(cruzid=None, canvas_id=None, uid=None):
+ 
+     Returns True if the student exists, or False if they do not.
+     """
+-    return bool(
++    return (
+         (not limited_data and cruzid and cruzid in student_data["CruzID"].values)
+         or (
+             not limited_data
+@@ -491,10 +366,10 @@ def new_staff(first_name, last_name, cruzid, uid=None):
+     ):
+         return False
+     staff_data.loc[len(staff_data)] = [
+-        uid if uid else "",
+         first_name,
+         last_name,
+         cruzid,
++        uid if uid else "",
+     ]
+ 
+     return True
+@@ -511,43 +386,29 @@ def set_uid(cruzid, uid, overwrite=False):
+     Returns the UID if it was set, or the existing UID if it was not set.
+     """
+     if (
+-        not cruzid
+-        or not uid
+-        or limited_data
++        limited_data
+         or (
+             cruzid not in student_data["CruzID"].values
+             and cruzid not in staff_data["CruzID"].values
+         )
+         or (
+-            (
+-                uid in student_data["Card UID"].values
+-                or uid in staff_data["Card UID"].values
+-            )
+-            and not overwrite
++            uid in student_data["Card UID"].values
++            or uid in staff_data["Card UID"].values
+         )
+     ):
+         return False
+ 
+-    if overwrite:
+-        if uid in student_data["Card UID"].values:
+-            row = student_data.index[student_data["Card UID"] == uid].tolist()[0]
+-            student_data.loc[row, "Card UID"] = ""
+-
+-        if uid in staff_data["Card UID"].values:
+-            row = staff_data.index[staff_data["Card UID"] == uid].tolist()[0]
+-            staff_data.loc[row, "Card UID"] = ""
+-
+-    if is_staff(cruzid=cruzid):
++    if cruzid in staff_data["CruzID"].values:
+         row = staff_data.index[staff_data["CruzID"] == cruzid].tolist()[0]
+         if not staff_data.loc[row, "Card UID"] or overwrite:
+             staff_data.loc[row, "Card UID"] = uid
+-            return staff_data.loc[row, "Card UID"]
++        return staff_data.loc[row, "Card UID"]
+ 
+     else:
+         row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
+         if not student_data.loc[row, "Card UID"] or overwrite:
+             student_data.loc[row, "Card UID"] = uid
+-            return student_data.loc[row, "Card UID"]
++        return student_data.loc[row, "Card UID"]
+ 
+ 
+ def get_uid(cruzid):
+@@ -559,57 +420,14 @@ def get_uid(cruzid):
+     Returns the student's card UID if it exists, or False if it does not.
+     """
+ 
+-    if limited_data or (
+-        cruzid not in student_data["CruzID"].values
+-        and cruzid not in staff_data["CruzID"].values
+-    ):
++    if limited_data or (cruzid not in student_data["CruzID"].values):
+         return False
+ 
+-    row = student_data.index[student_data["CruzID"] == cruzid].tolist()
+-    uid = None
+-    if row:
+-        row = row[0]
+-        uid = student_data.loc[row, "Card UID"]
+-
+-    if not uid:
+-        row = staff_data.index[staff_data["CruzID"] == cruzid].tolist()
+-        if row:
+-            row = row[0]
+-            uid = staff_data.loc[row, "Card UID"]
+-
++    row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
++    uid = student_data.loc[row, "Card UID"]
+     return uid if uid else False
+ 
+ 
+-def get_cruzid(uid):
+-    """
+-    Get a student or staff's CruzID from their card UID.
+-
+-    uid: str: the card UID.
+-
+-    Returns the CruzID if it exists, or False if it does not.
+-    """
+-
+-    if limited_data or (
+-        uid not in student_data["Card UID"].values
+-        and uid not in staff_data["Card UID"].values
+-    ):
+-        return False
+-
+-    row = student_data.index[student_data["Card UID"] == uid].tolist()
+-    cruzid = None
+-    if row:
+-        row = row[0]
+-        cruzid = student_data.loc[row, "CruzID"]
+-
+-    if not cruzid:
+-        row = staff_data.index[staff_data["Card UID"] == uid].tolist()
+-        if row:
+-            row = row[0]
+-            cruzid = staff_data.loc[row, "CruzID"]
+-
+-    return cruzid if cruzid else False
+-
+-
+ def set_access(room, access, cruzid=None, uid=None):
+     """
+     Set a student's access to a room.
+@@ -829,7 +647,6 @@ def get_all_accesses(cruzid=None, uid=None):
+ 
+ 
+ def write_student_sheet():
+-    global student_sheet_read_len, SEND_BLOCK
+     """
+     Write the student data to the Google Sheets document.
+ 
+@@ -840,30 +657,17 @@ def write_student_sheet():
+         student_data.sort_values(by=["Last Name"], inplace=True)
+         vals = student_data.values.tolist()
+         vals.insert(0, student_data.columns.tolist())
+-        length = len(vals)
+-        blank_filled = 0
+-
+-        if student_sheet_read_len > length:
+-            blank_filled = student_sheet_read_len - length
+-            vals = vals + [[""] * len(student_data.columns)] * (blank_filled)
+-        else:
+-            student_sheet_read_len = length
+ 
+-        for i in range(0, student_sheet_read_len, SEND_BLOCK):
+-            _ = (
+-                g_sheets.values()
+-                .update(
+-                    spreadsheetId=SPREADSHEET_ID,
+-                    range=STUDENTS_SHEET
+-                    + f"!A{i+1}:{str(chr(ord('A') + len(student_data.columns) - 1))}{min(i + SEND_BLOCK, student_sheet_read_len)}",
+-                    valueInputOption="USER_ENTERED",
+-                    body={
+-                        "values": vals[i : min(i + SEND_BLOCK, student_sheet_read_len)]
+-                    },
+-                )
+-                .execute()
++        _ = (
++            g_sheets.values()
++            .update(
++                spreadsheetId=SPREADSHEET_ID,
++                range=STUDENTS_SHEET,
++                valueInputOption="USER_ENTERED",
++                body={"values": vals},
+             )
+-        student_sheet_read_len -= blank_filled
++            .execute()
++        )
+         return True
+     except HttpError as e:
+         print(e)
+@@ -871,7 +675,6 @@ def write_student_sheet():
+ 
+ 
+ def write_staff_sheet():
+-    global staff_sheet_read_len, SEND_BLOCK
+     """
+     Write the staff data to the Google Sheets document.
+     """
+@@ -880,48 +683,22 @@ def write_staff_sheet():
+         staff_data.sort_values(by=["Last Name"], inplace=True)
+         vals = staff_data.values.tolist()
+         vals.insert(0, staff_data.columns.tolist())
+-        length = len(vals)
+-
+-        if staff_sheet_read_len > length:
+-            vals = vals + [[""] * len(staff_data.columns)] * (
+-                staff_sheet_read_len - length
+-            )
+ 
+-        for i in range(0, staff_sheet_read_len, SEND_BLOCK):
+-            _ = (
+-                g_sheets.values()
+-                .update(
+-                    spreadsheetId=SPREADSHEET_ID,
+-                    range=STAFF_SHEET
+-                    + f"!A{i+1}:{str(chr(ord('A') + len(staff_data.columns) - 1))}{min(i + SEND_BLOCK, max(staff_sheet_read_len, length))}",
+-                    valueInputOption="USER_ENTERED",
+-                    body={
+-                        "values": vals[
+-                            i : min(i + SEND_BLOCK, max(staff_sheet_read_len, length))
+-                        ]
+-                    },
+-                )
+-                .execute()
++        _ = (
++            g_sheets.values()
++            .update(
++                spreadsheetId=SPREADSHEET_ID,
++                range=STAFF_SHEET,
++                valueInputOption="USER_ENTERED",
++                body={"values": vals},
+             )
+-
+-        staff_sheet_read_len = length
+-        return True
++            .execute()
++        )
+     except HttpError as e:
+         print(e)
+-        return False
+-
+-
+-def write_student_staff_sheets():
+-    """
+-    Write the student and staff data to the Google Sheets document.
+-
+-    Returns True if the data was written, or False if it was not.
+-    """
+-
+-    return write_student_sheet() and write_staff_sheet()
+ 
+ 
+-def evaluate_modules(completed_modules, cruzid=None, uid=None, num_modules=None):
++def evaluate_modules(completed_modules, cruzid=None, uid=None):
+     """
+     Evaluate a student's completed modules and update their room accesses.
+ 
+@@ -930,92 +707,26 @@ def evaluate_modules(completed_modules, cruzid=None, uid=None, num_modules=None)
+     uid: str: the student's card UID.
+     """
+ 
+-    if not num_modules:
+-        num_modules = 1000
+-
+     for i in range(len(module_data)):
+         exp = str(module_data.loc[i, "Modules"])
+-        exp = exp.lower()
+-        exp = exp.replace("and", "&")
+-        exp = exp.replace("or", "|")
+-        exp = exp.replace(" ", "")
+-
+-        for m in range(num_modules, 0, -1):
+-            exp = exp.replace(str(m), "t" if m in completed_modules else "f")
+-
+-        for l in exp:
+-            if l not in "tf&|()":
+-                exp = exp.replace(l, "")
+-
++        for m in range(1, module_count + 1):
++            exp = exp.replace(str(m), str(m in completed_modules))
+         if (
+             set_access(
+-                module_data.loc[i, "Access Levels"],
+-                (string_eval(exp) == "t") if len(exp) > 0 else False,
++                module_data.loc[i, "Room"],
++                eval(exp) if len(exp) > 0 else False,
+                 cruzid=cruzid,
+                 uid=uid,
+             )
+             is None
+         ):
++            # print(module_data.loc[i, "Room"], "<" + exp + ">")
++            # print(eval(exp))
++            # print("fail")
+             return False
+     return True
+ 
+ 
+-def string_eval(exp):
+-    """
+-    Evaluate a string expression for modules.
+-
+-    exp: str: the expression to evaluate.
+-
+-    Returns the evaluated expression.
+-    """
+-
+-    while "(" in exp:
+-        start = 0
+-        end = exp.index(")")
+-        while "(" in exp[start + 1 : end]:
+-            start = exp.index("(", start + 1)
+-
+-        exp = exp[:start] + string_eval(exp[start + 1 : end]) + exp[end + 1 :]
+-
+-    while "&" in exp:
+-        i = exp.index("&")
+-
+-        bw = 0
+-        if "|" in exp[:i]:
+-            bw = exp.rindex("|", 0, i) + 1
+-
+-        fw = len(exp)
+-        if "|" in exp[i + 1 :]:
+-            fw = exp.index("|", i + 1)
+-
+-        exp = (
+-            exp[:bw]
+-            + (
+-                "t"
+-                if (
+-                    string_eval(exp[bw:i]) == "t"
+-                    and string_eval(exp[i + 1 : fw]) == "t"
+-                )
+-                else "f"
+-            )
+-            + exp[fw:]
+-        )
+-
+-    while "|" in exp:
+-        i = exp.index("|")
+-        exp = (
+-            exp[: i - 1]
+-            + (
+-                "t"
+-                if (string_eval(exp[:i]) == "t" or string_eval(exp[i + 1 :]) == "t")
+-                else "f"
+-            )
+-            + exp[i + 2 :]
+-        )
+-
+-    return exp
+-
+-
+ def is_staff(cruzid=None, uid=None):
+     """
+     Check if a student is a staff member.
+@@ -1024,137 +735,35 @@ def is_staff(cruzid=None, uid=None):
+     uid: str: the student's card UID.
+     """
+ 
+-    return bool(
+-        (not limited_data and cruzid and cruzid in staff_data["CruzID"].values)
+-        or (uid and uid in staff_data["Card UID"].values)
+-    )
+-
+-
+-def get_user_data(cruzid=None, uid=None):
+-    """
+-    Get a user's data.
+-
+-    cruzid: str: the user's CruzID.
+-    uid: str: the user's card UID.
+-
+-    Returns an array with the user's data if they exist, or None if they do not. The array is as follows:
+-    [is_staff, cruzid, uid, first_name, last_name, access1, access2, ..., accessN]
+-    Where access1, access2, ..., accessN are the user's room accesses, corresponding to the rooms list.
+-    """
+-    if student_exists(cruzid=cruzid, uid=uid):
+-        if cruzid:
+-            uid = student_data.loc[student_data["CruzID"] == cruzid, "Card UID"].values[
+-                0
+-            ]
+-        elif uid:
+-            cruzid = student_data.loc[student_data["Card UID"] == uid, "CruzID"].values[
+-                0
+-            ]
+-        return (
+-            [False, cruzid, uid]
+-            + student_data.loc[
+-                (
+-                    student_data["CruzID"] == cruzid
+-                    if cruzid
+-                    else student_data["Card UID"] == uid
+-                ),
+-                "First Name":"Last Name",
+-            ].values.tolist()[0]
+-            # + get_all_accesses(cruzid=cruzid, uid=uid)
++    if (
++        (not cruzid and not uid)
++        or (
++            not limited_data
++            and cruzid
++            and staff_data.index[staff_data["CruzID"] == cruzid].empty
+         )
+-    elif is_staff(cruzid=cruzid, uid=uid):
+-        if cruzid:
+-            uid = staff_data.loc[
+-                staff_data["CruzID"] == cruzid, "Card UID"
+-            ].values.tolist()[0]
+-        elif uid:
+-            cruzid = staff_data.loc[
+-                staff_data["Card UID"] == uid, "CruzID"
+-            ].values.tolist()[0]
+-
+-        return [True, cruzid, uid] + staff_data.loc[
+-            (
+-                staff_data["CruzID"] == cruzid
+-                if cruzid
+-                else staff_data["Card UID"] == uid
+-            ),
+-            "First Name":"Last Name",
+-        ].values.tolist()[0]
+-    else:
+-        return (None, None)
+-
+-
+-def remove_student(cruzid):
+-    """
+-    Remove a student from the database.
+-
+-    cruzid: str: the student's CruzID.
+-
+-    Returns True if the student was removed, or False if they do not exist.
+-    """
+-
+-    if not student_exists(cruzid=cruzid):
++        or (uid and staff_data.index[staff_data["Card UID"] == uid].empty)
++        or (
++            not limited_data
++            and (
++                cruzid
++                and uid
++                and (
++                    staff_data.index[staff_data["CruzID"] == cruzid].tolist()
++                    != staff_data.index[staff_data["Card UID"] == uid].tolist()
++                )
++            )
++        )
++    ):
+         return False
+ 
+-    row = student_data.index[student_data["CruzID"] == cruzid].tolist()[0]
+-    student_data.drop(row, inplace=True)  # TODO: move to archive sheet instead
+-    student_data.reset_index(drop=True, inplace=True)
+-
+-    return True
+-
+-
+-def remove_staff(cruzid):
+-    """
+-    Remove a staff member from the database.
+-
+-    cruzid: str: the staff member's CruzID.
+-
+-    Returns True if the staff member was removed, or False if they do not exist.
+-    """
+-
+-    if not is_staff(cruzid=cruzid):
++    if not limited_data and cruzid:
++        return not staff_data.index[staff_data["CruzID"] == cruzid].empty
++    elif uid:
++        return not staff_data.index[staff_data["Card UID"] == uid].empty
++    else:
+         return False
+ 
+-    row = staff_data.index[staff_data["CruzID"] == cruzid].tolist()[0]
+-    staff_data.drop(row, inplace=True)  # TODO: move to archive sheet instead
+-    staff_data.reset_index(drop=True, inplace=True)
+-
+-    return True
+-
+-
+-def clamp_staff(staff_list):
+-    """
+-    Clamp the staff list to the staff sheet.
+-
+-    staff_list: list: the list of staff members to clamp.
+-
+-    Returns the clamped staff list.
+-    """
+-
+-    # return [
+-    #     staff_list[i]
+-    #     for i in range(len(staff_list))
+-    #     if staff_list[i] in staff_data["CruzID"].values
+-    # ]
+-
+-    for i in range(staff_data.shape[0]):
+-        if staff_data.loc[i, "CruzID"] not in staff_list:
+-            staff_data.drop(i, inplace=True)  # TODO: move to archive sheet instead
+-
+-
+-def clamp_students(student_list):
+-    """
+-    Clamp the student list to the student sheet.
+-
+-    student_list: list: the list of students to clamp.
+-
+-    Returns the clamped student list.
+-    """
+-
+-    for i in range(student_data.shape[0]):
+-        if student_data.loc[i, "CruzID"] not in student_list:
+-            student_data.drop(i, inplace=True)  # TODO: move to archive sheet instead
+-
+ 
+ def log(uid, access, alarm_status, disarm_time):
+     """
+@@ -1217,9 +826,7 @@ def need_updating():
+     Returns True if update needed, or False if not.
+     """
+ 
+-    return this_reader and (
+-        this_reader["needs_update"] == "PENDING" or this_reader["needs_update"] == True
+-    )
++    return this_reader["needs_update"]
+ 
+ 
+ def scan_uid(uid, alarm_status=False):
+@@ -1234,43 +841,34 @@ def scan_uid(uid, alarm_status=False):
+ 
+     if is_staff(uid=uid):
+         if access_data["staff"]:
+-            if ENABLE_SCAN_LOGS:
+-                log(uid, "Staff", alarm_status, access_data["staff"][1])
++            log(uid, "Staff", alarm_status, access_data["staff"][1])
+             return access_data["staff"]
+         elif access_data["no_access"]:
+-            if ENABLE_SCAN_LOGS:
+-                log(uid, "Staff", alarm_status, access_data["no_access"][1])
++            log(uid, "Staff", alarm_status, access_data["no_access"][1])
+             return access_data["no_access"]
+         else:
+-            if ENABLE_SCAN_LOGS:
+-                log(uid, "Staff (Not Found)", alarm_status, 0)
++            log(uid, "Staff (Not Found)", alarm_status, 0)
+             return False
+ 
+     elif student_exists(uid=uid):
+         for i in range(len(rooms)):
+             if get_access(rooms[i], uid=uid) and access_data[rooms[i]]:
+-                if ENABLE_SCAN_LOGS:
+-                    log(uid, rooms[i], alarm_status, access_data[rooms[i]][1])
++                log(uid, rooms[i], alarm_status, access_data[rooms[i]][1])
+                 return access_data[rooms[i]]
+ 
+         if access_data["no_access"]:
+-            if ENABLE_SCAN_LOGS:
+-                log(uid, "No Access", alarm_status, access_data["no_access"][1])
++            log(uid, "No Access", alarm_status, access_data["no_access"][1])
+             return access_data["no_access"]
+         else:
+-            if ENABLE_SCAN_LOGS:
+-                log(uid, "Student (Not Found)", alarm_status, 0)
++            log(uid, "Student (Not Found)", alarm_status, 0)
+             return False
+ 
+     else:
+-        if ENABLE_SCAN_LOGS:
+-            log(uid, "Unknown", alarm_status, 0)
+-        return access_data["no_access"]
++        log(uid, "Unknown", alarm_status, 0)
++        return None
+ 
+ 
+-def run_in_thread(
+-    f: Callable, args: Iterable[Any] = (), kwargs: Mapping[str, Any] = None
+-):
++def run_in_thread(f, args, kwargs):
+     """
+     Run a function in a separate thread.
+ 
+@@ -1300,37 +898,6 @@ def update_all_readers():
+         print(e)
+ 
+ 
+-def update_reader(id, location=None, alarm=None, alarm_delay=None):
+-    """
+-    Set a reader to need updating.
+-
+-    id: int: the reader ID.
+-    """
+-
+-    if id < 0 or id >= len(reader_data):
+-        return False
+-
+-    if not set_reader_properties(id, location, alarm, alarm_delay):
+-        return False
+-
+-    try:
+-        _ = (
+-            g_sheets.values()
+-            .update(
+-                spreadsheetId=SPREADSHEET_ID,
+-                range=READERS_SHEET + f"!G{id+2}",
+-                valueInputOption="USER_ENTERED",
+-                body={"values": [["PENDING"]]},
+-            )
+-            .execute()
+-        )
+-    except HttpError as e:
+-        print(e)
+-        return False
+-
+-    return True
+-
+-
+ def get_alarm_status(id):
+     """
+     Get the alarm status of a reader.
+@@ -1356,43 +923,6 @@ def get_all_alarm_statuses():
+     return reader_data["alarm_status"].tolist()
+ 
+ 
+-def set_reader_properties(id, location=None, alarm=None, alarm_delay=None):
+-    """
+-    Set the properties of a reader.
+-
+-    id: int: the reader ID.
+-    location: str: the reader's location.
+-    alarm: bool: the alarm status.
+-    alarm_delay: int: the alarm delay time in minutes.
+-    """
+-
+-    if id < 0 or id >= len(reader_data):
+-        return False
+-
+-    if location:
+-        reader_data.loc[id, "location"] = location
+-    if alarm:
+-        reader_data.loc[id, "alarm"] = alarm
+-    if alarm_delay:
+-        reader_data.loc[id, "alarm_delay_min"] = alarm_delay
+-
+-    try:
+-        _ = (
+-            g_sheets.values()
+-            .update(
+-                spreadsheetId=SPREADSHEET_ID,
+-                range=READERS_SHEET + f"!C{id+2}:E{id+2}",
+-                valueInputOption="USER_ENTERED",
+-                body={"values": [[location, alarm, alarm_delay]]},
+-            )
+-            .execute()
+-        )
+-        return True
+-    except HttpError as e:
+-        print(e)
+-        return False
+-
+-
+ if __name__ == "__main__":
+     get_sheet_data(limited=False)
+     # print(student_data)
+@@ -1403,10 +933,10 @@ if __name__ == "__main__":
+     # print()
+     # # print(module_data)
+     # # print()
+-    # print(reader_data)
++    print(reader_data)
+     # print()
+     # print(this_reader)
+-    # print()
++    print()
+ 
+     # print(alarm_enabled, alarm_delay)
+     # print(alarm_setting())
+@@ -1435,18 +965,7 @@ if __name__ == "__main__":
+     # if not new_student("Cédric", "Chartier", "cchartie"):
+     #     print("CruzID, Canvas ID, or Card UID already in use.")
+ 
+-    # print(set_uid("sabsadik", "23458923", overwrite=True))
+-    # remove_student("sabsadik")
+-
+-    # print(staff_data)
+-    # remove_staff("imadan0")
+-    # new_staff("Ethan", "Wachtel", "asdf", "63B104FF")
+-    # new_staff("Cédric", "Chartier", "fdsa", "01234567")
+-    # new_staff("Cédric", "Chartier", "nobody")
+-    # remove_staff("asdf")
+-    # remove_staff("fdsa")
+-    # remove_staff("nobody")
+-    # print(staff_data)
++    # print(set_uid("cchartie", "0123456789", overwrite=True))
+ 
+     # print(set_access("BE-49", False, cruzid="tstudent"))
+     # print(get_access("BE-49", uid="0123456789"))
+@@ -1456,34 +975,16 @@ if __name__ == "__main__":
+     # print(evaluate_modules([1, 2, 5, 6, 7, 8, 9, 10], cruzid="tstudent"))
+ 
+     # write_student_sheet()
+-    # write_staff_sheet()
+-
+-    # set_uid("ewachtel", "63B104FF")
+-    # set_uid("cchartie", "63B104FF")
+-    # write_student_staff_sheets()
+ 
+     # log("63B104FF", "Staff", True, 10)
+ 
+-    # print(get_user_data(uid="63B104FF"))
+-    # print(get_user_data(uid="73B104FF"))
+-    # print(get_user_data(uid="83B104FF"))
+-    # print(get_user_data(cruzid="ewachtel"))
+-    # print(get_user_data(cruzid="cchartie"))
+-
+-    # print(
+-    #     student_data.loc[
+-    #         student_data["3D Printing"].isin(["Access", "Override Access"])
+-    #     ]["CruzID"].values.tolist()
+-    # )
+-    # print(staff_data["CruzID"].values.tolist())
+-
+     # print()
+     # print(student_data)
+     # print()
+     # print(staff_data)
+     # print()
+     # print(access_data)
+-    # print()
+-    # print(module_data)
++    # # print()
++    # # print(module_data)
+     # print()
+     # print(reader_data)
+diff --git a/templates/dashboard.html b/templates/dashboard.html
+index 741e997..f80bb99 100644
+--- a/templates/dashboard.html
++++ b/templates/dashboard.html
+@@ -3,135 +3,160 @@
+ 
+ 
+ <head>
+-    <title>Dashboard
+-    </title>
+-    <style>
+-        #container {
+-            display: flex;
+-            flex-flow: row wrap;
+-            justify-content: space-evenly;
+-            align-items: flex-start;
+-            align-content: space-around;
+-        }
+-
+-        #container2 {
+-            display: flex;
+-            justify-content: right;
+-            align-items: right;
+-            height: 30vh;
+-        }
+-
+-        table,
+-        th,
+-        td {
+-            border: 1px solid black;
+-        }
+-
+-        th,
+-        td {
+-            padding: 5px;
+-        }
+-    </style>
+-</head>
++  <title>Dashboard
++  </title>
++  <style>
++    #container {
++      display: flex;
++      flex-flow: row wrap;
++      justify-content: space-evenly;
++      align-items: flex-start;
++      align-content: space-around;
++    }
++    #container2 {
++      display: flex;
++      justify-content: right;
++      align-items: right;
++      height: 30vh;
++    }
++    table,
++    th,
++    td {
++      border: 1px solid black;
++    }
++
++    /* #status {
++      background-color: #3CBC8D;
++    } */
++
++    /* input[type=text] {
++      /* width: 100%; */
++    /* padding: 12px 20px; */
++    /* margin: 8px 0;
++      box-sizing: border-box;
++      border: none;
++      background-color: #3CBC8D;
++      color: rgb(239, 0, 0);
++    }
++
++    input {
++      width: auto;
++    } */
++  </style>
+ 
+ 
+-<body>
+-    <p> <strong>THIS SYSTEM IS TO BE USED BY AUTHORIZED STAFF ONLY</strong></p>
+-    {% for message in get_flashed_messages() %}
+-    <div class="alert">{{ message }}</div>
+-    {% endfor %}
+ 
+-    <a href="logout">
+-        <button>Logout</button>
+-    </a>
+ 
+-    <div>
+-        <h2><strong>Canvas Last Updated: </strong></h2>
+-        <h2 style="color: red;">{{ canvas_update }}</h2>
+-        <!-- <h2>Update Buttons</h2> -->
++<body>
++  <div id = "container2">
++  <!-- <p> <strong>THIS IS TO BE USED BY AUTHORIZED STAFF ONLY</strong>.</p>
++  {% for message in get_flashed_messages() %}
++  <div class="alert">{{ message }}</div> -->
++  {% endfor %}
++  <div>
++    <h2>Update Buttons</h2>
++    <form method="post">
++      <input type="hidden" name="label" value="update-all-devices">
++      <button type="submit" name="update-all-devices">Update All Devices</button>
++    </form>
++    <br>
++    <form method="post">
++      <input type="hidden" name="label" value="update scanners from sheet">
++      <button type="submit" name="update-from-sheet">Update from Sheet</button>
++    </form>
++  </div>
++</div>
++
++  <div id="container">
++  <h2>Device Control</h2>
++  
++  <table>
++    <tr>
++      <!-- TODO: make location, alarm delay -->
++      <th>Device</th>
++      <th>Status</th>
++      <th>Location</th>
++      <th>Alarm ON</th>
++      <th>Alarm Delay</th>
++      <th>Alarm Status</th>
++      <th>Last Checked In</th>
++      <th>Update</th>
++
++
++
++    </tr>
++    <!-- wrap this tr in a for loop: -->
++    {% for device in devices %}
++    <tr>
++      <td>{{ device.name }}</td>
++      <!-- make the device location editable -->
++    </td>
++    <td style="background-color: {{ device.status_color }};">
++      {{ device.status }}
++    </td>
++      <td>
+         <form method="post">
+-            <input type="hidden" name="label" value="update-canvas">
+-            <button type="submit" name="update-canvas">Update user data from Canvas</button>
++          <input type="hidden" name="label" value="update-location-{{ device.id }}">
++          <input type="text" name="location" value="{{ device.location }}">
+         </form>
++     
++      <td style="background-color: {{ device.alarm_power_color }};">
++        <!-- <label for="alarm_power">Alarm Power: </label> -->
++        <select name="alarm_power" id="alarm_power" style="border: 0; background: transparent;">
++          <option disabled selected hidden value="">{{ device.alarm_power }}</option> <!-- this is the default value -->
++          {% for option in device.alarm_enable_names %}
++          <option value="{{ option }}">{{ option }}</option>
++          {% endfor %}
++        </select>
++        <!-- {{ device.alarm_power }} -->
++      </td>
++      <td>
+         <form method="post">
+-            <input type="hidden" name="label" value="update-all">
+-            <button type="submit" name="update-all">Update All Readers</button>
++          <input type="hidden" name="label" value="update-delay-{{ device.id }}">
++          <input type="text" name="delay" value="{{ device.alarm_delay_min }}" style="max-width: 10;">
+         </form>
+-        <a href="setup">
+-            <button>Setup Card</button>
+-        </a>
+-        <br>
+-        <a href="identify">
+-            <button>Identify User/Card</button>
+-        </a>
+-        <br>
+-        <!-- <a href="log">
+-      <button>Log Files</button>
+-    </a> -->
+-    </div>
+-
+-    <h2>Device Control</h2>
+-    <table>
+-        <tr>
+-            <th>Device</th>
+-            <th>Status</th>
+-            <th>Location</th>
+-            <th>Alarm ON</th>
+-            <th>Alarm Delay</th>
+-            <th>Alarm Status</th>
+-            <th>Last Checked In</th>
+-            <th>Update</th>
+-        </tr>
+-        {% for device in devices %}
+-        <tr>
+-            <form method="post">
+-                <td>{{ device.id }}{% if (device.id == 0) %} (Canvas){%endif%}
+-                    <input type="hidden" name="id" value="{{ device.id }}">
+-                </td>
+-
+-                <td style="background-color: {{ device.status_color }};">
+-                    {{ device.status }}
+-                </td>
+-
+-                <td>
+-                    <input type="text" name="location" value="{{ device.location }}">
+-                </td>
+-
+-                <td style="background-color: {{ device.alarm_power_color }};">
+-                    {% if (device.id > 0) %}
+-                    <select name="alarm_power" id="alarm_power" style="border: 0; background: transparent;">
+-                        <!-- this is the default value -->
+-                        <option disabled selected hidden value="">{{ device.alarm_power }}</option>
+-                        {% for option in device.alarm_enable_names %}
+-                        <option value="{{ option }}">{{ option }}</option>
+-                        {% endfor %}
+-                    </select>
+-                    {% endif %}
+-                </td>
+-
+-                <td>
+-                    {% if (device.id > 0) %}
+-                    <input type="text" name="delay" value="{{ device.alarm_delay_min }}" style="max-width: 10;">
+-                    {% endif %}
+-                </td>
+-
+-                <td style="background-color: {{ device.alarm_color }};">
+-                    {% if (device.id > 0) %}
+-                    {{ device.alarm_status }}
+-                    {% endif %}
+-                </td>
+-
+-                <td>{{device.last_checked_in}}</td>
+-                <td>
+-                    {% if (device.id > 0) %}
+-                    <input type="hidden" name="label" value="update-device">
+-                    <button type="submit" name="update-device-{{ device.id }}">Update</button>
+-                    {% endif %}
+-                </td>
+-            </form>
+-        </tr>
+-        {% endfor %}
++      </td>
++      <td style="background-color: {{ device.alarm_color }};">
++        {{ device.alarm_status }}
++      </td>
++      
++
++      <td>{{device.last_checked_in}}</td>
++      <td>
++        <form method="post">
++        <form method="post">
++          <input type="hidden" name="label" value="update-device">
++          <input type="hidden" name="device_id" value="{{ device.id }}">
++          <input type="hidden" name="location" value="{{ device.location }}">
++          <input type="hidden" name="alarm_power" value="{{ device.alarm_power }}">
++          <input type="hidden" name="delay" value="{{ device.alarm_delay_min }}">
++          <button type="submit" name="update-device-{{ device.id }}">Update</button>
++        </form>
++      </td>
++    </tr>
++    {% endfor %}
++    <!-- for loop ends here -->
+     </table>
+-</body>
++  </div>
++
+ 
+-</html>
+\ No newline at end of file
++
++  <h2>Tools</h2>
++  <!-- create buttons to link to different sites -->
++  <div>
++    <a href="student">
++      <button>Setup Student Card</button>
++    </a>
++    <br>
++    <br>
++    <a href="staff">
++      <button>Setup Staff Card</button>
++    </a>
++    <br>
++    <br>
++    <a href="log">
++      <button>Log Files</button>
++    </a>
++  </div>
++</body>
++</html>
+diff --git a/templates/identify.html b/templates/identify.html
+deleted file mode 100644
+index 397e03d..0000000
+--- a/templates/identify.html
++++ /dev/null
+@@ -1,95 +0,0 @@
+-<!doctype html>
+-<html>
+-
+-<head>
+-    <title>Identify User/Card</title>
+-    <style>
+-        #container {
+-            display: flex;
+-            flex-flow: row wrap;
+-            justify-content: space-evenly;
+-            align-items: flex-start;
+-            align-content: space-around;
+-        }
+-    </style>
+-</head>
+-
+-<body>
+-    <p> <strong>THIS SYSTEM IS TO BE USED BY AUTHORIZED STAFF ONLY</strong></p>
+-    {% for message in get_flashed_messages() %}
+-    <div class="alert">{{ message }}</div>
+-    {% endfor %}
+-
+-    <a href="logout">
+-        <button>Logout</button>
+-    </a>
+-
+-    <div>
+-        <h2>Identify User/Card</h2>
+-        <form method="post">
+-            <input type="hidden" name="label" value="identifyuid">
+-            {% if (err != "") %}
+-            <label for="error-lab">Error: </label>
+-            <div id="error-cont">
+-                <!-- <input type="text" id="error" name="error" value="{{ err }}" readonly style="color:red"> -->
+-                <p id="error" name="error" style="color:{{color}}">{{ err }}</p>
+-            </div>
+-            {% endif %}
+-
+-            <table>
+-                <tr>
+-                    <th>CruzID to lookup (optional)</th>
+-                    <td>
+-                        <input type="text" name="cruzid" value="{{ None }}">
+-                    </td>
+-                </tr>
+-                <tr>
+-                    <th>CruzID</th>
+-                    <td>{{ user_data.cruzid }}</td>
+-                </tr>
+-                <tr>
+-                    <th>Type</th>
+-                    <td>{{ user_data.type }}</td>
+-                </tr>
+-
+-                <tr>
+-                    <th>Card UID</th>
+-                    <td>{{ user_data.uid }}</td>
+-                </tr>
+-                <tr>
+-                    <th>First Name</th>
+-                    <td>{{ user_data.first_name }}</td>
+-                </tr>
+-                <tr>
+-                    <th>Last Name</th>
+-                    <td>{{ user_data.last_name }}</td>
+-                </tr>
+-
+-                {% for i in range(0, length) %}
+-                <tr>
+-                    <th>{{ rooms[i] }}</th>
+-                    <td>{{ accesses[i] }}</td>
+-                </tr>
+-                {% endfor %}
+-            </table>
+-
+-            <div>
+-                <button type="submit" name="checkcard" value="checkcard">Check Card</button>
+-            </div>
+-        </form>
+-    </div>
+-    <div>
+-        <br>
+-        <a href="/dashboard">
+-            <button>Return to Dashboard</button>
+-        </a>
+-    </div>
+-</body>
+-
+-</html>
+-
+-</form>
+-</div>
+-</body>
+-
+-</html>
+\ No newline at end of file
+diff --git a/templates/setup.html b/templates/setup.html
+deleted file mode 100644
+index c2a6736..0000000
+--- a/templates/setup.html
++++ /dev/null
+@@ -1,58 +0,0 @@
+-<!doctype html>
+-<html>
+-
+-<head>
+-    <title>Card Setup</title>
+-    <style>
+-        #container {
+-            display: flex;
+-            flex-flow: row wrap;
+-            justify-content: space-evenly;
+-            align-items: flex-start;
+-            align-content: space-around;
+-        }
+-    </style>
+-</head>
+-
+-<body>
+-    <p> <strong>THIS SYSTEM IS TO BE USED BY AUTHORIZED STAFF ONLY</strong></p>
+-    {% for message in get_flashed_messages() %}
+-    <div class="alert">{{ message }}</div>
+-    {% endfor %}
+-
+-    <a href="logout">
+-        <button>Logout</button>
+-    </a>
+-
+-    <div>
+-        <h2>Card Setup</h2>
+-        <form method="post">
+-            <input type="hidden" name="label" value="uidsetup">
+-            {% if (err != "") %}
+-            <label for="error-lab">Error: </label>
+-            <!-- <div id="error-cont"> -->
+-            <span id="error" name="error" style="color:{% if added %}green{% else %}red{% endif %}">{{ err }}</span>
+-            <br><br>
+-            <!-- </div> -->
+-            {% endif %}
+-            <div id="cruzid-div">
+-                <label for="cruzid-label">CruzID: </label> <br>
+-                <input type="text" id="cruzid" name="cruzid">
+-            </div>
+-            <label for="overwrite-label">Overwrite existing card?</label>
+-            <input type="checkbox" id="overwrite" name="overwrite" value="overwrite">
+-            <div>
+-                <button type="submit" name="formatuid">Generate</button>
+-            </div>
+-        </form>
+-    </div>
+-
+-    <div>
+-        <br>
+-        <a href="/dashboard">
+-            <button>Return to Dashboard</button>
+-        </a>
+-    </div>
+-</body>
+-
+-</html>
+\ No newline at end of file
+diff --git a/templates/student.html b/templates/student.html
+new file mode 100644
+index 0000000..ba8dda1
+--- /dev/null
++++ b/templates/student.html
+@@ -0,0 +1,58 @@
++<!doctype html>
++<html>
++
++<head>
++  <title>Student Card Setup</title>
++  <style>
++    #container {
++      display: flex;
++      flex-flow: row wrap;
++      justify-content: space-evenly;
++      align-items: flex-start;
++      align-content: space-around;
++    }
++  </style>
++</head>
++
++<body>
++  <p> <strong>THIS IS TO BE USED BY AUTHORIZED STAFF ONLY</strong>.</p>
++  {% for message in get_flashed_messages() %}
++  <div class="alert">{{ message }}</div>
++  {% endfor %}
++
++
++  <div>
++    <h2>Student Card Setup</h2>
++    <form method="post"> 
++      <input type="hidden" name="label" value="uidsetup">
++      <label for=" error-lab">Error: </label>
++      <div id="error-cont">
++        <input type="text" id="error" name="error" value="{{ error }}" readonly style="color:red">
++        <div>
++          <div id="cruzid-div">
++            <label for="cruzid-label">CruzID: </label> <br>
++            <input type="text" id="cruzid" name="cruzid">
++          </div>
++          <!-- add checkbox for overwrite -->
++          <label for="overwrite-label">Overwrite existing card?</label>
++          <input type="checkbox" id="overwrite" name="overwrite" value="overwrite">
++          <div>
++            <button type="submit" name="formatuid">Generate</button>
++          </div>
++        </div>
++      </div>
++    </form>
++  </div>
++
++</div>
++
++<!-- create buttons to link to different sites -->
++<div>
++  <br>
++  <a href="http://127.0.0.1:5001/"><!-- Replace "" with the desired URL -->
++    <button>Return</button>
++  </a>
++</div>
++</body>
++
++</html>
+\ No newline at end of file
+diff --git a/user.py b/user.py
+deleted file mode 100644
+index 983df4a..0000000
+--- a/user.py
++++ /dev/null
+@@ -1,34 +0,0 @@
+-from flask_login import UserMixin
+-
+-from db import get_db
+-
+-class User(UserMixin):
+-    def __init__(self, id_, name, email, profile_pic):
+-        self.id = id_
+-        self.name = name
+-        self.email = email
+-        self.profile_pic = profile_pic
+-
+-    @staticmethod
+-    def get(user_id):
+-        db = get_db()
+-        user = db.execute(
+-            "SELECT * FROM user WHERE id = ?", (user_id,)
+-        ).fetchone()
+-        if not user:
+-            return None
+-
+-        user = User(
+-            id_=user[0], name=user[1], email=user[2], profile_pic=user[3]
+-        )
+-        return user
+-
+-    @staticmethod
+-    def create(id_, name, email, profile_pic):
+-        db = get_db()
+-        db.execute(
+-            "INSERT INTO user (id, name, email, profile_pic) "
+-            "VALUES (?, ?, ?, ?)",
+-            (id_, name, email, profile_pic),
+-        )
+-        db.commit()
+\ No newline at end of file
+diff --git a/users.db b/users.db
+deleted file mode 100644
+index 615f926..0000000
+Binary files a/users.db and /dev/null differ
