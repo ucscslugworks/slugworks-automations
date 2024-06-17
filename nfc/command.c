@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+// CRCs by byte (from 0x00 to 0xFF)
 static const uint16_t CCITTCRCTable[256] = {
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50a5,
     0x60c6, 0x70e7, 0x8108, 0x9129, 0xa14a, 0xb16b,
@@ -119,12 +120,14 @@ int main(int argc, char *argv[])
     {
         printf("Usage: %s <command> <data>\n", argv[0]);
         return 1;
-    } else {
+    }
+    else
+    {
         // printf("\nCustom Command:\n");
         uint8_t custom_data[argc - 1];
         for (int i = 1; i < argc; i++)
         {
-            custom_data[i-1] = strtol(argv[i], NULL, 16);
+            custom_data[i - 1] = strtol(argv[i], NULL, 16);
             // printf("custom_data[%d] = %02x\n", i-1, custom_data[i-1]);
         }
         print_command(custom_data, sizeof(custom_data));
