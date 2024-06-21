@@ -344,7 +344,7 @@ def update():
 
 
 # Constants
-CANVAS_UPDATE_HOUR = 4  # update at 4am
+CANVAS_UPDATE_HOUR = 2  # update at 2am
 CHECKIN_TIMEOUT = 5  # check in every 5 minutes
 
 if __name__ == "__main__":
@@ -383,24 +383,31 @@ if __name__ == "__main__":
                         False, tmp_time
                     )  # set the canvas updating status to False (indicates the update is complete) and store the time the update started
                 elif (
-                    not sheet.last_checkin_time
+                    not sheet.last_checkin_time # no checkin time recorded - has not checked in yet (first run)
                     or datetime.now() - sheet.last_checkin_time
-                    > timedelta(0, 0, 0, 0, CHECKIN_TIMEOUT, 0, 0)
+                    > timedelta(0, 0, 0, 0, CHECKIN_TIMEOUT, 0, 0) # or it's been more than CHECKIN_TIMEOUT minutes since the last checkin
                 ):
+                    # log the checkin
                     logger.info("Checking in...")
+                    # check in
                     sheet.check_in()
                 else:
+                    # log that it's waiting for the next update - indicates that it hasn't crashed yet
                     logger.info("Waiting for next update...")
+                # sleep for 60 seconds - prevents the loop from running too quickly
                 time.sleep(60)
 
             except Exception as e:
-                if type(e) == KeyboardInterrupt:
+                # if an error occurs
+                if type(e) == KeyboardInterrupt: # if it's a keyboard interrupt, exit
                     raise e
+                # otherwise, log the error, sleep for 60 seconds, and mark the canvas status as no longer updating
                 logger.error(f"Error: {e}")
                 time.sleep(60)
                 sheet.set_canvas_status_sheet(False)
 
     except KeyboardInterrupt:
+        # if error was a keyboard interrupt, log and exit
         print("Exiting...")
         sheet.set_canvas_status_sheet(False)
         exit(0)

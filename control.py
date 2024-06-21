@@ -241,8 +241,9 @@ def callback():
 @app.route("/logout")
 @login_required
 def logout():
+    logger.info(f"User {current_user.email} logging out.")
     logout_user()
-    logger.info(f"User {current_user.email} logged out.")
+    logger.info("User logged out.")
     return redirect(url_for("index"))
 
 
