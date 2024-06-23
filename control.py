@@ -4,6 +4,7 @@ import sqlite3
 import datetime
 import time
 import logging
+from dateutil import parser
 
 import requests
 from flask import Flask, redirect, render_template, request, url_for
@@ -18,8 +19,9 @@ from flask_socketio import SocketIO, emit
 from oauthlib.oauth2 import WebApplicationClient
 from threading import Thread, Event
 
-import nfc_control as nfc
+import nfc_fake as nfc
 import sheet
+import cal
 from db import init_db_command
 from user import User
 
@@ -460,6 +462,19 @@ def identify():
         length=0 if not rooms else len(rooms),
     )
 
+#TODO: create a thread system to update every five minutes and change the html to show the current event and the next event
+@app.route("/system/events", methods=("GET", "POST"))
+def events():
+    event_now = cal.get_upcoming_events(1)
+    current_time = datetime.datetime.now(datetime.timezone.utc)
+
+    if not event_now.empty:
+        event_now['start'] = event_now['start'].apply(lambda x: parser.isoparse(x))
+        event_now['end'] = event_now['end'].apply(lambda x: parser.isoparse(x))
+        event_now = event_now[(event_now['start'] <= current_time) & (event_now['end'] >= current_time)]
+    
+    return render_template("events.html", event_now=event_now)
+
 
 @socketio.on("connect")
 def handle_connect():
@@ -471,4 +486,4 @@ def handle_connect():
 
 
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=5001, ssl_context="adhoc")
+    socketio.run(app, host="0.0.0.0", port=5001, ssl_context="adhoc", debug=True)

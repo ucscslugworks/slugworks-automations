@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Events</title>
+    <style>
+        .icon {
+            font-size: 100px;
+            text-align: center;
+            margin-top: 50px;
+        }
+        .red-x {
+            color: red;
+        }
+        .green-check {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <div class="icon">
+        {% if event_now.empty %}
+            <div class="green-check">&#10003;</div> <!-- Green check mark -->
+        {% else %}
+            <div class="red-x">&#10007;</div> <!-- Red X mark -->
+        {% endif %}
+    </div>
+</body>
+</html>
