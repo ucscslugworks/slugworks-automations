@@ -4,14 +4,12 @@ from multiprocessing import Queue, Process
 import RPi.GPIO as GPIO  # type: ignore
 from mfrc522 import SimpleMFRC522  # type: ignore
 
+# https://www.nxp.com/docs/en/data-sheet/MFRC522.pdf
+
 # delay between reads for the same card
 DELAY = 1
 
 reader = SimpleMFRC522()
-
-# TODO: when refreshing the database from the sheet, clear the timestamps (otherwise this will fill up & take a lot of memory)
-# maintain the last scanned time for each card id so that we can prevent multiple scans within a short time
-# timestamps = {}
 
 
 def read_card():

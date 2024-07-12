@@ -137,6 +137,7 @@ def update_data():
     ):
         logger.info("Getting sheet data...")
         sheet.get_sheet_data()
+        nfc.clear_timestamps()
 
 
 def background_thread():
