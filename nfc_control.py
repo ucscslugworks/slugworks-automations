@@ -264,7 +264,6 @@ if __name__ == "__main__":
     while True:
         try:
             print(read_card())
-            # try/except w/ keyboard interrupt is necessary in case no card is scanned
         except KeyboardInterrupt:
             close()
             raise
