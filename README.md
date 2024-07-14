@@ -32,6 +32,7 @@ sudo python3 neopixeltest.py
 This should light up the NeoPixels connected to the reader with a rainbow pattern. If this works, the NeoPixel library is set up correctly. (You may need to adjust the num_pixels and pixel_pin variables in the `neopixeltest.py` file to match the number of NeoPixels and the GPIO pin they are connected to.)
 
 ### Required JSON Files
+*All files listed below should be stored in a top-level `common` folder.*
 - ID.json
 ```json
 {
