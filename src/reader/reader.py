@@ -1,13 +1,46 @@
+import logging
+import os
 from datetime import datetime, timedelta
-from multiprocessing import Process, Queue
 from threading import Thread
 from time import sleep, time
 
 import board  # type: ignore
 import neopixel  # type: ignore
 
-import sheet
-from nfc import nfc_reader as nfc
+from .. import sheet
+from ..nfc import nfc_reader as nfc
+
+# Change directory to current file location
+path = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+)
+os.chdir(path)
+
+# Create a new directory for logs if it doesn't exist
+if not os.path.exists(path + "/logs/reader"):
+    os.makedirs(path + "/logs/reader")
+
+# create new logger with all levels
+logger = logging.getLogger("root")
+logger.setLevel(logging.DEBUG)
+
+# create file handler which logs debug messages (and above - everything)
+fh = logging.FileHandler(f"logs/reader/{str(datetime.now())}.log")
+fh.setLevel(logging.DEBUG)
+
+# create console handler which only logs warnings (and above)
+ch = logging.StreamHandler()
+ch.setLevel(logging.WARNING)
+
+# create formatter and add it to the handlers
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s: %(message)s")
+fh.setFormatter(formatter)
+ch.setFormatter(formatter)
+
+# add the handlers to the logger
+logger.addHandler(fh)
+logger.addHandler(ch)
+
 
 SHEET_UPDATE_HOUR = 4  # pull new data from sheet at 4am
 CHECKIN_TIMEOUT = 30  # check in every 30 seconds
@@ -106,7 +139,7 @@ def breathe_leds():
                 if type(e) == KeyboardInterrupt:
                     raise e
                 # otherwise, print error and sleep for 60 seconds to prevent spamming
-                print(f"Error: {e}")
+                logger.error(f"Error: {e}")
                 sleep(60)
     except KeyboardInterrupt:
         # set exit flag to True - this will exit the main loop and cause the end of this thread
@@ -124,7 +157,7 @@ if __name__ == "__main__":
         Thread(target=breathe_leds).start()
     except Exception as e:
         # print error, set red LEDs, sleep for 5 seconds, and set exit flag
-        print(e)
+        logger.error(e)
         pixels.fill((255, 0, 0))
         pixels.show()
         sleep(5)
@@ -145,20 +178,20 @@ if __name__ == "__main__":
                     or datetime.now().date() > sheet.last_update_time.date()
                 ) and datetime.now().hour >= SHEET_UPDATE_HOUR:
                     # update sheet data and check in
-                    print("Updating sheet...")
+                    logger.info("Updating sheet...")
                     sheet.get_sheet_data()
                     sheet.check_in(alarm_status=alarm_status)
                 elif not sheet.last_checkin_time or datetime.now() - sheet.last_checkin_time > timedelta(
                     0, CHECKIN_TIMEOUT, 0, 0, 0, 0, 0
                 ):  # if last checkin time is not set or it has been CHECKIN_TIMEOUT seconds since last checkin
                     # check in
-                    print("Checking in...")
+                    logger.info("Checking in...")
                     sheet.check_in(alarm_status=alarm_status)
 
                 # read card ID from NFC reader with a timeout of 1 second
-                print("Hold a tag near the reader")
+                # print("Hold a tag near the reader")
                 card_id = nfc.read_card_queue_timeout(1)
-                print(card_id)
+                # print(card_id)
                 # if card ID is not None and it is not in the last 5 IDs scanned - a new card has been scanned
                 if card_id and card_id not in last_ids:
                     # add card ID to last IDs scanned and remove the oldest one
@@ -171,7 +204,7 @@ if __name__ == "__main__":
                     # if response is not a color/alarm timeout tuple
                     if not response:
                         # print an error - likely caused by the card being in the database but not having a color for this room
-                        print("error - card not in database or something else")
+                        logger.error("error - card not in database or something else")
                         # TODO: flash no access color or some other unique indication
                         pass
                     else:  # a response was received
@@ -179,7 +212,7 @@ if __name__ == "__main__":
                         color, timeout = response
 
                         # print color and timeout for debugging
-                        print(color, timeout)
+                        # print(color, timeout)
 
                         # convert color from hex to RGB tuple
                         colors = tuple(
@@ -187,7 +220,7 @@ if __name__ == "__main__":
                         )
 
                         # print colors for debugging
-                        print(colors)
+                        # print(colors)
 
                         # stop breathing LEDs, set scan time, and sleep to give the breathing thread time to stop
                         breathe = False
@@ -210,7 +243,7 @@ if __name__ == "__main__":
                     raise e
 
                 # otherwise, print error and sleep for 60 seconds to prevent spamming
-                print(f"Error: {e}")
+                logger.error(f"Error: {e}")
                 sleep(60)
 
     except KeyboardInterrupt:  # if KeyboardInterrupt is raised, set exit flag to True

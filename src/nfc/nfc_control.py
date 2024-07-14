@@ -23,7 +23,7 @@ def get_command(data):
     # convert data to bytes (from hex-formatted string)
     return bytes.fromhex(
         subprocess.run(
-            ["./nfc/command"] + data, capture_output=True
+            ["src/nfc/command"] + data, capture_output=True
         )  # run command.c with command data as the arguments
         .stdout.decode("utf-8")  # decode the output from bytes to string
         .strip()  # remove leading/trailing whitespace
