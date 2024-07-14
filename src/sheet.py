@@ -13,8 +13,12 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 # Change directory to current file location
-path = os.path.dirname(os.path.abspath(__file__))
+path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 os.chdir(path)
+
+# Create a new directory for logs if it doesn't exist
+if not os.path.exists(path + "/logs/sheet"):
+    os.makedirs(path + "/logs/sheet")
 
 # create new logger with all levels
 logger = logging.getLogger("sheet")
@@ -22,7 +26,7 @@ logger.setLevel(logging.DEBUG)
 
 # get reader id (0 is the control pi, any other number is a reader pi zero)
 try:
-    reader_file = json.load(open("ID.json"))
+    reader_file = json.load(open("common/ID.json"))
 except FileNotFoundError:
     logger.error("No ID.json file found.")
     exit(1)
@@ -82,42 +86,13 @@ canvas_needs_update = None
 student_sheet_read_len = 0
 staff_sheet_read_len = 0
 
-# Change directory to current file location
-path = os.path.dirname(os.path.abspath(__file__))
-os.chdir(path)
-
-# Create a new directory for logs if it doesn't exist
-if not os.path.exists(path + "/logs/sheet"):
-    os.makedirs(path + "/logs/sheet")
-
-# create new logger with all levels
-logger = logging.getLogger("sheet")
-logger.setLevel(logging.DEBUG)
-
-# # create file handler which logs debug messages (and above - everything)
-# fh = logging.FileHandler(f"logs/sheet/{str(datetime.datetime.now())}.log")
-# fh.setLevel(logging.DEBUG)
-
-# # create console handler which only logs warnings (and above)
-# ch = logging.StreamHandler()
-# ch.setLevel(logging.WARNING)
-
-# # create formatter and add it to the handlers
-# formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s: %(message)s")
-# fh.setFormatter(formatter)
-# ch.setFormatter(formatter)
-
-# # add the handlers to the logger
-# logger.addHandler(fh)
-# logger.addHandler(ch)
-
 creds = None
 # The file token.json stores the user's access and refresh tokens, and is
 # created automatically when the authorization flow completes for the first
 # time.
-if os.path.exists("token.json"):
-    creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-elif not os.path.exists("credentials.json"):
+if os.path.exists("common/token.json"):
+    creds = Credentials.from_authorized_user_file("common/token.json", SCOPES)
+elif not os.path.exists("common/credentials.json"):
     logger.error("No credentials.json file found.")
     exit(1)
 # If there are no (valid) credentials available, let the user log in (assuming credentials.json exists).
@@ -125,10 +100,12 @@ if not creds or not creds.valid:
     if creds and creds.expired and creds.refresh_token:
         creds.refresh(Request())
     else:
-        flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
+        flow = InstalledAppFlow.from_client_secrets_file(
+            "common/credentials.json", SCOPES
+        )
         creds = flow.run_local_server(port=44649)
     # Save the credentials for the next run
-    with open("token.json", "w") as token:
+    with open("common/token.json", "w") as token:
         token.write(creds.to_json())
 
 try:

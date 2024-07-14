@@ -1,11 +1,13 @@
+import datetime
 import json
+import logging
 import os
 import sqlite3
-import datetime
 import time
-import logging
+from threading import Event, Thread
 
 import requests
+from .db import init_db_command
 from flask import Flask, redirect, render_template, request, url_for
 from flask_login import (
     LoginManager,
@@ -16,12 +18,12 @@ from flask_login import (
 )
 from flask_socketio import SocketIO, emit
 from oauthlib.oauth2 import WebApplicationClient
-from threading import Thread, Event
+from .user import User
 
-import nfc_control as nfc
-import sheet
-from db import init_db_command
-from user import User
+from ..nfc import nfc_fake as nfc
+# from ..nfc import nfc_control as nfc
+
+from .. import sheet
 
 # Configuration
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", sheet.creds.client_id)
@@ -30,7 +32,9 @@ GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configura
 ALLOWED_EMAILS = {"chartier@ucsc.edu", "imadan1@ucsc.edu", "nkouatli@ucsc.edu"}
 
 # Change directory to current file location
-path = os.path.dirname(os.path.abspath(__file__))
+path = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+)
 os.chdir(path)
 
 # Create a new directory for logs if it doesn't exist

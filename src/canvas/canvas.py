@@ -6,10 +6,12 @@ from datetime import datetime, timedelta
 
 import requests
 
-import sheet
+from .. import sheet
 
 # Change directory to current file location
-path = os.path.dirname(os.path.abspath(__file__))
+path = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+)
 os.chdir(path)
 
 # Create a new directory for logs if it doesn't exist
@@ -41,7 +43,7 @@ logger.addHandler(ch)
 # Function to list all modules in a course
 def list_modules():
     # Load keys from json file
-    keys = json.load(open("canvas.json"))
+    keys = json.load(open("common/canvas.json"))
 
     # get Canvas API auth token and course ID
     token = keys["auth_token"]
@@ -72,7 +74,7 @@ def update():
         logger.info("Successfully retrieved sheet data")
 
         # Load keys from json file
-        keys = json.load(open("canvas.json"))
+        keys = json.load(open("common/canvas.json"))
 
         # get Canvas API auth token and course ID
         token = keys["auth_token"]
@@ -348,6 +350,7 @@ CANVAS_UPDATE_HOUR = 2  # update at 2am
 CHECKIN_TIMEOUT = 5  # check in every 5 minutes
 
 if __name__ == "__main__":
+    logger.info("Initialization complete")
     # try/except to exit nicely if a keyboard interrupt is received
     try:
         # loop to continuously update Canvas data
@@ -382,11 +385,9 @@ if __name__ == "__main__":
                     sheet.set_canvas_status_sheet(
                         False, tmp_time
                     )  # set the canvas updating status to False (indicates the update is complete) and store the time the update started
-                elif (
-                    not sheet.last_checkin_time # no checkin time recorded - has not checked in yet (first run)
-                    or datetime.now() - sheet.last_checkin_time
-                    > timedelta(0, 0, 0, 0, CHECKIN_TIMEOUT, 0, 0) # or it's been more than CHECKIN_TIMEOUT minutes since the last checkin
-                ):
+                elif not sheet.last_checkin_time or datetime.now() - sheet.last_checkin_time > timedelta(  # no checkin time recorded - has not checked in yet (first run)
+                    0, 0, 0, 0, CHECKIN_TIMEOUT, 0, 0
+                ):  # or it's been more than CHECKIN_TIMEOUT minutes since the last checkin
                     # log the checkin
                     logger.info("Checking in...")
                     # check in
@@ -399,7 +400,7 @@ if __name__ == "__main__":
 
             except Exception as e:
                 # if an error occurs
-                if type(e) == KeyboardInterrupt: # if it's a keyboard interrupt, exit
+                if type(e) == KeyboardInterrupt:  # if it's a keyboard interrupt, exit
                     raise e
                 # otherwise, log the error, sleep for 60 seconds, and mark the canvas status as no longer updating
                 logger.error(f"Error: {e}")

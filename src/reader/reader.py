@@ -6,8 +6,8 @@ from time import sleep, time
 import board  # type: ignore
 import neopixel  # type: ignore
 
-import nfc_reader as nfc
 import sheet
+from nfc import nfc_reader as nfc
 
 SHEET_UPDATE_HOUR = 4  # pull new data from sheet at 4am
 CHECKIN_TIMEOUT = 30  # check in every 30 seconds
