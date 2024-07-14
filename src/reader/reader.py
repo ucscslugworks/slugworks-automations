@@ -7,6 +7,13 @@ from time import sleep, time
 import board  # type: ignore
 import neopixel  # type: ignore
 
+try:
+    import RPi.GPIO as GPIO  # type: ignore
+except RuntimeError:
+    print(
+        "Error importing RPi.GPIO!  This is probably because you need superuser privileges.  You can achieve this by using 'sudo' to run your script"
+    )
+
 from .. import sheet
 from ..nfc import nfc_reader as nfc
 
@@ -50,10 +57,15 @@ BREATHE_DELAY = 0.05  # seconds to wait between LED brightness changes
 BRIGHTNESS_LOW = 0.2  # low brightness while breathing LEDs
 BRIGHTNESS_HIGH = 0.5  # high brightness while holding color
 
+DOOR_SENSOR_PIN = 16  # GPIO pin for door sensor
+
 breathe = True  # breathe LEDs when no card is scanned
 scan_time = None  # time of last scan to hold color
 EXIT = False  # exit flag
 alarm_status = False  # True if alarm is triggered - reported back to sheet
+door_open = False  # True if door is open
+door_change_time = time()  # time of last door state change
+door_time_limit = 0  # time limit for door open before alarm based on card scan
 
 num_pixels = 30  # 30 LEDs
 pixel_pin = board.D18  # LEDs are on GPIO pin 18
@@ -65,6 +77,7 @@ pixels = neopixel.NeoPixel(
     auto_write=False,
     pixel_order=ORDER,
 )  # initialize LEDs
+GPIO.setmode(GPIO.BCM)  # set GPIO mode to BCM (GPIO numbering)
 
 
 # thread to breathe LEDs in background
@@ -163,6 +176,8 @@ if __name__ == "__main__":
         sleep(5)
         EXIT = True
 
+    GPIO.setup(DOOR_SENSOR_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
     # try except for clean exit on keyboard interrupt
     try:
         # list of last 5 card IDs scanned - debouncing to prevent multiple scans
@@ -191,7 +206,7 @@ if __name__ == "__main__":
                 # read card ID from NFC reader with a timeout of 1 second
                 # print("Hold a tag near the reader")
                 card_id = nfc.read_card_queue_timeout(1)
-                # print(card_id)
+                print(card_id)
                 # if card ID is not None and it is not in the last 5 IDs scanned - a new card has been scanned
                 if card_id and card_id not in last_ids:
                     # add card ID to last IDs scanned and remove the oldest one
@@ -212,7 +227,7 @@ if __name__ == "__main__":
                         color, timeout = response
 
                         # print color and timeout for debugging
-                        # print(color, timeout)
+                        print(color, timeout)
 
                         # convert color from hex to RGB tuple
                         colors = tuple(
@@ -231,12 +246,43 @@ if __name__ == "__main__":
                         pixels.brightness = BRIGHTNESS_HIGH
                         pixels.fill(colors)
                         pixels.show()
+
+                        if alarm_status and timeout:
+                            alarm_status = False
+                            sheet.check_in(alarm_status=alarm_status)
+                            print("Alarm untriggered")
+                            door_change_time = time()
+                            door_time_limit = timeout * 60
+
                 elif card_id is None:  # scanned too soon or no card scanned
                     # add None to last IDs scanned and remove the oldest one (if we didn't do this, the same person could never scan twice in a row, even if they waited a long time)
                     last_ids.append(None)
                     last_ids.pop(0)
                 elif card_id is False:  # some error occurred, exit loop
                     EXIT = True
+
+                # check if door sensor is open
+                input_state = bool(GPIO.input(DOOR_SENSOR_PIN))
+                if input_state != door_open and time() - door_change_time > 0.5:
+                    door_open = input_state
+                    door_change_time = time()
+
+                    if not door_open and alarm_status:
+                        alarm_status = False
+                        sheet.check_in(alarm_status=alarm_status)
+                        print("Alarm untriggered")
+
+                if (
+                    door_open
+                    and not alarm_status
+                    and time() - door_change_time > door_time_limit
+                    and time() - door_change_time
+                    > sheet.this_reader["alarm_delay_min"] * 60
+                ):
+                    alarm_status = True
+                    sheet.check_in(alarm_status=alarm_status)
+                    print("Alarm triggered")
+
             except Exception as e:  # catch any exceptions
                 # if exception is KeyboardInterrupt, raise it to exit cleanly
                 if type(e) == KeyboardInterrupt:
