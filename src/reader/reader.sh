@@ -11,4 +11,4 @@ if [[ "$EUID" != 0 ]]; then
     fi
 fi
 source /home/slugworks/slugworks-access-cards/venv/bin/activate
-sudo python3 /home/slugworks/slugworks-access-cards/reader.py
+sudo python3 -m src.reader.reader /home/slugworks/slugworks-access-cards/src/reader/reader.py

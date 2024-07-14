@@ -5,7 +5,7 @@ import time
 from threading import Event, Thread
 
 from flask import Flask, redirect, render_template, request, url_for
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO
 
 from .. import sheet
 from ..nfc import nfc_control as nfc

@@ -1,5 +1,4 @@
-from time import sleep, time
-from multiprocessing import Queue, Process
+from multiprocessing import Process, Queue
 
 import RPi.GPIO as GPIO  # type: ignore
 from mfrc522 import SimpleMFRC522  # type: ignore

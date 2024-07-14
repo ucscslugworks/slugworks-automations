@@ -1,17 +1,19 @@
-import sheet
-from ms_active_directory import *
-from ldap3 import *
 import gssapi
+from ldap3 import *
+from ms_active_directory import *
+
+import sheet
 
 
 def login():
     print("starting ....")
     domain = ADDomain("au.ucsc.edu")
     print("domain connected")
-    session = domain.create_session_as_user(authentication_mechanism="SASL",sasl_mechanism=KERBEROS)
+    session = domain.create_session_as_user(
+        authentication_mechanism="SASL", sasl_mechanism=KERBEROS
+    )
     print("session created")
     return session
-
 
 
 def add_user(session, to_add):
@@ -19,14 +21,15 @@ def add_user(session, to_add):
     print("added users")
 
 
-
-
 def remove_user(session, to_remove):
     session.remove_users_from_groups(list(to_remove), ["au-slugworks-access"])
     print("removed users")
 
+
 def get_group(session):
-    single_group_member_list = session.find_members_of_group("au-slugworks-access", ["cn"])
+    single_group_member_list = session.find_members_of_group(
+        "au-slugworks-access", ["cn"]
+    )
     print("group members found")
 
     in_group = []
@@ -50,14 +53,12 @@ def get_group(session):
     return to_add, to_remove
 
 
-
 def main():
     session = login()
     to_add, to_remove = get_group(session)
     add_user(session, to_add)
     remove_user(session, to_remove)
     print("done")
-
 
 
 if __name__ == "__main__":
