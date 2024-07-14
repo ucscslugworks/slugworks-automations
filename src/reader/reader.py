@@ -247,12 +247,15 @@ if __name__ == "__main__":
                         pixels.fill(colors)
                         pixels.show()
 
-                        if alarm_status and timeout:
-                            alarm_status = False
-                            sheet.check_in(alarm_status=alarm_status)
-                            print("Alarm untriggered")
+                        if timeout:
                             door_change_time = time()
                             door_time_limit = timeout * 60
+                            print("Door time limit set to", door_time_limit)
+
+                            if alarm_status:
+                                alarm_status = False
+                                sheet.check_in(alarm_status=alarm_status)
+                                print("Alarm untriggered")
 
                 elif card_id is None:  # scanned too soon or no card scanned
                     # add None to last IDs scanned and remove the oldest one (if we didn't do this, the same person could never scan twice in a row, even if they waited a long time)
