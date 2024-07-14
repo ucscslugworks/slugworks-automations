@@ -1,20 +1,14 @@
 import datetime
-import json
 import logging
 import os
-import sqlite3
 import time
 from threading import Event, Thread
 
-import requests
 from flask import Flask, redirect, render_template, request, url_for
 from flask_socketio import SocketIO, emit
 
-from ..nfc import nfc_fake as nfc
-
-# from ..nfc import nfc_control as nfc
-
 from .. import sheet
+from ..nfc import nfc_control as nfc
 
 # Change directory to current file location
 path = os.path.abspath(
