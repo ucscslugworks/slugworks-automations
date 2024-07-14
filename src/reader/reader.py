@@ -206,7 +206,7 @@ if __name__ == "__main__":
                 # read card ID from NFC reader with a timeout of 1 second
                 # print("Hold a tag near the reader")
                 card_id = nfc.read_card_queue_timeout(1)
-                print(card_id)
+                # print(card_id)
                 # if card ID is not None and it is not in the last 5 IDs scanned - a new card has been scanned
                 if card_id and card_id not in last_ids:
                     # add card ID to last IDs scanned and remove the oldest one
@@ -227,7 +227,7 @@ if __name__ == "__main__":
                         color, timeout = response
 
                         # print color and timeout for debugging
-                        print(color, timeout)
+                        # print(color, timeout)
 
                         # convert color from hex to RGB tuple
                         colors = tuple(
@@ -266,6 +266,7 @@ if __name__ == "__main__":
                 if input_state != door_open and time() - door_change_time > 0.5:
                     door_open = input_state
                     door_change_time = time()
+                    print(door_open)
 
                     if not door_open and alarm_status:
                         alarm_status = False
