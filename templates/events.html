@@ -22,8 +22,15 @@
     <div class="icon">
         {% if event_now.empty %}
             <div class="green-check">&#10003;</div> <!-- Green check mark -->
+        {% elif event_type == "class" %}
+            <div class="red-x">&#10007;</div> <!-- Red X mark -->
+            <h1>Do Not Enter</h1>
+        {%   elif event_type == "workshop" %}
+            <div class="green-check">&#10003;</div> <!-- Green check mark -->
+            <h1>Please come in, workshop is being held</h1>
         {% else %}
             <div class="red-x">&#10007;</div> <!-- Red X mark -->
+            <h1>Unknown</h1>
         {% endif %}
     </div>
 </body>

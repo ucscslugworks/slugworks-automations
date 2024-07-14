@@ -472,8 +472,19 @@ def events():
         event_now['start'] = event_now['start'].apply(lambda x: parser.isoparse(x))
         event_now['end'] = event_now['end'].apply(lambda x: parser.isoparse(x))
         event_now = event_now[(event_now['start'] <= current_time) & (event_now['end'] >= current_time)]
+        event_name = event_now['summary'].values[0]  # Get the name of the event
+        if event_name and any(keyword in event_name.lower() for keyword in ["tela", "cmpm", "117", "class"]):
+            event_type = "class"
+        elif event_name and "workshop" in event_name.lower():
+            event_type = "workshop"
+        else:
+            event_type = "event"
+        print(event_name)
+        print(event_type)
+    else:
+        event_name = None
     
-    return render_template("events.html", event_now=event_now)
+    return render_template("events.html", event_now=event_now, event_name=event_name, event_type=event_type)
 
 
 @socketio.on("connect")
