@@ -82,7 +82,19 @@
         }
 
         .error-message {
-            color: {% if added %}green{% else %}red{% endif %};
+            color: {
+                % if added %
+            }
+
+            green {
+                % else %
+            }
+
+            red {
+                % endif %
+            }
+
+            ;
             font-weight: bold;
         }
     </style>
@@ -99,10 +111,6 @@
         {% for message in get_flashed_messages() %}
         <div class="alert">{{ message }}</div>
         {% endfor %}
-
-        <a href="logout">
-            <button>Logout</button>
-        </a>
 
         <div>
             <form method="post">

@@ -7,29 +7,14 @@ import time
 from threading import Event, Thread
 
 import requests
-from .db import init_db_command
 from flask import Flask, redirect, render_template, request, url_for
-from flask_login import (
-    LoginManager,
-    current_user,
-    login_required,
-    login_user,
-    logout_user,
-)
 from flask_socketio import SocketIO, emit
-from oauthlib.oauth2 import WebApplicationClient
-from .user import User
 
 from ..nfc import nfc_fake as nfc
+
 # from ..nfc import nfc_control as nfc
 
 from .. import sheet
-
-# Configuration
-GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", sheet.creds.client_id)
-GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", sheet.creds.client_secret)
-GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
-ALLOWED_EMAILS = {"chartier@ucsc.edu", "imadan1@ucsc.edu", "nkouatli@ucsc.edu"}
 
 # Change directory to current file location
 path = os.path.abspath(
@@ -75,32 +60,6 @@ device_status_names = ["ONLINE", "OFFLINE"]
 status_colors = ["#3CBC8D", "red", ""]
 alarm_status_names = ["OK", "ALARM", "TAGGED OUT", "DISABLED"]
 alarm_status_colors = ["#3CBC8D", "red", "yellow", "gray", ""]
-
-login_manager = LoginManager()
-login_manager.init_app(app)
-
-# Naive database setup
-try:
-    init_db_command()
-    logger.info("Database initialized successfully.")
-except sqlite3.OperationalError:
-    # Assume it's already been created
-    logger.warning("Database already exists. Skipping initialization.")
-
-# OAuth 2 client setup
-client = WebApplicationClient(GOOGLE_CLIENT_ID)
-
-
-# Flask-Login helper to retrieve a user from our db
-@login_manager.user_loader
-def load_user(user_id):
-    return User.get(user_id)
-
-
-@login_manager.unauthorized_handler
-def unauthorized():
-    logger.warning("Unauthorized access attempt.")
-    return redirect("/login")
 
 
 def assign_uid(cruzid, overwrite, uid):
@@ -158,102 +117,10 @@ def background_thread():
 
 @app.route("/")
 def index():
-    if current_user.is_authenticated:
-        logger.debug("Rendering index page for authenticated user.")
-        return (
-            "<p>Hello, you're logged in as {}! Email: {}</p>"
-            "<a class='button' href='/dashboard'>Dashboard</a><br>"
-            '<a class="button" href="/logout">Logout</a>'.format(
-                current_user.name, current_user.email
-            )
-        )
-    else:
-        logger.debug("Rendering index page for unauthenticated user.")
-        return '<a class="button" href="/login">Google Login</a>'
-
-
-def get_google_provider_cfg():
-    logger.debug("Fetching Google provider configuration.")
-    return requests.get(GOOGLE_DISCOVERY_URL).json()
-
-
-@app.route("/login")
-def login():
-    google_provider_cfg = get_google_provider_cfg()
-    authorization_endpoint = google_provider_cfg["authorization_endpoint"]
-
-    request_uri = client.prepare_request_uri(
-        authorization_endpoint,
-        redirect_uri=request.base_url + "/callback",
-        scope=["openid", "email", "profile"],
-    )
-    logger.debug("Redirecting to Google's OAuth 2.0 authorization endpoint.")
-    return redirect(request_uri)
-
-
-@app.route("/login/callback")
-def callback():
-    code = request.args.get("code")
-    google_provider_cfg = get_google_provider_cfg()
-    token_endpoint = google_provider_cfg["token_endpoint"]
-
-    token_url, headers, body = client.prepare_token_request(
-        token_endpoint,
-        authorization_response=request.url,
-        redirect_url=request.base_url,
-        code=code,
-    )
-    token_response = requests.post(
-        token_url,
-        headers=headers,
-        data=body,
-        auth=(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET),
-    )
-
-    client.parse_request_body_response(json.dumps(token_response.json()))
-
-    userinfo_endpoint = google_provider_cfg["userinfo_endpoint"]
-    uri, headers, body = client.add_token(userinfo_endpoint)
-    userinfo_response = requests.get(uri, headers=headers, data=body)
-
-    if userinfo_response.json().get("email_verified"):
-        unique_id = userinfo_response.json()["sub"]
-        users_email = userinfo_response.json()["email"]
-        picture = userinfo_response.json()["picture"]
-        users_name = userinfo_response.json()["given_name"]
-        logger.info(f"User {users_email} authenticated successfully.")
-
-        # Check if email is allowed
-        if users_email not in ALLOWED_EMAILS:
-            logger.warning(f"Unauthorized login attempt by {users_email}.")
-            return "Unauthorized user", 403
-
-    else:
-        logger.error("User email not available or not verified by Google.")
-        return "User email not available or not verified by Google.", 400
-
-    user = User(id_=unique_id, name=users_name, email=users_email, profile_pic=picture)
-
-    if not User.get(unique_id):
-        User.create(unique_id, users_name, users_email, picture)
-        logger.info(f"Created new user {users_email} in the database.")
-
-    login_user(user)
-
     return redirect(url_for("dashboard"))
 
 
-@app.route("/logout")
-@login_required
-def logout():
-    logger.info(f"User {current_user.email} logging out.")
-    logout_user()
-    logger.info("User logged out.")
-    return redirect(url_for("index"))
-
-
 @app.route("/dashboard", methods=("GET", "POST"))
-@login_required
 def dashboard():
     canvas_update = sheet.last_canvas_update_time
     if sheet.canvas_is_updating:
@@ -362,7 +229,6 @@ def dashboard():
 
 
 @app.route("/setup", methods=("GET", "POST"))
-@login_required
 def setup():
     err = ""
     added = False
@@ -401,7 +267,6 @@ def setup():
 
 
 @app.route("/identify", methods=("GET", "POST"))
-@login_required
 def identify():
     cruzid = ""
     uid = ""
