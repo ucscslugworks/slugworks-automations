@@ -269,6 +269,7 @@ if __name__ == "__main__":
                 if input_state != door_open and time() - door_change_time > 0.5:
                     door_open = input_state
                     door_change_time = time()
+                    door_time_limit = 0
                     print(door_open)
 
                     if not door_open and alarm_status:
@@ -283,6 +284,7 @@ if __name__ == "__main__":
                     and time() - door_change_time
                     > sheet.this_reader["alarm_delay_min"] * 60
                 ):
+                    door_time_limit = 0
                     alarm_status = True
                     sheet.check_in(alarm_status=alarm_status)
                     print("Alarm triggered")
