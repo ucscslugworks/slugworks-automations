@@ -12,7 +12,7 @@ GPIO.setup(16, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 old_input_state = False
 
 while True:
-    input_state = GPIO.input(16)
+    input_state = bool(GPIO.input(16))
     if input_state != old_input_state:
         print(input_state)
         old_input_state = input_state
