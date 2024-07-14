@@ -58,6 +58,7 @@ BRIGHTNESS_LOW = 0.2  # low brightness while breathing LEDs
 BRIGHTNESS_HIGH = 0.5  # high brightness while holding color
 
 DOOR_SENSOR_PIN = 16  # GPIO pin for door sensor
+DOOR_SENSOR_DEBOUNCE = 0.5  # seconds to debounce door sensor
 
 breathe = True  # breathe LEDs when no card is scanned
 scan_time = None  # time of last scan to hold color
@@ -266,7 +267,10 @@ if __name__ == "__main__":
 
                 # check if door sensor is open
                 input_state = bool(GPIO.input(DOOR_SENSOR_PIN))
-                if input_state != door_open and time() - door_change_time > 0.5:
+                if (
+                    input_state != door_open
+                    and time() - door_change_time > DOOR_SENSOR_DEBOUNCE
+                ):
                     door_open = input_state
                     door_change_time = time()
                     door_time_limit = 0
