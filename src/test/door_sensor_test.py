@@ -11,12 +11,15 @@ GPIO.setmode(GPIO.BCM)
 
 GPIO.setup(16, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-old_input_state = True
+door_open = True
 last_change = time.time()
 
 while True:
     input_state = bool(GPIO.input(16))
-    if input_state != old_input_state and time.time() - last_change > 0.1:
+    if input_state != door_open and time.time() - last_change > 0.1:
         print(input_state)
-        old_input_state = input_state
+        door_open = input_state
         last_change = time.time()
+
+    if door_open and time.time() - last_change > 5:
+        print("Door has been open for 5+ seconds")
