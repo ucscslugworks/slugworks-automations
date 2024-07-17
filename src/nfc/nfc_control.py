@@ -1,3 +1,4 @@
+import logging
 import subprocess
 import time
 from multiprocessing import Process, Queue
@@ -16,6 +17,9 @@ ser = serial.Serial("/dev/ttyUSB0", 9600, timeout=0.1)
 
 # maintain the last scanned time for each card id so that we can prevent multiple scans within a short time
 timestamps = {}
+
+logger = logging.getLogger("nfc_control")
+logger.setLevel(logging.DEBUG)
 
 
 # use the command.c file to get the hex string for the command to send to the NFC reader
@@ -48,7 +52,7 @@ def get_response():
 
     # packet must start with 0x02 - reference RFID-B1 manual 4.5.1.1
     if response_split[0] != "02":
-        print("Invalid response: ", response_split)
+        logger.error("Invalid response: ", response_split)
         return []
 
     # get length of the response data
@@ -74,14 +78,14 @@ def get_response():
 
             # if the response does not start with 0x02, then it is invalid
             if r[0] != "02":
-                print("Invalid response: ", r)
+                logger.error("Invalid response: ", r)
             else:
                 # the first byte of the data is the error code, the rest is the data
                 # TODO: why are the last 2 bytes dropped?
                 responses.append((r[5], r[6:-2]))
         else:
             # if the response does not start with 0x02, then it is invalid
-            print("Invalid response: ", response_split)
+            logger.error("Invalid response: ", response_split)
             break
     return responses
 
@@ -159,7 +163,7 @@ def read_card():
         or responses[1][1][0]
         != "20"  # asynchronous response's data byte should have the 5th bit set to indicate RFID command end - RFID-B1 manual 5.6
     ):
-        # TODO log print("RFID Command did not end?", responses)
+        logger.error("RFID Command did not end? " + str(responses))
         return None
 
     # command to read the card type
@@ -195,9 +199,12 @@ def read_card():
                 # return the UID of the card
                 return get_mifare_1k_uid(responses[0])
             else:
-                # TODO log error
-                # print("Error Code:", responses[0][0])
-                # print("Error Data:", responses[0][1])
+                logger.error(
+                    "Error Code: "
+                    + responses[0][0]
+                    + "\nError Data: "
+                    + responses[0][1]
+                )
                 return None
         else:
             # if the card type is not 06, then the card is not supported

@@ -136,10 +136,14 @@
 
                 <table>
                     <tr>
-                        <th>CruzID (optional)</th>
+                        <th><em>CruzID to lookup (optional)</em></th>
                         <td>
-                            <input type="text" name="cruzid" value="{{ user_data.cruzid or None }}">
+                            <input type="text" name="cruzid" placeholder="If not specified, card will be scanned instead" value="None">
                         </td>
+                    </tr>
+                    <tr>
+                        <th>CruzID</th>
+                        <td>{{ user_data.cruzid }}</td>
                     </tr>
                     <tr>
                         <th>Type</th>

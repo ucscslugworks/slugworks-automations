@@ -28,6 +28,8 @@ def read_card_queue_timeout(time):
     r = q.get()
     return r if not r else r.upper()
 
+def clear_timestamps():
+    pass
 
 def close():
     pass

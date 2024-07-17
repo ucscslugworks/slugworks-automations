@@ -17,7 +17,7 @@ except RuntimeError:
 from .. import sheet
 from ..nfc import nfc_reader as nfc
 
-# Change directory to current file location
+# Change directory to repository root
 path = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 )
@@ -318,3 +318,6 @@ if __name__ == "__main__":
 
     # close NFC reader - needed to prevent errors on next run
     nfc.close()
+
+    # cleanup GPIO
+    GPIO.cleanup()

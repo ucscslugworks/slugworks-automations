@@ -12,7 +12,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-# Change directory to current file location
+# Change directory to repository root
 path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 os.chdir(path)
 
@@ -47,19 +47,25 @@ READERS_SHEET = "Readers"  # contains statuses of the readers
 LOG_SHEET = "Log"  # contains a log of all card reads
 CANVAS_STATUS_SHEET = "Canvas Status"  # contains the last update time of the Canvas data & the current status of the update
 
+# max lines to send to Google Sheets at a time
 SEND_BLOCK = 500
 
 ENABLE_SCAN_LOGS = False  # disable scan logs - considered P3 data due to tracking locations of students (can add back in for testing or when a secure logging system is implemented)
 
+# Dataframes/dictionaries to store the sheet data
 student_data = None
 staff_data = None
 module_data = None
 access_data = None
 reader_data = None
 
+# the data is limited to UIDs and accesses only
 limited_data = False
 
+# status names
 statuses = ["No Access", "Access"]
+
+# headers for this_reader dictionary
 reader_headers = [
     "id",
     "status",
@@ -70,19 +76,30 @@ reader_headers = [
     "needs_update",
     "last_checked_in",
 ]
-access_headers = None
+
+# status/alarm/etc info for this reader
 this_reader = None
 
-module_count = 0
+# headers for access_data dataframe
+access_headers = None
+
+# list of room names
 rooms = list()
 
+# last update time of the sheet data
 last_update_time = None
+
+# last check-in time of the reader
 last_checkin_time = None
 
+# last update time of the Canvas data
 last_canvas_update_time = None
+
+# whether Canvas is currently updating/needs updating
 canvas_is_updating = None
 canvas_needs_update = None
 
+# how many lines were read from the student and staff sheets - used to determine how many blank lines to add when writing
 student_sheet_read_len = 0
 staff_sheet_read_len = 0
 
@@ -109,11 +126,9 @@ if not creds or not creds.valid:
         token.write(creds.to_json())
 
 try:
-    service = build("sheets", "v4", credentials=creds)
-
     # Call the Sheets API
+    service = build("sheets", "v4", credentials=creds)
     g_sheets = service.spreadsheets()
-
 except HttpError as e:
     logger.error(e)
     exit(1)
@@ -127,13 +142,15 @@ def get_sheet_data(limited=None):
 
     Returns True if the data was retrieved, or False if it was not.
     """
-    global student_data, staff_data, module_data, access_data, rooms, module_count, limited_data, last_update_time, student_sheet_read_len, staff_sheet_read_len
+    global student_data, staff_data, module_data, access_data, rooms, limited_data, last_update_time, student_sheet_read_len, staff_sheet_read_len
 
+    # set limited data mode
     if limited is not None:
         limited_data = limited
     try:
+        # set the last update time to now
         last_update_time = datetime.datetime.now()
-        # get the students sheet
+        # get the students sheet - skip the first 4 columns if in limited data mode
         students = (
             g_sheets.values()
             .get(
@@ -148,17 +165,22 @@ def get_sheet_data(limited=None):
             logger.error("No data found.")
             exit()
 
+        # fill in empty cells - this is necessary for the dataframes to be created
         values = [r + [""] * (len(values[0]) - len(r)) for r in values]
+
+        # set the length of the sheet read
         student_sheet_read_len = len(values)
 
+        # create the student data dataframe - first row is the headers
         student_data = pd.DataFrame(
             values[1:] if len(values) > 1 else None,
             columns=values[0],
         )
 
+        # get the rooms from the headers
         rooms = student_data.columns.tolist()[(1 if limited_data else 5) :]
 
-        # get the staff sheet
+        # get the staff sheet, get only the first column if in limited data mode
         staff = (
             g_sheets.values()
             .get(
@@ -168,9 +190,13 @@ def get_sheet_data(limited=None):
             .execute()
         )
         values = staff.get("values", [])
+
+        # fill in empty cells - this is necessary for the dataframes to be created
         values = [r + [""] * (len(values[0]) - len(r)) for r in values]
+        # set the length of the sheet read
         staff_sheet_read_len = len(values)
 
+        # create the staff data dataframe - first row is the headers
         staff_data = pd.DataFrame(
             values[1:] if len(values) > 1 else None,
             columns=values[0],
@@ -186,18 +212,23 @@ def get_sheet_data(limited=None):
             .execute()
         )
         values = modules.get("values", [])
+
+        # fill in empty cells
         values = [r + [""] * (len(values[0]) - len(r)) for r in values]
+
+        # create the modules data dataframe - first row is the headers
         module_data = pd.DataFrame(
             values[1:] if len(values) > 1 else None,
             columns=values[0],
         )
 
-        module_count = len(module_data)
-
+        # if this is not the control pi, get the reader data
         if reader_id > 0:
+            # create the access headers - column names for the access data
             access_headers = ["id", "staff"] + rooms + ["no_access"]
 
-            # get the accesses sheet
+            # get the accesses sheet - get only the row for this reader, and number of columns is based on the length of the access headers
+            # start at 'A' and go to the character corresponding to the length of the access headers
             accesses = (
                 g_sheets.values()
                 .get(
@@ -208,19 +239,28 @@ def get_sheet_data(limited=None):
                 .execute()
             )
             values = accesses.get("values", [])
+
+            # initialize the access data dictionary
             access_data = dict()
+            # fill in the dict with the values from the sheet row
             for i, r in enumerate(values[0]):
                 if access_headers[i] == "id":
+                    # if the column is the id, convert it to an int (0 if empty)
                     access_data["id"] = int(0 if not r else r)
                 elif not r:
+                    # if the value is empty, set it to None
                     access_data[access_headers[i]] = None
                 else:
+                    # if the value is not empty, split it by the comma and space - color code and alarm timeout
                     r = r.split(", ")
+                    # if the alarm timeout is not empty, convert it to an int
                     if r[1]:
                         r[1] = int(r[1])
+                    # set the value in the access data dict as a tuple
                     access_data[access_headers[i]] = tuple(r)
 
-        return True and get_reader_data()
+        # call get_reader_data() and return its result (True if successful, False if not) - presumably get_sheet_data has succeeded
+        return get_reader_data()
     except HttpError as e:
         logger.error(e)
         return False

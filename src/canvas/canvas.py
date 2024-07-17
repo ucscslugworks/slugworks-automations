@@ -8,7 +8,7 @@ import requests
 
 from .. import sheet
 
-# Change directory to current file location
+# Change directory to repository root
 path = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 )
@@ -410,5 +410,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         # if error was a keyboard interrupt, log and exit
         print("Exiting...")
+        # mark the canvas status as no longer updating
         sheet.set_canvas_status_sheet(False)
         exit(0)
