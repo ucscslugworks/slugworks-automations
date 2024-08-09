@@ -467,24 +467,49 @@ def identify():
 def events():
     event_now = cal.get_upcoming_events(1)
     current_time = datetime.datetime.now(datetime.timezone.utc)
+    event_type = None
+    event_club_event = False
+    event_club_name = None
+    event_class_name = None
+    event_description = None    
+    event_info = None
 
     if not event_now.empty:
         event_now['start'] = event_now['start'].apply(lambda x: parser.isoparse(x))
         event_now['end'] = event_now['end'].apply(lambda x: parser.isoparse(x))
         event_now = event_now[(event_now['start'] <= current_time) & (event_now['end'] >= current_time)]
         event_name = event_now['summary'].values[0]  # Get the name of the event
-        if event_name and any(keyword in event_name.lower() for keyword in ["tela", "cmpm", "117", "class"]):
-            event_type = "class"
-        elif event_name and "workshop" in event_name.lower():
-            event_type = "workshop"
+        event_desc = event_now['description'].values[0]  # Get the description of the event
+        event_description = event_desc[event_desc.index("}") + 1:]
+        print(event_desc)
+        if event_desc and event_desc.startswith("{"):
+            event_special_desc = event_desc[event_desc.index("{")+1:event_desc.index("}")]
+            event_info = event_special_desc[1:-1].split(":")
+            if len(event_info) == 3:
+                event_type, event_club_event, event_club_name = event_info
+                
+                if event_type.lower() == "event":
+                    event_type = "event"
+                elif event_type.lower() == "workshop":
+                    event_type = "workshop"
+            if len(event_info) == 2:
+                event_type, event_class_name = event_info
+                if event_type.lower() == "class":
+                    event_type = "class"
+                    
+                
         else:
             event_type = "event"
-        print(event_name)
+        # print(event_info)
         print(event_type)
+        print(event_club_event)
+        print(event_club_name)
+        print(event_class_name)
+
     else:
         event_name = None
     
-    return render_template("events.html", event_now=event_now, event_name=event_name, event_type=event_type)
+    return render_template("events.html", event_now=event_now, event_name=event_name, event_type=event_type, event_description=event_description, event_club_event=event_club_event, event_club_name=event_club_name, event_class_name=event_class_name)
 
 
 @socketio.on("connect")

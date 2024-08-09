@@ -4,19 +4,74 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Events</title>
-    <style>
-        .icon {
-            font-size: 100px;
-            text-align: center;
-            margin-top: 50px;
-        }
-        .red-x {
-            color: red;
-        }
-        .green-check {
-            color: green;
-        }
-    </style>
+    {% if event_type == "class" %}
+        <style>
+        
+            body {
+                padding: 25px;
+                background-color: #222222;
+                color: #bf0000;
+                font-size: 25px;
+            }
+        
+
+            .dark-mode {
+                background-color: black;
+                color: red;
+            }
+
+            .light-mode {
+                background-color: white;
+                color: black;
+            }
+
+
+            .icon {
+                font-size: 100px;
+                text-align: center;
+                margin-top: 50px;
+            }
+            .red-x {
+                color: red;
+            }
+            .green-check {
+                color: green;
+            }
+        </style>
+    {% else %}
+        <style>
+            body {
+                padding: 25px;
+                background-color: white;
+                color: black;
+                font-size: 25px;
+            }
+
+            .dark-mode {
+                background-color: black;
+                color: red;
+            }
+
+            .light-mode {
+                background-color: white;
+                color: black;
+            }
+
+            .icon {
+                font-size: 100px;
+                text-align: center;
+                margin-top: 50px;
+            }
+            .red-x {
+                color: red;
+            }
+            .green-check {
+                color: green;
+            }
+        </style>
+    {% endif %}
+  
+    
 </head>
 <body>
     <div class="icon">
@@ -24,14 +79,33 @@
             <div class="green-check">&#10003;</div> <!-- Green check mark -->
         {% elif event_type == "class" %}
             <div class="red-x">&#10007;</div> <!-- Red X mark -->
-            <h1>Do Not Enter</h1>
+            <h1>Do Not Disturb</h1>
+            <h1>{{event_class_name}} is in session</h1>
+            
+            
         {%   elif event_type == "workshop" %}
-            <div class="green-check">&#10003;</div> <!-- Green check mark -->
-            <h1>Please come in, workshop is being held</h1>
+               {% if event_club_event == "club" %}
+                    <div class="green-check">&#10003;</div> <!-- Green check mark -->
+                    <h2>Please come in {{ event_club_name }} is holding {{event_name}}</h2>
+                    <p>{{ event_description }}</p>
+                    
+                {% else %}
+                    <div class="green-check">&#10007;</div> <!-- Red X mark -->
+                    <h1>Psst you there, Slugworks in holding {{event_name}} and we want you there!</h1>
+                    <p>{{ event_description }}</p>
+                    
+                {% endif %}
+        {%   elif event_type == "event" %}
+                <div class="green-check">&#10003;</div> <!-- Green check mark -->
+                <h2>Please come in {{ event_name }} is being held</h2>
+                <p>{{ event_description }}</p>
+            
         {% else %}
             <div class="red-x">&#10007;</div> <!-- Red X mark -->
-            <h1>Unknown</h1>
+            <h1>Unknown, Please ask a Slugworks employee for help</h1>
+            
         {% endif %}
     </div>
 </body>
+
 </html>

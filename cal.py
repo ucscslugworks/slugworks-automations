@@ -60,8 +60,13 @@ try:
     # Call the Calendar API
     g_calendar = service.events()
 
-except HttpError as e:
-    logger.error(e)
+    # Fetch the calendar description
+    calendar = service.calendars().get(calendarId=CALENDAR_ID).execute()
+    calendar_description = calendar.get("description", "No description available.")
+    logger.info(f"Calendar Description: {calendar_description}")
+
+except Exception as e:
+    logger.error(f"An error occurred: {e}")
     exit(1)
 
 
