@@ -216,6 +216,7 @@ if __name__ == "__main__":
                 logger.error(f"Error: {e}")
                 time.sleep(60)
                 server.set_canvas_status(server.CANVAS_OK)
+
     except KeyboardInterrupt:
         # if error was a keyboard interrupt, log and exit
         print("Exiting...")
