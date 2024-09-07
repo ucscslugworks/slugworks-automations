@@ -31,7 +31,9 @@ def update():
     server.set_canvas_status(server.CANVAS_UPDATING)
 
     # Get all staff members in the course (paginated list)
-    staff = course.get_users(enrollment_type=["teacher", "ta", "designer"])
+    staff = course.get_users(
+        enrollment_type=["teacher", "ta", "designer"], enrollment_state=["active"]
+    )
 
     # Empty list for all staff cruzids
     staff_done = []
@@ -82,7 +84,9 @@ def update():
     num_modules = len(list(course.get_modules()))
 
     # Get all students in the course (paginated list)
-    students = course.get_users(enrollment_type=["student"])
+    students = course.get_users(
+        enrollment_type=["student"], enrollment_state=["active"]
+    )
 
     # Empty list for all students cruzids
     students_done = []

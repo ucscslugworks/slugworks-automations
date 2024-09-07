@@ -71,9 +71,6 @@ def setup_logs(name: str, level: int | None = None):
     logger.setLevel(logging.DEBUG)
 
     # create file handler which logs debug messages (and above - everything)
-    # fh = logging.FileHandler(
-    #     f"logs/{name}/{timestamp.strftime('%Y-%m-%d')}/{timestamp.strftime('%Y-%m-%d %H:%M:%S')}.log"
-    # )
     fh = RollingFileHandler(
         f"logs/{name}/{timestamp.strftime('%Y-%m-%d')}/{timestamp.strftime('%Y-%m-%d %H:%M:%S')}",
         maxBytes=10 * 1000 * 1000,  # max log file size of 10MB
