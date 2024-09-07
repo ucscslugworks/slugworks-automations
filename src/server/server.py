@@ -24,6 +24,8 @@ ACCESS_YES = 1
 ACCESS_NO_OVERRIDE = 2
 ACCESS_YES_OVERRIDE = 3
 
+NEVER = -1
+
 # Change directory to repository root
 path = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
@@ -49,13 +51,14 @@ CREATE_TABLES = [
     ("tagout", "(uid TEXT)"),
     ("offline_timeout", "(timeout_min INTEGER)"),
     ("canvas_course_id", "(id INTEGER)"),
+    ("canvas_update_hour", "(hour INTEGER)"),
 ]
 
 for name, params in CREATE_TABLES:
     sql(f"CREATE TABLE IF NOT EXISTS {name} {params}")
 
 if not sql("SELECT * FROM canvas_status").fetchone():
-    sql(f"INSERT INTO canvas_status (status, timestamp) VALUES ({CANVAS_OK}, -1)")
+    sql(f"INSERT INTO canvas_status (status, timestamp) VALUES ({CANVAS_OK}, {NEVER})")
 
 if not sql("SELECT * FROM tagout").fetchone():
     sql("INSERT INTO tagout (uid) VALUES ('')")
@@ -65,6 +68,9 @@ if not sql("SELECT * FROM offline_timeout").fetchone():
 
 if not sql("SELECT * FROM canvas_course_id").fetchone():
     sql("INSERT INTO canvas_course_id (id) VALUES (0)")
+
+if not sql("SELECT * FROM canvas_update_hour").fetchone():
+    sql("INSERT INTO canvas_update_hour (hour) VALUES (0)")
 
 # TODO: should access logs be stored in a database or in a .log file?
 
@@ -494,7 +500,7 @@ def add_reader(location: str, alarm_enable: bool, alarm_delay_min: int):
             ALARM_ENABLE if alarm_enable else ALARM_DISABLE,
             alarm_delay_min,
             ALARM_STATUS_OK if alarm_enable else ALARM_STATUS_DISABLED,
-            -1,
+            NEVER,
         ),
     )
 
@@ -638,15 +644,35 @@ def set_canvas_pending():
         return True
 
 
-def set_canvas_status(status: int):
+def set_canvas_status(status: int, timestamp: float = time.time()):
     """
     Set Canvas status to 'UPDATING' or 'OK'
     """
-    get_canvas_status()
-    sql("UPDATE canvas_status SET status = ?", (str(status)))
+    sql("UPDATE canvas_status SET status = ?", (str(status),))
 
     if status == CANVAS_OK:
-        sql("UPDATE canvas_status SET timestamp = ?", (time.time(),))
+        sql("UPDATE canvas_status SET timestamp = ?", (timestamp,))
+    return True
+
+
+def get_canvas_update_hour():
+    """
+    Get pre-set update hour for Canvas
+    """
+
+    if not sql("SELECT * FROM canvas_update_hour").fetchone():
+        logger.error("No Canvas update hour present")
+        return False
+
+    return sql("SELECT hour FROM canvas_update_hour").fetchone()[0]
+
+
+def set_canvas_update_hour(hour: int):
+    """
+    Set Canvas update hour
+    """
+
+    sql("UPDATE canvas_update_hour SET hour = ?", (str(hour),))
     return True
 
 

@@ -1,5 +1,7 @@
 import json
 import os
+import time
+from datetime import datetime
 
 from canvasapi import Canvas
 
@@ -159,12 +161,64 @@ def update():
     logger.info("Canvas update complete")
 
 
+# Constants
+
 if __name__ == "__main__":
-    update()
-    # user = None
-    # for s in course.get_users(enrollment_type=["student"]):
-    #     if s.name == "Heli Kadakia":
-    #         user = s
-    #         break
-    # print(user.get_profile())
-    # [print(m.state, m.position) for m in course.get_modules(student_id=user.id)]
+    logger.info("Initialization complete")
+    need_update = False
+    # try/except to exit nicely if a keyboard interrupt is received
+    try:
+        # loop to continuously update Canvas data
+        while True:
+            # try/except to log error and continue if an error occurs - unless a keyboard interrupt is received
+            try:
+                # variable to allow for checking & logging separate conditions
+                need_update = False
+                # get current canvas status
+                status, last_update = server.get_canvas_status()
+
+                if status == server.CANVAS_PENDING:
+                    # if pending, user must have requested the update
+                    need_update = True
+                    logger.info("Canvas update requested by user")
+                elif last_update == server.NEVER:
+                    # first run, updater has never run before
+                    need_update = True
+                    logger.info("Canvas update never done")
+                elif (
+                    datetime.fromtimestamp(last_update).date() < datetime.now().date()
+                    and datetime.now().hour >= server.get_canvas_update_hour()
+                ):
+                    # last update's date was before today, and pre-set update hour is now or has passed
+                    need_update = True
+                    logger.info(
+                        "Canvas update - last update was previous day & update hour is now/passed"
+                    )
+
+                if need_update:
+                    # set update status to "UPDATING"
+                    server.set_canvas_status(server.CANVAS_UPDATING)
+                    # save update start time - will be used for status
+                    tmp_time = time.time()
+                    # perform canvas update
+                    update()
+                    # set update status to ok/done
+                    server.set_canvas_status(server.CANVAS_OK, tmp_time)
+
+                # sleep for 60 seconds - prevents spamming/overloading
+                time.sleep(60)
+
+            except Exception as e:
+                # if an error occurs
+                if type(e) == KeyboardInterrupt:  # if it's a keyboard interrupt, exit
+                    raise e
+                # otherwise, log the error, sleep for 60 seconds, and mark the canvas status as no longer updating
+                logger.error(f"Error: {e}")
+                time.sleep(60)
+                server.set_canvas_status(server.CANVAS_OK)
+    except KeyboardInterrupt:
+        # if error was a keyboard interrupt, log and exit
+        print("Exiting...")
+        # mark the canvas status as no longer updating
+        server.set_canvas_status(server.CANVAS_OK)
+        exit(0)
