@@ -26,6 +26,8 @@ ACCESS_YES_OVERRIDE = 3
 
 NEVER = -1
 
+UID_LEN = 8
+
 # Change directory to repository root
 path = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
@@ -34,7 +36,34 @@ os.chdir(path)
 
 logger = log.setup_logs("server", log.INFO)
 
-db = sqlite3.connect("src/server/access.db", autocommit=True)
+
+def get_sqlite3_thread_safety():
+
+    # Map value from SQLite's THREADSAFE to Python's DBAPI 2.0
+    # threadsafety attribute.
+    sqlite_threadsafe2python_dbapi = {0: 0, 2: 1, 1: 3}
+    conn = sqlite3.connect(":memory:")
+    threadsafety = conn.execute(
+        """
+select * from pragma_compile_options
+where compile_options like 'THREADSAFE=%'
+"""
+    ).fetchone()[0]
+    conn.close()
+
+    threadsafety_value = int(threadsafety.split("=")[1])
+
+    return sqlite_threadsafe2python_dbapi[threadsafety_value]
+
+
+if sqlite3.threadsafety == 3 or get_sqlite3_thread_safety() == 3:
+    check_same_thread = False
+else:
+    check_same_thread = True
+
+db = sqlite3.connect(
+    "src/server/access.db", autocommit=True, check_same_thread=check_same_thread
+)
 cursor = db.cursor()
 sql = cursor.execute
 
@@ -52,25 +81,41 @@ CREATE_TABLES = [
     ("offline_timeout", "(timeout_min INTEGER)"),
     ("canvas_course_id", "(id INTEGER)"),
     ("canvas_update_hour", "(hour INTEGER)"),
+    ("desk_uid_scan", "(uid TEXT, timestamp REAL)"),
 ]
 
 for name, params in CREATE_TABLES:
     sql(f"CREATE TABLE IF NOT EXISTS {name} {params}")
 
 if not sql("SELECT * FROM canvas_status").fetchone():
-    sql(f"INSERT INTO canvas_status (status, timestamp) VALUES ({CANVAS_OK}, {NEVER})")
+    sql(
+        f"INSERT INTO canvas_status (status, timestamp) VALUES (?, ?)",
+        (
+            CANVAS_OK,
+            NEVER,
+        ),
+    )
 
 if not sql("SELECT * FROM tagout").fetchone():
-    sql("INSERT INTO tagout (uid) VALUES ('')")
+    sql("INSERT INTO tagout (uid) VALUES (?)", ("",))
 
 if not sql("SELECT * FROM offline_timeout").fetchone():
-    sql("INSERT INTO offline_timeout (timeout_min) VALUES (15)")
+    sql("INSERT INTO offline_timeout (timeout_min) VALUES (?)", (15,))
 
 if not sql("SELECT * FROM canvas_course_id").fetchone():
-    sql("INSERT INTO canvas_course_id (id) VALUES (0)")
+    sql("INSERT INTO canvas_course_id (id) VALUES (?)", (0,))
 
 if not sql("SELECT * FROM canvas_update_hour").fetchone():
-    sql("INSERT INTO canvas_update_hour (hour) VALUES (0)")
+    sql("INSERT INTO canvas_update_hour (hour) VALUES (?)", (0,))
+
+if not sql("SELECT * FROM desk_uid_scan").fetchone():
+    sql(
+        f"INSERT INTO desk_uid_scan (uid, timestamp) VALUES (?, ?)",
+        (
+            "",
+            NEVER,
+        ),
+    )
 
 # TODO: should access logs be stored in a database or in a .log file?
 
@@ -82,20 +127,15 @@ def add_student(cruzid: str, firstname: str, lastname: str, uid: str | None = No
     if uid is None:
         uid = ""
 
+    cruzid = cruzid.lower()
+    uid = uid.lower()
+
     if not cruzid.isalnum():
         logger.warning(f"add_student: Student {cruzid} is not alphanumeric")
         return False
-    # elif any([not c.isalpha() and c != " " for c in firstname]):
-    #     logger.warning(f"add_student: First name {firstname} is not alphabetic")
-    #     return False
-    # elif any([not c.isalpha() and c != " " for c in lastname]):
-    #     logger.warning(f"add_student: Last name {lastname} is not alphabetic")
-    #     return False
-    elif not uid.isalnum() and uid != "":
-        logger.warning(f"add_student: UID {uid} is not alphanumeric")
+    elif (not uid.isalnum() or len(uid) != UID_LEN) and uid != "":
+        logger.warning(f"add_student: UID {uid} is not valid")
         return False
-
-    uid = uid.lower()
 
     if sql("SELECT * FROM students WHERE cruzid = ?", (cruzid,)).fetchone():
         logger.warning(f"add_student: Student {cruzid} already exists in the database")
@@ -124,6 +164,8 @@ def remove_student(cruzid: str):
     """
     Remove a student from the database
     """
+    cruzid = cruzid.lower()
+
     if not cruzid.isalnum():
         logger.warning(f"remove_student: Student {cruzid} is not alphanumeric")
         return False
@@ -154,9 +196,15 @@ def is_student(cruzid: str | None = None, uid: str | None = None):
     return bool(
         (
             cruzid
+            and cruzid.isalnum()
             and sql("SELECT * FROM students WHERE cruzid = ?", (cruzid,)).fetchone()
         )
-        or (uid and sql("SELECT * FROM students WHERE uid = ?", (uid,)).fetchone())
+        or (
+            uid
+            and uid.isalnum()
+            and len(uid) != UID_LEN
+            and sql("SELECT * FROM students WHERE uid = ?", (uid,)).fetchone()
+        )
     )
 
 
@@ -181,20 +229,15 @@ def add_staff(cruzid: str, firstname: str, lastname: str, uid: str | None = None
     if uid is None:
         uid = ""
 
+    cruzid = cruzid.lower()
+    uid = uid.lower()
+
     if not cruzid.isalnum():
         logger.warning(f"add_staff: Student {cruzid} is not alphanumeric")
         return False
-    # elif any([not c.isalpha() and c != " " for c in firstname]):
-    #     logger.warning(f"add_staff: First name {firstname} is not alphabetic")
-    #     return False
-    # elif any([not c.isalpha() and c != " " for c in lastname]):
-    #     logger.warning(f"add_staff: Last name {lastname} is not alphabetic")
-    #     return False
-    elif not uid.isalnum() and uid != "":
+    elif (not uid.isalnum() or len(uid) != UID_LEN) and uid != "":
         logger.warning(f"add_staff: UID {uid} is not alphanumeric")
         return False
-
-    uid = uid.lower()
 
     if sql("SELECT * FROM staff WHERE cruzid = ?", (cruzid,)).fetchone():
         logger.warning(f"add_staff: Staff {cruzid} already exists in the database")
@@ -222,6 +265,8 @@ def remove_staff(cruzid: str):
     """
     Remove a staff member from the database
     """
+    cruzid = cruzid.lower()
+
     if not cruzid.isalnum():
         logger.warning(f"remove_staff: Staff {cruzid} is not alphanumeric")
         return False
@@ -247,8 +292,17 @@ def is_staff(cruzid: str | None = None, uid: str | None = None):
         uid = uid.lower()
 
     return bool(
-        (cruzid and sql("SELECT * FROM staff WHERE cruzid = ?", (cruzid,)).fetchone())
-        or (uid and sql("SELECT * FROM staff WHERE uid = ?", (uid,)).fetchone())
+        (
+            cruzid
+            and cruzid.isalnum()
+            and sql("SELECT * FROM staff WHERE cruzid = ?", (cruzid,)).fetchone()
+        )
+        or (
+            uid
+            and uid.isalnum()
+            and len(uid) != UID_LEN
+            and sql("SELECT * FROM staff WHERE uid = ?", (uid,)).fetchone()
+        )
     )
 
 
@@ -277,6 +331,11 @@ def get_user_data(cruzid: str | None = None, uid: str | None = None):
     """
     Get a user's data for the identify page.
     """
+    if cruzid:
+        cruzid = cruzid.lower()
+
+    if uid:
+        uid = uid.lower()
 
     if is_student(cruzid=cruzid, uid=uid):
         rooms = sql("SELECT name FROM rooms").fetchall()
@@ -341,22 +400,24 @@ def get_user_data(cruzid: str | None = None, uid: str | None = None):
     return False
 
 
-def set_uid(cruzid: str, uid: str, overwrite: bool = False):
+def set_uid(cruzid: str, uid: str):
     """
     Set a student or staff member's card UID
     """
 
     if (
         not cruzid
+        or not cruzid.isalnum()
         or not uid
+        or not uid.isalnum()
+        or len(uid) != UID_LEN
         or not user_exists(cruzid=cruzid)
-        or (user_exists(uid=uid) and not overwrite)
+        or user_exists(uid=uid)
     ):
         return False
 
-    if overwrite:
-        sql("UPDATE students SET uid = ? WHERE uid = ?", ("", uid))
-        sql("UPDATE staff SET uid = ? WHERE uid = ?", ("", uid))
+    cruzid = cruzid.lower()
+    uid = uid.lower()
 
     sql("UPDATE students SET uid = ? WHERE cruzid = ?", (uid, cruzid))
     sql("UPDATE staff SET uid = ? WHERE cruzid = ?", (uid, cruzid))
@@ -365,6 +426,8 @@ def set_uid(cruzid: str, uid: str, overwrite: bool = False):
 def get_uid(cruzid: str):
     if not user_exists(cruzid=cruzid):
         return False
+
+    cruzid = cruzid.lower()
 
     data = (
         sql("SELECT uid FROM students WHERE cruzid = ?", (cruzid,)).fetchone()
@@ -377,6 +440,8 @@ def get_cruzid(uid: str):
     if not user_exists(uid=uid):
         return False
 
+    uid = uid.lower()
+
     data = (
         sql("SELECT cruzid FROM students WHERE uid = ?", (uid,)).fetchone()
         + sql("SELECT cruzid FROM staff WHERE uid = ?", (uid,)).fetchone()
@@ -388,6 +453,8 @@ def set_access(room: str, access: int, cruzid: str):
     if not is_room(room) or not is_student(cruzid=cruzid):
         # TODO: separate, log individual warnings
         return False
+
+    cruzid = cruzid.lower()
 
     sql(f"UPDATE students SET {room} = ? WHERE cruzid = ?", (access, cruzid))
     return True
@@ -405,10 +472,12 @@ def get_access(room: str, cruzid: str | None = None, uid: str | None = None):
 
     access = None
     if cruzid:
+        cruzid = cruzid.lower()
         access = sql(
             f"SELECT {room} FROM students WHERE cruzid = ?", (cruzid,)
         ).fetchone()[0]
     elif uid:
+        uid = uid.lower()
         access = sql(f"SELECT {room} FROM students WHERE uid = ?", (uid,)).fetchone()[0]
 
     if access is None:
@@ -575,14 +644,17 @@ def set_reader_settings(
     return True
 
 
-def check_in(reader_id: int):
+def check_in(reader_id: int, alarm_status: int):
     """
     Check in a reader: update its last seen time to now
     """
     if not sql(
         "SELECT * FROM readers WHERE reader_id = ?", (str(reader_id))
     ).fetchone():
-        logger.warning(f"check_in: No reader with ID {reader_id}")
+        logger.error(f"check_in: No reader with ID {reader_id}")
+        return False
+    elif alarm_status not in [ALARM_STATUS_OK, ALARM_STATUS_ALARM, ALARM_STATUS_TAGGEDOUT, ALARM_STATUS_DISABLED]:
+        logger.error(f"check_in: alarm_status {alarm_status} is not valid")
         return False
 
     sql(
@@ -648,6 +720,12 @@ def set_canvas_status(status: int, timestamp: float = time.time()):
     """
     Set Canvas status to 'UPDATING' or 'OK'
     """
+    if status not in [CANVAS_OK, CANVAS_UPDATING, CANVAS_PENDING]:
+        logger.error(
+            f"set_canvas_status: status {status} is not valid (run with timestamp {timestamp})"
+        )
+        return False
+
     sql("UPDATE canvas_status SET status = ?", (str(status),))
 
     if status == CANVAS_OK:
@@ -672,6 +750,10 @@ def set_canvas_update_hour(hour: int):
     Set Canvas update hour
     """
 
+    if hour < 0 or hour > 23:
+        logger.error(f"set_canvas_update_hour: invalid hour {hour}")
+        return False
+
     sql("UPDATE canvas_update_hour SET hour = ?", (str(hour),))
     return True
 
@@ -686,6 +768,11 @@ def get_tagout():
 
 def set_tagout(uid: str):
     uid = uid.lower()
+    if not uid.isalnum() or len(uid) != UID_LEN:
+        logger.error(f"set_tagout: uid {uid} not valid")
+        return False
+    elif user_exists(uid=uid):
+        logger.error(f"set_tagout: uid {uid} belongs to existing user")
 
     sql("UPDATE tagout SET uid = ?", (uid,))
     return True
@@ -725,6 +812,7 @@ def evaluate_modules(completed_modules: list, cruzid: str, num_modules: int):
     if not is_student(cruzid=cruzid):
         return False
 
+    cruzid = cruzid.lower()
     module_data = sql("SELECT * FROM rooms").fetchall()
 
     for room, exp in module_data:
@@ -915,6 +1003,29 @@ def get_alarm_status(reader_id: int):
     return status[0]
 
 
+def get_desk_uid_scan():
+    if not sql("SELECT * FROM desk_uid_scan").fetchone():
+        logger.error("No desk scan UID present")
+        return False
+
+    return sql("SELECT uid, timestamp FROM desk_uid_scan").fetchone()
+
+
+def set_desk_uid_scan(uid: str):
+    if not uid or not uid.isalnum() or len(uid) != UID_LEN:
+        logger.error(f"set_desk_uid_scan: uid {uid} not valid")
+        return False
+
+    sql(
+        "UPDATE desk_uid_scan SET uid = ?, timestamp = ?",
+        (
+            uid,
+            time.time(),
+        ),
+    )
+    return True
+
+
 if __name__ == "__main__":
     pass
     # remove_room("Super_User")
@@ -1002,7 +1113,7 @@ if __name__ == "__main__":
 
     # print(get_tagout())
     # print(get_offline_timeout())
-    # print(get_canvas_course_id())
+    # print(get_desk_uid_scan())
     # print(set_tagout('zxcvbnmp'))
     # print(set_offline_timeout(5))
     # print(set_canvas_course_id(67429))

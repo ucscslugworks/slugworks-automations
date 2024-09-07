@@ -161,9 +161,7 @@ def update():
     logger.info("Canvas update complete")
 
 
-# Constants
-
-if __name__ == "__main__":
+def auto_updater():
     logger.info("Initialization complete")
     need_update = False
     # try/except to exit nicely if a keyboard interrupt is received
@@ -223,3 +221,6 @@ if __name__ == "__main__":
         # mark the canvas status as no longer updating
         server.set_canvas_status(server.CANVAS_OK)
         exit(0)
+
+if __name__ == "__main__":
+    auto_updater()
