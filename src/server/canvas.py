@@ -40,9 +40,14 @@ def update():
     # Empty list for all staff cruzids
     staff_done = []
 
+    # length of staff list
+    staff_len = 0
+    for _ in staff:
+        staff_len += 1
+
     # Iterate through all staff members (as User objects)
-    for s in staff:
-        logger.debug(f"Starting staff {str(s)}")
+    for i, s in enumerate(staff):
+        logger.debug(f"Starting staff {str(s)} ({i}/{staff_len})")
 
         # Get the user's profile
         profile = s.get_profile()
@@ -93,9 +98,14 @@ def update():
     # Empty list for all students cruzids
     students_done = []
 
+    # length of students list
+    students_len = 0
+    for _ in students:
+        students_len += 1
+
     # Iterate through all students (as User objects)
-    for s in students:
-        logger.debug(f"Starting student {str(s)}")
+    for i, s in enumerate(students):
+        logger.debug(f"Starting student {str(s)} ({i}/{students_len})")
 
         # Get the user's profile
         profile = s.get_profile()
@@ -221,6 +231,7 @@ def auto_updater():
         # mark the canvas status as no longer updating
         server.set_canvas_status(server.CANVAS_OK)
         exit(0)
+
 
 if __name__ == "__main__":
     auto_updater()
