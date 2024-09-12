@@ -1,8 +1,9 @@
 import os
+
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
-from . import server
-from .. import log
+from src import log
+from src.server import server
 
 # Change directory to repository root
 path = os.path.abspath(
@@ -10,7 +11,7 @@ path = os.path.abspath(
 )
 os.chdir(path)
 
-# Create a new logger for the canvas module
+# Create a new logger for the flask module
 logger = log.setup_logs("flask", log.INFO)
 
 # Initialize Flask app

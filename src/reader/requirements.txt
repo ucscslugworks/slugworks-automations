@@ -1,0 +1,4 @@
+requests
+spidev
+mfrc522
+RPi.GPIO

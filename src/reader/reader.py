@@ -1,4 +1,3 @@
-import logging
 import os
 from datetime import datetime, timedelta
 from threading import Thread
@@ -7,6 +6,8 @@ from time import sleep, time
 import board  # type: ignore
 import neopixel  # type: ignore
 
+from src import api, constants, log
+
 try:
     import RPi.GPIO as GPIO  # type: ignore
 except RuntimeError:
@@ -14,8 +15,7 @@ except RuntimeError:
         "Error importing RPi.GPIO!  This is probably because you need superuser privileges.  You can achieve this by using 'sudo' to run your script"
     )
 
-from .. import sheet
-from ..nfc import nfc_reader as nfc
+from src.nfc import nfc_reader as nfc
 
 # Change directory to repository root
 path = os.path.abspath(
@@ -23,31 +23,11 @@ path = os.path.abspath(
 )
 os.chdir(path)
 
-# Create a new directory for logs if it doesn't exist
-if not os.path.exists(path + "/logs/reader"):
-    os.makedirs(path + "/logs/reader")
+# Create a new logger for the reader module
+logger = log.setup_logs("reader", log.INFO)
 
-# create new logger with all levels
-logger = logging.getLogger("root")
-logger.setLevel(logging.DEBUG)
-
-# create file handler which logs debug messages (and above - everything)
-fh = logging.FileHandler(f"logs/reader/{str(datetime.now())}.log")
-fh.setLevel(logging.DEBUG)
-
-# create console handler which only logs warnings (and above)
-ch = logging.StreamHandler()
-ch.setLevel(logging.WARNING)
-
-# create formatter and add it to the handlers
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s: %(message)s")
-fh.setFormatter(formatter)
-ch.setFormatter(formatter)
-
-# add the handlers to the logger
-logger.addHandler(fh)
-logger.addHandler(ch)
-
+# pass logger to api
+api.set_logger(logger)
 
 SHEET_UPDATE_HOUR = 4  # pull new data from sheet at 4am
 CHECKIN_TIMEOUT = 30  # check in every 30 seconds
@@ -60,17 +40,22 @@ BRIGHTNESS_HIGH = 0.5  # high brightness while holding color
 DOOR_SENSOR_PIN = 16  # GPIO pin for door sensor
 DOOR_SENSOR_DEBOUNCE = 0.5  # seconds to debounce door sensor
 
+TAGOUT = api.tagout()
+
+EXIT = False  # exit flag
 breathe = True  # breathe LEDs when no card is scanned
 scan_time = None  # time of last scan to hold color
-EXIT = False  # exit flag
-alarm_status = False  # True if alarm is triggered - reported back to sheet
+alarm_enable = True
+alarm_delay_min = 60
+alarm_status = constants.ALARM_STATUS_OK
 door_open = False  # True if door is open
 door_change_time = time()  # time of last door state change
 door_time_limit = 0  # time limit for door open before alarm based on card scan
+last_checkin_time = None
 
-num_pixels = 30  # 30 LEDs
-pixel_pin = board.D18  # LEDs are on GPIO pin 18
 ORDER = neopixel.GRB  # RGB color order
+pixel_pin = board.D18  # LEDs are on GPIO pin 18
+num_pixels = 30  # 30 LEDs
 pixels = neopixel.NeoPixel(
     pixel_pin,
     num_pixels,
@@ -79,6 +64,16 @@ pixels = neopixel.NeoPixel(
     pixel_order=ORDER,
 )  # initialize LEDs
 GPIO.setmode(GPIO.BCM)  # set GPIO mode to BCM (GPIO numbering)
+
+
+def checkin(status: int):
+    global alarm_enable, alarm_delay_min
+    success, response = api.checkin(status)
+    if not success:
+        logger.error("checkin failed")
+    else:
+        alarm_enable = response["alarm_enable"]
+        alarm_delay_min = response["alarm_delay_min"]
 
 
 # thread to breathe LEDs in background
@@ -163,9 +158,8 @@ def breathe_leds():
 if __name__ == "__main__":
     # try except for red error LED on exception
     try:
-        # get sheet data and check in
-        sheet.get_sheet_data(limited=True)
-        sheet.check_in(alarm_status=alarm_status)
+        # check in
+        checkin(alarm_status)
 
         # start breathe LEDs thread
         Thread(target=breathe_leds).start()
@@ -189,74 +183,80 @@ if __name__ == "__main__":
             # try except to handle errors and continue
             try:
                 # if sheet has never been updated or sheet data is older than today and it is past SHEET_UPDATE_HOUR
-                if (
-                    not sheet.last_update_time
-                    or datetime.now().date() > sheet.last_update_time.date()
-                ) and datetime.now().hour >= SHEET_UPDATE_HOUR:
-                    # update sheet data and check in
-                    logger.info("Updating sheet...")
-                    sheet.get_sheet_data()
-                    sheet.check_in(alarm_status=alarm_status)
-                elif not sheet.last_checkin_time or datetime.now() - sheet.last_checkin_time > timedelta(
+                if not last_checkin_time or datetime.now() - last_checkin_time > timedelta(
                     0, CHECKIN_TIMEOUT, 0, 0, 0, 0, 0
                 ):  # if last checkin time is not set or it has been CHECKIN_TIMEOUT seconds since last checkin
                     # check in
                     logger.info("Checking in...")
-                    sheet.check_in(alarm_status=alarm_status)
+                    checkin(alarm_status)
 
                 # read card ID from NFC reader with a timeout of 1 second
-                # print("Hold a tag near the reader")
                 card_id = nfc.read_card_queue_timeout(1)
-                # print(card_id)
+
                 # if card ID is not None and it is not in the last 5 IDs scanned - a new card has been scanned
                 if card_id and card_id not in last_ids:
                     # add card ID to last IDs scanned and remove the oldest one
                     last_ids.append(card_id)
                     last_ids.pop(0)
 
-                    # scan card ID in sheet - returns color and alarm timeout
-                    response = sheet.scan_uid(card_id)
-
-                    # if response is not a color/alarm timeout tuple
-                    if not response:
-                        # print an error - likely caused by the card being in the database but not having a color for this room
-                        logger.error("error - card not in database or something else")
-                        # TODO: flash no access color or some other unique indication
-                        pass
-                    else:  # a response was received
-                        # unpack color and timeout from response
-                        color, timeout = response
-
-                        # print color and timeout for debugging
-                        # print(color, timeout)
-
-                        # convert color from hex to RGB tuple
-                        colors = tuple(
-                            [int(color[i : i + 2], 16) for i in range(0, len(color), 2)]
+                    if card_id == TAGOUT:
+                        alarm_status = (
+                            constants.ALARM_STATUS_OK
+                            if alarm_status == constants.ALARM_STATUS_TAGGEDOUT
+                            else constants.ALARM_STATUS_TAGGEDOUT
                         )
+                        logger.info("tagged out")
+                    else:
+                        # scan card ID in sheet - returns color and alarm timeout
+                        success, response = api.scan(card_id)
 
-                        # print colors for debugging
-                        # print(colors)
+                        if not success:  # api returned fail
+                            logger.error("error - could not get api response")
+                        elif not response[
+                            "color"
+                        ]:  # if response is not a color/alarm timeout tuple
+                            # print an error - likely caused by the card being in the database but not having a color for this room
+                            logger.error(
+                                "error - card not in database or something else"
+                            )
+                            # TODO: flash no access color or some other unique indication
+                            pass
+                        else:  # a response was received
+                            # unpack color and timeout from response
+                            color = response["color"]
+                            timeout = response["delay"]
 
-                        # stop breathing LEDs, set scan time, and sleep to give the breathing thread time to stop
-                        breathe = False
-                        scan_time = datetime.now()
-                        sleep(BREATHE_DELAY * 2)
+                            # print color and timeout for debugging
+                            # print(color, timeout)
 
-                        # set LED brightness to high, fill LEDs with color, and show LEDs
-                        pixels.brightness = BRIGHTNESS_HIGH
-                        pixels.fill(colors)
-                        pixels.show()
+                            # convert color from hex to RGB tuple
+                            colors = tuple(
+                                [
+                                    int(color[i : i + 2], 16)
+                                    for i in range(0, len(color), 2)
+                                ]
+                            )
 
-                        if timeout:
-                            door_change_time = time()
-                            door_time_limit = timeout * 60
-                            print("Door time limit set to", door_time_limit)
+                            # stop breathing LEDs, set scan time, and sleep to give the breathing thread time to stop
+                            breathe = False
+                            scan_time = datetime.now()
+                            sleep(BREATHE_DELAY * 2)
 
-                            if alarm_status:
-                                alarm_status = False
-                                sheet.check_in(alarm_status=alarm_status)
-                                print("Alarm untriggered")
+                            # set LED brightness to high, fill LEDs with color, and show LEDs
+                            pixels.brightness = BRIGHTNESS_HIGH
+                            pixels.fill(colors)
+                            pixels.show()
+
+                            # if user had a specified timeout and it was greater than the existing timeout
+                            if timeout and timeout * 60 > door_time_limit:
+                                door_change_time = time()
+                                door_time_limit = timeout * 60
+                                logger.info("Door time limit set to", door_time_limit)
+
+                                if alarm_status == constants.ALARM_STATUS_ALARM:
+                                    alarm_status = constants.ALARM_STATUS_OK
+                                    checkin(alarm_status)
+                                    logger.info("Alarm untriggered")
 
                 elif card_id is None:  # scanned too soon or no card scanned
                     # add None to last IDs scanned and remove the oldest one (if we didn't do this, the same person could never scan twice in a row, even if they waited a long time)
@@ -274,24 +274,23 @@ if __name__ == "__main__":
                     door_open = input_state
                     door_change_time = time()
                     door_time_limit = 0
-                    print(door_open)
 
-                    if not door_open and alarm_status:
-                        alarm_status = False
-                        sheet.check_in(alarm_status=alarm_status)
-                        print("Alarm untriggered")
+                    if not door_open and alarm_status == constants.ALARM_STATUS_ALARM:
+                        alarm_status = constants.ALARM_STATUS_OK
+                        checkin(alarm_status)
+                        logger.info("Alarm untriggered")
 
                 if (
-                    door_open
-                    and not alarm_status
+                    alarm_enable
+                    and door_open
+                    and alarm_status == constants.ALARM_STATUS_OK
                     and time() - door_change_time > door_time_limit
-                    and time() - door_change_time
-                    > sheet.this_reader["alarm_delay_min"] * 60
+                    and time() - door_change_time > alarm_delay_min * 60
                 ):
                     door_time_limit = 0
-                    alarm_status = True
-                    sheet.check_in(alarm_status=alarm_status)
-                    print("Alarm triggered")
+                    alarm_status = constants.ALARM_STATUS_ALARM
+                    checkin(alarm_status)
+                    logger.info("Alarm triggered")
 
             except Exception as e:  # catch any exceptions
                 # if exception is KeyboardInterrupt, raise it to exit cleanly

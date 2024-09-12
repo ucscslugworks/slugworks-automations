@@ -5,8 +5,8 @@ from datetime import datetime
 
 from canvasapi import Canvas
 
-from .. import log
-from . import server
+from src import log
+from src.server import server
 
 # TODO: remove
 server.set_canvas_course_id(67429)

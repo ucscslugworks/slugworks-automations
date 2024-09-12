@@ -1,0 +1,13 @@
+#!/bin/bash
+
+cd "$(dirname "$(readlink -f "$0")")"
+source venv/bin/activate
+cd src/server
+
+case "$OSTYPE" in
+    darwin*) gunicorn ;;
+    linux*) authbind gunicorn ;;
+    *) echo "unsupported OS - server not started" && exit 0 ;;
+esac
+cd ../..
+# python -m src.server.canvas &
