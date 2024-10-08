@@ -5,7 +5,7 @@ from datetime import datetime
 
 from canvasapi import Canvas
 
-from src import log
+from src import log, constants
 from src.server import server
 
 # TODO: remove (when the canvas course id is set in the UI)
@@ -30,7 +30,7 @@ course = canvas.get_course(server.get_canvas_course_id())
 
 def update():
     # Set Canvas status to "updating"
-    server.set_canvas_status(server.CANVAS_UPDATING)
+    server.set_canvas_status(constants.CANVAS_UPDATING)
 
     # Get all staff members in the course (paginated list)
     staff = course.get_users(
@@ -165,7 +165,7 @@ def update():
     server.clamp_students(students_done)
 
     # Set Canvas status to "ok" (done)
-    server.set_canvas_status(server.CANVAS_OK)
+    server.set_canvas_status(constants.CANVAS_OK)
 
     # log completion message
     logger.info("Canvas update complete")
@@ -185,11 +185,11 @@ def auto_updater():
                 # get current canvas status
                 status, last_update = server.get_canvas_status()
 
-                if status == server.CANVAS_PENDING:
+                if status == constants.CANVAS_PENDING:
                     # if pending, user must have requested the update
                     need_update = True
                     logger.info("Canvas update requested by user")
-                elif last_update == server.NEVER:
+                elif last_update == constants.NEVER:
                     # first run, updater has never run before
                     need_update = True
                     logger.info("Canvas update never done")
@@ -205,13 +205,13 @@ def auto_updater():
 
                 if need_update:
                     # set update status to "UPDATING"
-                    server.set_canvas_status(server.CANVAS_UPDATING)
+                    server.set_canvas_status(constants.CANVAS_UPDATING)
                     # save update start time - will be used for status
                     tmp_time = time.time()
                     # perform canvas update
                     update()
                     # set update status to ok/done
-                    server.set_canvas_status(server.CANVAS_OK, tmp_time)
+                    server.set_canvas_status(constants.CANVAS_OK, tmp_time)
 
                 # sleep for 60 seconds - prevents spamming/overloading
                 time.sleep(60)
@@ -223,13 +223,13 @@ def auto_updater():
                 # otherwise, log the error, sleep for 60 seconds, and mark the canvas status as no longer updating
                 logger.error(f"Error: {e}")
                 time.sleep(60)
-                server.set_canvas_status(server.CANVAS_OK)
+                server.set_canvas_status(constants.CANVAS_OK)
 
     except KeyboardInterrupt:
         # if error was a keyboard interrupt, log and exit
         print("Exiting...")
         # mark the canvas status as no longer updating
-        server.set_canvas_status(server.CANVAS_OK)
+        server.set_canvas_status(constants.CANVAS_OK)
         exit(0)
 
 

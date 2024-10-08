@@ -60,9 +60,6 @@ def setup_logs(name: str, level: int | None = None):
     timestamp = datetime.datetime.now()
 
     # Create a new directory for logs if it doesn't exist
-    if not os.path.exists(path + f"/logs/{name}"):
-        os.makedirs(path + f"/logs/{name}")
-
     if not os.path.exists(path + f"/logs/{name}/{timestamp.strftime('%Y-%m-%d')}"):
         os.makedirs(path + f"/logs/{name}/{timestamp.strftime('%Y-%m-%d')}")
 
@@ -71,11 +68,14 @@ def setup_logs(name: str, level: int | None = None):
     logger.setLevel(logging.DEBUG)
 
     # create file handler which logs debug messages (and above - everything)
+    filename = f"logs/{name}/{timestamp.strftime('%Y-%m-%d')}/{timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
     fh = RollingFileHandler(
-        f"logs/{name}/{timestamp.strftime('%Y-%m-%d')}/{timestamp.strftime('%Y-%m-%d %H:%M:%S')}",
+        filename,
         maxBytes=10 * 1000 * 1000,  # max log file size of 10MB
     )
     fh.setLevel(level if level else logging.INFO)
+
+    os.symlink(filename, f"logs/{name}/latest.log")
 
     # create console handler which only logs warnings (and above)
     ch = logging.StreamHandler()
