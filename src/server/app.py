@@ -19,6 +19,8 @@ app = Flask(__name__)
 # Generate a random secret key for the session
 app.secret_key = os.urandom(12).hex()
 
+# TODO: need to set up the ui pages
+# TODO: add a way (api endpoint?) to set the canvas course id
 
 # main dashboard page
 @app.route("/")
@@ -52,7 +54,7 @@ def api_fail(reason: str = ""):
     return jsonify({"success": False, "reason": reason})
 
 
-# API page - upload most recently scanned card uid from desk scanner
+# API endpoint - upload most recently scanned card uid from desk scanner
 @app.route("/api/desk_uid_scan")
 def desk_uid_scan():
     uid = request.args.get("uid", "", type=str)

@@ -2,16 +2,12 @@
 # https://docs.gunicorn.org/en/stable/configure.html#configuration-file
 # https://docs.gunicorn.org/en/stable/settings.html
 import multiprocessing
-import os
 from datetime import datetime
 
 max_requests = 1000
 max_requests_jitter = 50
 
-# # Change directory to current file location
-# path = os.path.dirname(os.path.abspath(__file__))
-# os.chdir(path)
-
+# Change directory to current file location
 chdir = "../.."
 
 # get date & datetime strings

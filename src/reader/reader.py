@@ -6,7 +6,10 @@ from time import sleep, time
 import board  # type: ignore
 import neopixel  # type: ignore
 
+import nfc
 from src import api, constants, log
+
+# import nfc_fake as nfc
 
 try:
     import RPi.GPIO as GPIO  # type: ignore
@@ -15,7 +18,6 @@ except RuntimeError:
         "Error importing RPi.GPIO!  This is probably because you need superuser privileges.  You can achieve this by using 'sudo' to run your script"
     )
 
-from src.nfc import nfc_reader as nfc
 
 # Change directory to repository root
 path = os.path.abspath(

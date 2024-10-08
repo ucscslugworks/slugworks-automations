@@ -8,7 +8,7 @@ from canvasapi import Canvas
 from src import log
 from src.server import server
 
-# TODO: remove
+# TODO: remove (when the canvas course id is set in the UI)
 server.set_canvas_course_id(67429)
 
 # Change directory to repository root

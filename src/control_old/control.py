@@ -8,7 +8,7 @@ from flask import Flask, redirect, render_template, request, url_for
 from flask_socketio import SocketIO
 
 from .. import sheet
-from ..nfc import nfc_control as nfc
+from ..desk import nfc as nfc
 
 # Change directory to repository root
 path = os.path.abspath(

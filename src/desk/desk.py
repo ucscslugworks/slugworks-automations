@@ -1,8 +1,10 @@
 import os
 from time import sleep, time
 
+import nfc
 from src import api, constants, log
-from src.nfc import nfc_control as nfc
+
+# import nfc_fake as nfc
 
 # Change directory to repository root
 path = os.path.abspath(

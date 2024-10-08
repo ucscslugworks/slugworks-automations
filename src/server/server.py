@@ -2,9 +2,7 @@ import os
 import sqlite3
 import time
 
-from src import log
-
-from src import constants
+from src import constants, log
 
 # Change directory to repository root
 path = os.path.abspath(
