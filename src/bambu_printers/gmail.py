@@ -39,7 +39,15 @@ if not CREDS or not CREDS.valid:
         token.write(CREDS.to_json())
 
 
-def gmail_send_message(recipient, sender, subject, body, cc, reply_to):
+def gmail_send_message(
+    logger: logging.Logger,
+    recipient: str,
+    sender: str,
+    subject: str,
+    body: str,
+    cc: str | None,
+    reply_to: str | None,
+):
     """Create and send an email message
     Print the returned  message id
     Returns: Message object, including message id
@@ -48,7 +56,6 @@ def gmail_send_message(recipient, sender, subject, body, cc, reply_to):
     TODO(developer) - See https://developers.google.com/identity
     for guides on implementing OAuth2 for the application.
     """
-    
 
     try:
         service = build("gmail", "v1", credentials=CREDS)
@@ -72,9 +79,9 @@ def gmail_send_message(recipient, sender, subject, body, cc, reply_to):
         send_message = (
             service.users().messages().send(userId="me", body=create_message).execute()
         )
-        logging.info(f'Message ID: {send_message["id"]}')
+        logger.info(f'gmail: Message ID: {send_message["id"]}')
     except HttpError as error:
-        logging.error(f"An error occurred: {error}")
+        logger.error(f"gmail: An error occurred: {error}")
         send_message = None
     return send_message
 
@@ -87,10 +94,11 @@ This is a test email!
 Thank you,
 Ishan"""
     gmail_send_message(
+        logging.getLogger(),
         "Ishan Madan <imadan1@ucsc.edu>",
         "Ishan Madan <imadan1@ucsc.edu>",
         "Test Email",
         body,
         "",
-        ""
+        "",
     )

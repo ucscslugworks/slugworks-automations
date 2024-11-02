@@ -3,7 +3,7 @@ from bpm.bambuprinter import BambuPrinter
 from bpm.bambutools import parseFan, parseStage
 
 hostname = "us.mqtt.bambulab.com"
-access_code = "code"
+access_code = "token"
 serial_number = "serial"
 username = "username"
 

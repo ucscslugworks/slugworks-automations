@@ -28,7 +28,7 @@ class RollingFileHandler(RotatingFileHandler):
         self.last_backup_num = 0
         self.orig_filename = filename
         super(RollingFileHandler, self).__init__(
-            filename=filename + ".log",
+            filename=str(filename) + ".log",
             mode=mode,
             maxBytes=maxBytes,
             backupCount=backupCount,
@@ -40,7 +40,6 @@ class RollingFileHandler(RotatingFileHandler):
     def doRollover(self):
         if self.stream:
             self.stream.close()
-            self.stream = None
         self.last_backup_num += 1
         nextName = "%s.%d.log" % (self.orig_filename, self.last_backup_num)
         self.rotate(self.baseFilename, nextName)
