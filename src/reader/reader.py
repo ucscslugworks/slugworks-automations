@@ -5,8 +5,8 @@ from time import sleep, time
 
 import board  # type: ignore
 import neopixel  # type: ignore
-
 import nfc
+
 from src import api, constants, log
 
 # import nfc_fake as nfc
@@ -18,18 +18,8 @@ except RuntimeError:
         "Error importing RPi.GPIO!  This is probably because you need superuser privileges.  You can achieve this by using 'sudo' to run your script"
     )
 
-
-# Change directory to repository root
-path = os.path.abspath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
-)
-os.chdir(path)
-
 # Create a new logger for the reader module
 logger = log.setup_logs("reader", log.INFO)
-
-# pass logger to api
-api.set_logger(logger)
 
 SHEET_UPDATE_HOUR = 4  # pull new data from sheet at 4am
 CHECKIN_TIMEOUT = 30  # check in every 30 seconds

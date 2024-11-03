@@ -2,10 +2,14 @@ from bpm.bambuconfig import BambuConfig
 from bpm.bambuprinter import BambuPrinter
 from bpm.bambutools import parseFan, parseStage
 
+from src.bambu_printers.bambu_account import BambuAccount
+
+account = BambuAccount("slugworks@ucsc.edu")
+
 hostname = "us.mqtt.bambulab.com"
-access_code = "token"
-serial_number = "serial"
-username = "username"
+access_code = account.get_token()
+serial_number = account.get_devices()["Scooby"]
+username = account.get_username()
 
 config = BambuConfig(
     hostname=hostname,

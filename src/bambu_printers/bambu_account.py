@@ -1,10 +1,11 @@
-import logging
 import threading
 import time
 from getpass import getpass
 
 import jwt
 import requests
+
+from src import log
 
 # https://github.com/davglass/OpenBambuAPI/blob/main/cloud-http.md
 
@@ -19,9 +20,10 @@ REFRESH_DELAY = 30  # seconds
 
 
 class BambuAccount:
-    def __init__(self, email: str, logger: logging.Logger):
+    def __init__(self, email: str):
+        self.logger = log.setup_logs("bambu_account")
+
         self.email = email
-        self.password = getpass()
 
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -32,9 +34,8 @@ class BambuAccount:
         self.username = ""
         self.expire_time = -1
 
-        self.logger = logger
-
         self.refresh_thread = None
+        self.latest_task = 0
 
         self.login()
 
@@ -43,11 +44,11 @@ class BambuAccount:
             response = requests.post(
                 LOGIN_URL,
                 headers=self.headers,
-                data={"account": self.email, "password": self.password},
+                data={"account": self.email, "password": getpass()},
             )
 
             if "token" not in response.headers["Set-Cookie"]:
-                self.logger.error("Failed to login")
+                self.logger.error("login: Failed to login")
                 exit(1)
 
             for h in response.headers["Set-Cookie"].split("; "):
@@ -65,12 +66,12 @@ class BambuAccount:
             self.expire_time = decoded_token["exp"]
             self.username = decoded_token["username"]
 
-            self.logger.info(f"Logged in as {self.username}")
+            self.logger.info(f"login: Logged in as {self.username}")
 
             self.refresh_thread = threading.Thread(target=self.refresh_loop)
             self.refresh_thread.start()
         except Exception as e:
-            self.logger.error(f"BambuAccount: Failed to login: {e}")
+            self.logger.error(f"login: Failed to login: {e}")
             exit(1)
 
     def refresh(self):
@@ -89,9 +90,9 @@ class BambuAccount:
 
             self.headers["Authorization"] = f"Bearer {self.token}"
 
-            self.logger.info("BambuAccount: Refreshed token")
+            self.logger.info("refresh: Refreshed token")
         except Exception as e:
-            self.logger.error(f"BambuAccount: Failed to refresh token: {e}")
+            self.logger.error(f"refresh: Failed to refresh token: {e}")
             exit(1)
 
     def refresh_loop(self):
@@ -102,15 +103,21 @@ class BambuAccount:
 
                 time.sleep(REFRESH_DELAY)
             except Exception as e:
-                self.logger.error(f"BambuAccount: Refresh loop error: {e}")
+                self.logger.error(f"refresh_loop: Refresh loop error: {e}")
                 exit(1)
+
+    def get_token(self):
+        return self.token
+
+    def get_username(self):
+        return self.username
 
     def get_devices(self):
         try:
             response = requests.get(DEVICES_URL, headers=self.headers)
             devices = response.json()["devices"]
 
-            self.logger.info(f"BambuAccount: Got {len(devices)} devices")
+            self.logger.info(f"get_devices: Got {len(devices)} devices")
 
             device_data = dict()
             for device in devices:
@@ -118,20 +125,20 @@ class BambuAccount:
 
             return device_data
         except Exception as e:
-            self.logger.error(f"BambuAccount: Failed to get devices: {e}")
+            self.logger.error(f"get_devices: Failed to get devices: {e}")
             exit(1)
 
-    def get_tasks(self, limit: int | None = None):
+    def get_tasks(self):
         try:
-            if limit is None:
-                response = requests.get(TASKS_URL, headers=self.headers)
-            else:
-                response = requests.get(
-                    TASKS_URL, headers=self.headers, params={"limit": limit}
-                )
+            response = requests.get(
+                TASKS_URL, headers=self.headers, params={"after": self.latest_task}
+            )
 
-            self.logger.info(f"BambuAccount: Got {response.json()['total']} tasks")
+            self.logger.info(f"get_tasks: Got {response.json()['total']} tasks")
 
-            return response.json()["total"], response.json()["hits"]
+            if response.json()["total"] > 0:
+                self.latest_task = time.time() - 60
+
+            return response.json()["hits"]
         except Exception as e:
-            self.logger.error(f"BambuAccount: Failed to get tasks: {e}")
+            self.logger.error(f"get_tasks: Failed to get tasks: {e}")

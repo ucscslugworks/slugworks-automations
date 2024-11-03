@@ -2,28 +2,25 @@ import logging
 
 import requests
 
+from src.log import setup_logs
+
 SERVER_IP = "localhost"
 base_url = f"{SERVER_IP}/api"
 
-logger = None
-
-
-def set_logger(module_logger: logging.Logger):
-    global logger
-    logger = module_logger
+logger = setup_logs("api", logging.INFO)
 
 
 def handle_response(response: requests.Response):
     try:
-        response = response.json()
-        success = response["success"]
+        response_json = response.json()
+        success = response_json["success"]
         return (
             success,
-            response,
+            response_json,
         )
     except Exception as e:
         logger.error(f"api - handle_response - {e}")
-    return (False, "")
+    return (False, dict())
 
 
 def desk_uid_scan(uid: str):
@@ -33,7 +30,7 @@ def desk_uid_scan(uid: str):
             return handle_response(response)
     except Exception as e:
         logger.error(f"api - desk_uid_scan - {e}")
-    return (False, "")
+    return (False, dict())
 
 
 def tagout():
@@ -43,7 +40,7 @@ def tagout():
             return handle_response(response)
     except Exception as e:
         logger.error(f"api - tagout - {e}")
-    return (False, "")
+    return (False, dict())
 
 
 def scan(uid: str):
@@ -53,7 +50,7 @@ def scan(uid: str):
             return handle_response(response)
     except Exception as e:
         logger.error(f"api - scan - {e}")
-    return (False, "")
+    return (False, dict())
 
 
 def checkin(status: int):
@@ -63,4 +60,4 @@ def checkin(status: int):
             return handle_response(response)
     except Exception as e:
         logger.error(f"api - checkin - {e}")
-    return (False, "")
+    return (False, dict())

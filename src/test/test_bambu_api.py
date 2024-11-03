@@ -13,7 +13,7 @@ r = requests.post(
     "https://bambulab.com/api/sign-in/form",
     headers=headers,
     data={
-        "account": "email",
+        "account": "slugworks@ucsc.edu",
         "password": getpass(),
     },
 )
@@ -58,6 +58,8 @@ headers["Authorization"] = f"Bearer {token}"
 r_tasks = requests.get(
     "https://api.bambulab.com/v1/user-service/my/tasks", headers=headers
 )
+
+print(json.dumps(r_tasks.json(), indent=4))
 
 cover_url = r_tasks.json()["hits"][-1]["cover"]
 

@@ -11,6 +11,8 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+from src import log
+
 # If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
 
@@ -38,9 +40,10 @@ if not CREDS or not CREDS.valid:
     with open(path + "/../../common/gmail_token.json", "w") as token:
         token.write(CREDS.to_json())
 
+logger = log.setup_logs("gmail")
+
 
 def gmail_send_message(
-    logger: logging.Logger,
     recipient: str,
     sender: str,
     subject: str,
@@ -94,7 +97,6 @@ This is a test email!
 Thank you,
 Ishan"""
     gmail_send_message(
-        logging.getLogger(),
         "Ishan Madan <imadan1@ucsc.edu>",
         "Ishan Madan <imadan1@ucsc.edu>",
         "Test Email",

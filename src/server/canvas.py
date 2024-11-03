@@ -5,7 +5,7 @@ from datetime import datetime
 
 from canvasapi import Canvas
 
-from src import log, constants
+from src import constants, log
 from src.server import server
 
 # TODO: remove (when the canvas course id is set in the UI)
@@ -23,7 +23,17 @@ logger = log.setup_logs("canvas", log.INFO)
 # Set up the canvas API client using a saved auth token
 canvas = Canvas(
     "https://canvas.ucsc.edu",
-    json.load(open("src/server/canvas_token.json"))["token"],
+    json.load(
+        open(
+            os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "..",
+                "..",
+                "common",
+                "canvas.json",
+            )
+        )
+    )["auth_token"],
 )
 course = canvas.get_course(server.get_canvas_course_id())
 
@@ -183,7 +193,14 @@ def auto_updater():
                 # variable to allow for checking & logging separate conditions
                 need_update = False
                 # get current canvas status
-                status, last_update = server.get_canvas_status()
+                canvas_return = server.get_canvas_status()
+
+                # if the return value is None, skip
+                if canvas_return is None:
+                    continue
+
+                # unpack the return value
+                status, last_update = canvas_return
 
                 if status == constants.CANVAS_PENDING:
                     # if pending, user must have requested the update

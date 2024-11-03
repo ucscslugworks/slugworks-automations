@@ -405,7 +405,7 @@ def set_uid(cruzid: str, uid: str):
 
 def get_uid(cruzid: str):
     if not user_exists(cruzid=cruzid):
-        return False
+        return None
 
     cruzid = cruzid.lower()
 
@@ -418,7 +418,7 @@ def get_uid(cruzid: str):
 
 def get_cruzid(uid: str):
     if not user_exists(uid=uid):
-        return False
+        return None
 
     uid = uid.lower()
 
@@ -689,7 +689,7 @@ def get_canvas_status():
 
     if not sql("SELECT * FROM canvas_status").fetchone():
         logger.error("No Canvas status present")
-        return False
+        return None
 
     return sql("SELECT status, timestamp FROM canvas_status").fetchone()
 
@@ -699,7 +699,12 @@ def set_canvas_pending():
     Set Canvas status to be pending if not in progress
     """
 
-    status, _ = get_canvas_status()
+    canvas_return = get_canvas_status()
+
+    if not canvas_return:
+        return False
+
+    status, _ = canvas_return
 
     if status == constants.CANVAS_UPDATING:
         return False
@@ -992,11 +997,11 @@ def scan_uid(reader_id: int, uid: str):
 
 
 def get_alarm_status(reader_id: int):
-    if not sql("SELECT * FROM readers WHERE reader_id = ?", reader_id).fetchone():
+    if not sql("SELECT * FROM readers WHERE reader_id = ?", (reader_id,)).fetchone():
         logger.error(f"get_alarm_status: Reader {reader_id} does not exist in db")
 
     status = sql(
-        "SELECT alarm_status FROM readers WHERE reader_id = ?", reader_id
+        "SELECT alarm_status FROM readers WHERE reader_id = ?", (reader_id,)
     ).fetchone()
     if status is None:
         return constants.ALARM_STATUS_OK

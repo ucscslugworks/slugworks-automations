@@ -1,7 +1,7 @@
 import datetime
 import logging
-from logging.handlers import RotatingFileHandler
 import os
+from logging.handlers import RotatingFileHandler
 
 CRITICAL = logging.CRITICAL
 FATAL = logging.FATAL
@@ -12,12 +12,15 @@ INFO = logging.INFO
 DEBUG = logging.DEBUG
 NOTSET = logging.NOTSET
 
+loggers = {}
+
 
 class RollingFileHandler(RotatingFileHandler):
 
     def __init__(
         self,
         filename,
+        latest_filename,
         mode="a",
         maxBytes=0,
         backupCount=0,
@@ -27,6 +30,7 @@ class RollingFileHandler(RotatingFileHandler):
     ):
         self.last_backup_num = 0
         self.orig_filename = filename
+        self.latest_filename = latest_filename
         super(RollingFileHandler, self).__init__(
             filename=str(filename) + ".log",
             mode=mode,
@@ -35,6 +39,12 @@ class RollingFileHandler(RotatingFileHandler):
             encoding=encoding,
             delay=delay,
         )
+        # Remove the latest.log symlink if it exists
+        if os.path.exists(self.latest_filename):
+            os.remove(self.latest_filename)
+
+        # Create a new symlink to the latest log file
+        os.symlink(str(filename) + ".log", self.latest_filename)
 
     # override
     def doRollover(self):
@@ -46,35 +56,45 @@ class RollingFileHandler(RotatingFileHandler):
         if not self.delay:
             self.stream = self._open()
 
+        # Remove the latest.log symlink if it exists
+        if os.path.exists(self.latest_filename):
+            os.remove(self.latest_filename)
+
+        # Create a new symlink to the latest log file
+        os.symlink(nextName, self.latest_filename)
+
 
 def setup_logs(name: str, level: int | None = None):
-    cwd = os.getcwd()
+
+    if name in loggers:
+        return loggers[name]
 
     # Change directory to repository root
     path = os.path.abspath(
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logs", name)
     )
-    os.chdir(path)
 
     timestamp = datetime.datetime.now()
+    folder = timestamp.strftime("%Y-%m-%d")
+    filename = timestamp.strftime("%Y-%m-%d %H:%M:%S")
 
     # Create a new directory for logs if it doesn't exist
-    if not os.path.exists(path + f"/logs/{name}/{timestamp.strftime('%Y-%m-%d')}"):
-        os.makedirs(path + f"/logs/{name}/{timestamp.strftime('%Y-%m-%d')}")
+    if not os.path.exists(os.path.join(path, folder)):
+        os.makedirs(os.path.join(path, folder))
 
     # create new logger with all levels
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
+    print(os.path.join(path, folder, filename))
+
     # create file handler which logs debug messages (and above - everything)
-    filename = f"logs/{name}/{timestamp.strftime('%Y-%m-%d')}/{timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
     fh = RollingFileHandler(
-        filename,
+        os.path.join(path, folder, filename),
+        os.path.join(path, "latest.log"),
         maxBytes=10 * 1000 * 1000,  # max log file size of 10MB
     )
     fh.setLevel(level if level else logging.INFO)
-
-    os.symlink(filename, f"logs/{name}/latest.log")
 
     # create console handler which only logs warnings (and above)
     ch = logging.StreamHandler()
@@ -89,8 +109,7 @@ def setup_logs(name: str, level: int | None = None):
     logger.addHandler(fh)
     logger.addHandler(ch)
 
-    # Change directory back to original
-    os.chdir(cwd)
+    loggers[name] = logger
 
     return logger
 

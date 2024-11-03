@@ -2,21 +2,13 @@ import os
 from time import sleep, time
 
 import nfc
+
 from src import api, constants, log
 
 # import nfc_fake as nfc
 
-# Change directory to repository root
-path = os.path.abspath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
-)
-os.chdir(path)
-
 # Create a new logger for the reader module
 logger = log.setup_logs("desk", log.INFO)
-
-# pass logger to api
-api.set_logger(logger)
 
 scan_time = 0
 
