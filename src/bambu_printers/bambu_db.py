@@ -117,6 +117,14 @@ DATA_TABLES = {
     name: [col.split(" ")[0] for col in CREATE_TABLES[name]] for name in CREATE_TABLES
 }
 
+EXEMPT_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "..",
+    "..",
+    "common",
+    "bambu_limit_exempt.json",
+)
+
 
 class BambuDB:
     def __init__(self):
@@ -331,13 +339,7 @@ class BambuDB:
         try:
             if cruzid in json.load(
                 open(
-                    os.path.join(
-                        os.path.dirname(os.path.abspath(__file__)),
-                        "..",
-                        "..",
-                        "common",
-                        "bambu_limit_exempt.json",
-                    ),
+                    EXEMPT_PATH,
                     "r",
                 )
             ):
@@ -346,7 +348,10 @@ class BambuDB:
 
             self.column = self.get_limits_column()
 
-            if self.column not in [p[0] for p in sql("SELECT name from pragma_table_info('limits')").fetchall()]:
+            if self.column not in [
+                p[0]
+                for p in sql("SELECT name from pragma_table_info('limits')").fetchall()
+            ]:
                 sql(f"ALTER TABLE limits ADD COLUMN {self.column} REAL")
 
             result = sql(
@@ -366,7 +371,9 @@ class BambuDB:
                     f"UPDATE limits SET {self.column} = ? WHERE cruzid = ?",
                     (constants.BAMBU_DEFAULT_LIMIT, cruzid),
                 )
-                self.logger.info(f"get_limit: Added limit for {cruzid} for {self.column}")
+                self.logger.info(
+                    f"get_limit: Added limit for {cruzid} for {self.column}"
+                )
                 return constants.BAMBU_DEFAULT_LIMIT
 
             self.logger.info(f"get_limit: Retrieved limit {result[0]} for {cruzid}")
@@ -381,13 +388,7 @@ class BambuDB:
 
             if cruzid in json.load(
                 open(
-                    os.path.join(
-                        os.path.dirname(os.path.abspath(__file__)),
-                        "..",
-                        "..",
-                        "common",
-                        "bambu_limit_exempt.json",
-                    ),
+                    EXEMPT_PATH,
                     "r",
                 )
             ):
