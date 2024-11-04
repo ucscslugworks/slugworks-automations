@@ -113,8 +113,10 @@ try:
                     db.archive_print(c_print[0], constants.PRINT_SUCCEEDED)
                 elif printer.get_status() == constants.BAMBU_FAILED:
                     db.archive_print(c_print[0], constants.PRINT_FAILED)
+                    db.subtract_limit(c_print[2], -1 * c_print[8])
                 elif printer.get_status() == constants.BAMBU_IDLE:
                     db.archive_print(c_print[0], constants.PRINT_CANCELED)
+                    db.subtract_limit(c_print[2], -1 * c_print[8])
 
             logger.info("main: Finished main loop")
         except Exception as e:

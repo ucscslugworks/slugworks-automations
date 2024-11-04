@@ -33,6 +33,7 @@ NO_CRUZID = ""
 
 BAMBU_TIMEOUT = 10 * 60
 BAMBU_DEFAULT_LIMIT = 1000
+BAMBU_EXEMPT_LIMIT = float("inf")  # per-print weight limit for exempted users
 BAMBU_DELAY = 10
 
 BAMBU_FAILED = 0

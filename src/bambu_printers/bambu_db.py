@@ -1,3 +1,5 @@
+from datetime import datetime
+import json
 import os
 import sqlite3
 
@@ -108,7 +110,6 @@ CREATE_TABLES = {
     ],
     "limits": [
         "cruzid TEXT PRIMARY KEY",
-        "weight REAL",
     ],
 }
 
@@ -119,14 +120,14 @@ DATA_TABLES = {
 
 class BambuDB:
     def __init__(self):
-        self.logger = log.setup_logs("bambu_db")
-
         try:
+            self.logger = log.setup_logs("bambu_db")
             for name in CREATE_TABLES:
                 sql(
                     f"CREATE TABLE IF NOT EXISTS {name} ({', '.join(CREATE_TABLES[name])})"
                 )
 
+            self.column = self.get_limits_column()
             self.logger.info("init: Initialized")
         except Exception as e:
             self.logger.error(f"init: {e}")
@@ -270,7 +271,9 @@ class BambuDB:
                 (print_id, status, *print_data[1:]),
             )
 
-            self.logger.info(f"archive_print: Archived print {print_id} as status {status}")
+            self.logger.info(
+                f"archive_print: Archived print {print_id} as status {status}"
+            )
             return True
         except Exception as e:
             self.logger.error(f"archive_print: {e}")
@@ -326,25 +329,78 @@ class BambuDB:
 
     def get_limit(self, cruzid: str):
         try:
-            result = sql("SELECT * FROM limits WHERE cruzid = ?", (cruzid,)).fetchone()
+            if cruzid in json.load(
+                open(
+                    os.path.join(
+                        os.path.dirname(os.path.abspath(__file__)),
+                        "..",
+                        "..",
+                        "common",
+                        "bambu_limit_exempt.json",
+                    ),
+                    "r",
+                )
+            ):
+                self.logger.info(f"get_limit: Exempted user {cruzid}")
+                return constants.BAMBU_EXEMPT_LIMIT
+
+            self.column = self.get_limits_column()
+
+            if self.column not in [p[0] for p in sql("SELECT name from pragma_table_info('limits')").fetchall()]:
+                sql(f"ALTER TABLE limits ADD COLUMN {self.column} REAL")
+
+            result = sql(
+                f"SELECT {self.column} FROM limits WHERE cruzid = ?",
+                (cruzid,),
+            ).fetchone()
 
             if not result:
                 sql(
-                    f"INSERT INTO limits ({', '.join(DATA_TABLES['limits'])}) VALUES ({', '.join(['?'] * len(DATA_TABLES['limits']))})",
+                    f"INSERT INTO limits ({', '.join(DATA_TABLES['limits'])}, {self.column}) VALUES ({', '.join(['?'] * len(DATA_TABLES['limits']))}, ?)",
                     (cruzid, constants.BAMBU_DEFAULT_LIMIT),
                 )
+                self.logger.info(f"get_limit: Added limit for {cruzid} ({self.column})")
+                return constants.BAMBU_DEFAULT_LIMIT
+            elif result[0] is None:
+                sql(
+                    f"UPDATE limits SET {self.column} = ? WHERE cruzid = ?",
+                    (constants.BAMBU_DEFAULT_LIMIT, cruzid),
+                )
+                self.logger.info(f"get_limit: Added limit for {cruzid} for {self.column}")
                 return constants.BAMBU_DEFAULT_LIMIT
 
-            return result[1]
+            self.logger.info(f"get_limit: Retrieved limit {result[0]} for {cruzid}")
+            return result[0]
         except Exception as e:
             self.logger.error(f"get_limit: {e}")
-            return []
+            return None
 
     def subtract_limit(self, cruzid: str, amount: float):
         try:
+            self.get_limit(cruzid)
+
+            if cruzid in json.load(
+                open(
+                    os.path.join(
+                        os.path.dirname(os.path.abspath(__file__)),
+                        "..",
+                        "..",
+                        "common",
+                        "bambu_limit_exempt.json",
+                    ),
+                    "r",
+                )
+            ):
+                self.logger.info(f"subtract_limit: Exempted user {cruzid}")
+                return True
+
             sql(
-                "UPDATE limits SET weight = weight - ? WHERE cruzid = ?",
+                f"UPDATE limits SET {self.column} = {self.column} - ? WHERE cruzid = ?",
                 (amount, cruzid),
+            )
+
+            self.logger.info(
+                f"subtract_limit: Subtracted {amount} from {cruzid} for {self.column}"
             )
             return True
         except Exception as e:
@@ -388,3 +444,6 @@ class BambuDB:
         except Exception as e:
             self.logger.error(f"form_exists: {e}")
             return False
+
+    def get_limits_column(self):
+        return f"weight_{datetime.now().year}_{datetime.now().month // 4 + 1}"
