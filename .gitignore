@@ -163,3 +163,4 @@ cython_debug/
 *.json
 logs/
 *.db
+BambuPrinter.log.jsonl

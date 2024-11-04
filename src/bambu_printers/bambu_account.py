@@ -35,6 +35,7 @@ class BambuAccount:
         self.expire_time = -1
 
         self.refresh_thread = None
+        self.stop_refresh_loop = False
         self.latest_task = 0
 
         self.login()
@@ -70,6 +71,8 @@ class BambuAccount:
 
             self.refresh_thread = threading.Thread(target=self.refresh_loop)
             self.refresh_thread.start()
+
+            self.logger.info("login: Started refresh thread")
         except Exception as e:
             self.logger.error(f"login: Failed to login: {e}")
             exit(1)
@@ -96,7 +99,7 @@ class BambuAccount:
             exit(1)
 
     def refresh_loop(self):
-        while True:
+        while not self.stop_refresh_loop:
             try:
                 if self.expire_time - int(time.time()) < REFRESH_DELAY * 2:
                     self.refresh()
@@ -117,11 +120,11 @@ class BambuAccount:
             response = requests.get(DEVICES_URL, headers=self.headers)
             devices = response.json()["devices"]
 
-            self.logger.info(f"get_devices: Got {len(devices)} devices")
-
             device_data = dict()
             for device in devices:
                 device_data[device["name"]] = device["dev_id"]
+
+            self.logger.info(f"get_devices: Got {len(device_data)} devices")
 
             return device_data
         except Exception as e:
@@ -130,15 +133,23 @@ class BambuAccount:
 
     def get_tasks(self):
         try:
-            response = requests.get(
-                TASKS_URL, headers=self.headers, params={"after": self.latest_task}
-            )
+            response = requests.get(TASKS_URL, headers=self.headers)
+            tasks = response.json()["hits"]
 
-            self.logger.info(f"get_tasks: Got {response.json()['total']} tasks")
+            tasks = [t for t in tasks if t["id"] > self.latest_task]
+            if tasks:
+                self.latest_task = tasks[0]["id"]
 
-            if response.json()["total"] > 0:
-                self.latest_task = time.time() - 60
+            self.logger.info(f"get_tasks: Got {len(tasks)} tasks")
 
-            return response.json()["hits"]
+            return tasks
         except Exception as e:
             self.logger.error(f"get_tasks: Failed to get tasks: {e}")
+
+    def stop_refresh_thread(self):
+        if self.refresh_thread:
+            self.stop_refresh_loop = True
+            self.refresh_thread.join()
+            self.logger.info("stop_refresh_thread: Stopped refresh thread")
+        else:
+            self.logger.error("stop_refresh_thread: No refresh thread to stop")

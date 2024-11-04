@@ -2,7 +2,7 @@ from bpm.bambuconfig import BambuConfig
 from bpm.bambuprinter import BambuPrinter
 from bpm.bambutools import parseFan, parseStage
 
-from src import log
+from src import constants, log
 from src.bambu_printers.bambu_account import BambuAccount
 
 HOSTNAME = "us.mqtt.bambulab.com"
@@ -29,7 +29,7 @@ class Printer:
         self.bed_temp = 0
         self.bed_temp_target = 0
         self.fan_speed = 0
-        self.gcode_state = ""
+        self.gcode_state = constants.BAMBU_UNKNOWN
         self.speed_level = 0
         self.light_state = False
 
@@ -53,7 +53,20 @@ class Printer:
         self.bed_temp = printer.bed_temp
         self.bed_temp_target = printer.bed_temp_target
         self.fan_speed = parseFan(printer.fan_speed)
-        self.gcode_state = printer.gcode_state
+
+        if printer.gcode_state == "FAILED":
+            self.gcode_state = constants.BAMBU_FAILED
+        elif printer.gcode_state == "RUNNING":
+            self.gcode_state = constants.BAMBU_RUNNING
+        elif printer.gcode_state == "PAUSE":
+            self.gcode_state = constants.BAMBU_PAUSE
+        elif printer.gcode_state == "IDLE":
+            self.gcode_state = constants.BAMBU_IDLE
+        elif printer.gcode_state == "FINISH":
+            self.gcode_state = constants.BAMBU_FINISH
+        else:
+            self.gcode_state = constants.BAMBU_UNKNOWN
+
         self.speed_level = printer.speed_level
         self.light_state = printer.light_state
 
@@ -68,5 +81,12 @@ class Printer:
         self.logger.info(f"on_update: {self.name}")
 
     def cancel(self):
-        # self.printer.stop_printing()
+        self.printer.stop_printing()
         self.logger.info(f"cancel: {self.name}")
+
+    def get_status(self):
+        return self.gcode_state
+    
+    def stop_thread(self):
+        self.printer.quit()
+        self.logger.info(f"stop_thread: {self.name}")

@@ -56,10 +56,11 @@ expire_time = int(time.time()) + data["refreshExpiresIn"]
 headers["Authorization"] = f"Bearer {token}"
 
 r_tasks = requests.get(
-    "https://api.bambulab.com/v1/user-service/my/tasks", headers=headers
+    "https://api.bambulab.com/v1/user-service/my/tasks", headers=headers, params={"after": "2024-11-01T19:29:46Z"}
 )
 
 print(json.dumps(r_tasks.json(), indent=4))
+print(r_tasks.status_code)
 
 cover_url = r_tasks.json()["hits"][-1]["cover"]
 

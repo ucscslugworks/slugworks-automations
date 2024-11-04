@@ -57,6 +57,7 @@ CREATE_TABLES = {
     "prints_current": [
         "id INTEGER PRIMARY KEY",
         "form_row INTEGER",
+        "cruzid TEXT",
         "printer TEXT",
         "title TEXT",
         "cover TEXT",
@@ -76,6 +77,7 @@ CREATE_TABLES = {
         "id INTEGER PRIMARY KEY",
         "status INTEGER",
         "form_row INTEGER",
+        "cruzid TEXT",
         "printer TEXT",
         "title TEXT",
         "cover TEXT",
@@ -125,7 +127,7 @@ class BambuDB:
                     f"CREATE TABLE IF NOT EXISTS {name} ({', '.join(CREATE_TABLES[name])})"
                 )
 
-            self.logger.info("Initialized")
+            self.logger.info("init: Initialized")
         except Exception as e:
             self.logger.error(f"init: {e}")
             exit(1)
@@ -169,7 +171,7 @@ class BambuDB:
                     color4_weight,
                 ),
             )
-            self.logger.info(f"Added print {id}")
+            self.logger.info(f"add_print: Added print {id}")
             return True
         except Exception as e:
             self.logger.error(f"add_print: {e}")
@@ -181,7 +183,7 @@ class BambuDB:
                 f"INSERT INTO form_unmatched ({', '.join(DATA_TABLES['form_unmatched'])}) VALUES ({', '.join(['?'] * len(DATA_TABLES['form_unmatched']))})",
                 (form_row, timestamp, printer, cruzid),
             )
-            self.logger.info(f"Added form {form_row}")
+            self.logger.info(f"add_form: Added form {form_row}")
             return True
         except Exception as e:
             self.logger.error(f"add_form: {e}")
@@ -205,7 +207,7 @@ class BambuDB:
 
             sql(
                 f"INSERT INTO prints_current ({', '.join(DATA_TABLES['prints_current'])}) VALUES ({', '.join(['?'] * len(DATA_TABLES['prints_current']))})",
-                (print_id, form_row, *print_data[1:]),
+                (print_id, form_row, form_data[3], *print_data[1:]),
             )
 
             sql(
@@ -216,7 +218,7 @@ class BambuDB:
             sql("DELETE FROM prints_unmatched WHERE id = ?", (print_id,))
             sql("DELETE FROM form_unmatched WHERE form_row = ?", (form_row,))
 
-            self.logger.info(f"Matched print {print_id} with form {form_row}")
+            self.logger.info(f"match: Matched print {print_id} with form {form_row}")
             return True
         except Exception as e:
             self.logger.error(f"match: {e}")
@@ -240,11 +242,12 @@ class BambuDB:
                     print_id,
                     constants.PRINT_EXPIRED,
                     constants.NO_FORM_ROW,
+                    constants.NO_CRUZID,
                     *print_data[1:],
                 ),
             )
 
-            self.logger.info(f"Archived print {print_id} as expired")
+            self.logger.info(f"expire_print: Archived print {print_id} as expired")
             return True
         except Exception as e:
             self.logger.error(f"expire_print: {e}")
@@ -253,7 +256,7 @@ class BambuDB:
     def archive_print(self, print_id: int, status: int):
         try:
             print_data = sql(
-                "SELECT * FROM prints_cuarchiveHERE id = ?", (print_id,)
+                "SELECT * FROM prints_current WHERE id = ?", (print_id,)
             ).fetchone()
 
             if not print_data:
@@ -267,7 +270,7 @@ class BambuDB:
                 (print_id, status, *print_data[1:]),
             )
 
-            self.logger.info(f"Archived print {print_id} as status {status}")
+            self.logger.info(f"archive_print: Archived print {print_id} as status {status}")
             return True
         except Exception as e:
             self.logger.error(f"archive_print: {e}")
@@ -294,7 +297,7 @@ class BambuDB:
                 ),
             )
 
-            self.logger.info(f"Archived form {form_row} as expired")
+            self.logger.info(f"expire_form: Archived form {form_row} as expired")
             return True
         except Exception as e:
             self.logger.error(f"match: {e}")

@@ -86,8 +86,6 @@ def setup_logs(name: str, level: int | None = None):
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
-    print(os.path.join(path, folder, filename))
-
     # create file handler which logs debug messages (and above - everything)
     fh = RollingFileHandler(
         os.path.join(path, folder, filename),
