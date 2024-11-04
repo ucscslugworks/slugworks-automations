@@ -53,7 +53,7 @@ class StartForm:
             self.g_sheets = service.spreadsheets()
 
         except HttpError as e:
-            self.logger.error(f"init: {e}")
+            self.logger.error(f"init: {type(e)} {e}")
             exit(1)
 
         self.latest_row = 1
@@ -100,6 +100,6 @@ class StartForm:
             self.logger.info(f"get: Got {len(values)} new rows.")
             return values
         except Exception as e:
-            self.logger.error(f"get: {e}")
+            self.logger.error(f"get: {type(e)} {e}")
             time.sleep(60)
             return None

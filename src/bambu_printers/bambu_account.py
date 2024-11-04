@@ -1,3 +1,5 @@
+import json
+import os
 import threading
 import time
 from getpass import getpass
@@ -10,6 +12,7 @@ from src import log
 # https://github.com/davglass/OpenBambuAPI/blob/main/cloud-http.md
 
 LOGIN_URL = "https://bambulab.com/api/sign-in/form"
+CODE_URL = "https://bambulab.com/api/sign-in/code"
 BASE_URL = "https://api.bambulab.com/v1"
 
 REFRESH_TOKEN_URL = f"{BASE_URL}/user-service/user/refreshtoken"
@@ -42,11 +45,51 @@ class BambuAccount:
 
     def login(self):
         try:
+            pw = json.load(
+                open(
+                    os.path.join(
+                        os.path.dirname(os.path.abspath(__file__)),
+                        "..",
+                        "..",
+                        "common",
+                        "bambu.json",
+                    )
+                )
+            )["bambu"]
+
+            code = json.load(
+                open(
+                    os.path.join(
+                        os.path.dirname(os.path.abspath(__file__)),
+                        "..",
+                        "..",
+                        "common",
+                        "bambu.json",
+                    )
+                )
+            )["code"]
+
             response = requests.post(
                 LOGIN_URL,
                 headers=self.headers,
-                data={"account": self.email, "password": getpass()},
+                data={
+                    "account": self.email,
+                    "password": pw,
+                    "apiError": "",
+                },
             )
+
+            if response.json() and response.json()["loginType"] == "verifyCode":
+                response = requests.post(
+                    CODE_URL,
+                    headers=self.headers,
+                    data={
+                        "account": self.email,
+                        "password": pw,
+                        "apiError": "",
+                        "code": code,
+                    },
+                )
 
             if "token" not in response.headers["Set-Cookie"]:
                 self.logger.error("login: Failed to login")
@@ -74,7 +117,7 @@ class BambuAccount:
 
             self.logger.info("login: Started refresh thread")
         except Exception as e:
-            self.logger.error(f"login: Failed to login: {e}")
+            self.logger.error(f"login: Failed to login: {type(e)} {e}")
             exit(1)
 
     def refresh(self):
@@ -95,7 +138,7 @@ class BambuAccount:
 
             self.logger.info("refresh: Refreshed token")
         except Exception as e:
-            self.logger.error(f"refresh: Failed to refresh token: {e}")
+            self.logger.error(f"refresh: Failed to refresh token: {type(e)} {e}")
             exit(1)
 
     def refresh_loop(self):
@@ -106,7 +149,7 @@ class BambuAccount:
 
                 time.sleep(REFRESH_DELAY)
             except Exception as e:
-                self.logger.error(f"refresh_loop: Refresh loop error: {e}")
+                self.logger.error(f"refresh_loop: Refresh loop error: {type(e)} {e}")
                 exit(1)
 
     def get_token(self):
@@ -128,7 +171,7 @@ class BambuAccount:
 
             return device_data
         except Exception as e:
-            self.logger.error(f"get_devices: Failed to get devices: {e}")
+            self.logger.error(f"get_devices: Failed to get devices: {type(e)} {e}")
             exit(1)
 
     def get_tasks(self):
@@ -144,7 +187,7 @@ class BambuAccount:
 
             return tasks
         except Exception as e:
-            self.logger.error(f"get_tasks: Failed to get tasks: {e}")
+            self.logger.error(f"get_tasks: Failed to get tasks: {type(e)} {e}")
 
     def stop_refresh_thread(self):
         if self.refresh_thread:

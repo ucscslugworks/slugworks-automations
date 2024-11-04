@@ -120,7 +120,7 @@ try:
 
             logger.info("main: Finished main loop")
         except Exception as e:
-            logger.error(f"main: {e}")
+            logger.error(f"main: {type(e)} {e}")
 
             if type(e) == KeyboardInterrupt:
                 raise e
@@ -134,5 +134,5 @@ except KeyboardInterrupt:
     account.stop_refresh_thread()
     exit(0)
 except Exception as e:
-    logger.error(f"main: {e}")
+    logger.error(f"main: {type(e)} {e}")
     exit(1)

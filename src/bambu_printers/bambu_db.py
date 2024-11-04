@@ -138,7 +138,7 @@ class BambuDB:
             self.column = self.get_limits_column()
             self.logger.info("init: Initialized")
         except Exception as e:
-            self.logger.error(f"init: {e}")
+            self.logger.error(f"init: {type(e)} {e}")
             exit(1)
 
     def add_print(
@@ -183,7 +183,7 @@ class BambuDB:
             self.logger.info(f"add_print: Added print {id}")
             return True
         except Exception as e:
-            self.logger.error(f"add_print: {e}")
+            self.logger.error(f"add_print: {type(e)} {e}")
             return False
 
     def add_form(self, form_row: int, timestamp: int, printer: str, cruzid: str):
@@ -195,7 +195,7 @@ class BambuDB:
             self.logger.info(f"add_form: Added form {form_row}")
             return True
         except Exception as e:
-            self.logger.error(f"add_form: {e}")
+            self.logger.error(f"add_form: {type(e)} {e}")
             return False
 
     def match(self, print_id: int, form_row: int):
@@ -230,7 +230,7 @@ class BambuDB:
             self.logger.info(f"match: Matched print {print_id} with form {form_row}")
             return True
         except Exception as e:
-            self.logger.error(f"match: {e}")
+            self.logger.error(f"match: {type(e)} {e}")
             return False
 
     def expire_print(self, print_id: int):
@@ -259,7 +259,7 @@ class BambuDB:
             self.logger.info(f"expire_print: Archived print {print_id} as expired")
             return True
         except Exception as e:
-            self.logger.error(f"expire_print: {e}")
+            self.logger.error(f"expire_print: {type(e)} {e}")
             return False
 
     def archive_print(self, print_id: int, status: int):
@@ -284,7 +284,7 @@ class BambuDB:
             )
             return True
         except Exception as e:
-            self.logger.error(f"archive_print: {e}")
+            self.logger.error(f"archive_print: {type(e)} {e}")
             return False
 
     def expire_form(self, form_row: int):
@@ -311,28 +311,28 @@ class BambuDB:
             self.logger.info(f"expire_form: Archived form {form_row} as expired")
             return True
         except Exception as e:
-            self.logger.error(f"match: {e}")
+            self.logger.error(f"match: {type(e)} {e}")
             return False
 
     def get_unmatched_prints(self):
         try:
             return sql("SELECT * FROM prints_unmatched").fetchall()
         except Exception as e:
-            self.logger.error(f"get_unmatched_prints: {e}")
+            self.logger.error(f"get_unmatched_prints: {type(e)} {e}")
             return []
 
     def get_current_prints(self):
         try:
             return sql("SELECT * FROM prints_current").fetchall()
         except Exception as e:
-            self.logger.error(f"get_current_prints: {e}")
+            self.logger.error(f"get_current_prints: {type(e)} {e}")
             return []
 
     def get_unmatched_forms(self):
         try:
             return sql("SELECT * FROM form_unmatched").fetchall()
         except Exception as e:
-            self.logger.error(f"get_unmatched_forms: {e}")
+            self.logger.error(f"get_unmatched_forms: {type(e)} {e}")
             return []
 
     def get_limit(self, cruzid: str):
@@ -379,7 +379,7 @@ class BambuDB:
             self.logger.info(f"get_limit: Retrieved limit {result[0]} for {cruzid}")
             return result[0]
         except Exception as e:
-            self.logger.error(f"get_limit: {e}")
+            self.logger.error(f"get_limit: {type(e)} {e}")
             return None
 
     def subtract_limit(self, cruzid: str, amount: float):
@@ -405,7 +405,7 @@ class BambuDB:
             )
             return True
         except Exception as e:
-            self.logger.error(f"subtract_limit: {e}")
+            self.logger.error(f"subtract_limit: {type(e)} {e}")
             return False
 
     def print_exists(self, print_id: int):
@@ -428,7 +428,7 @@ class BambuDB:
                 )
             )
         except Exception as e:
-            self.logger.error(f"print_exists: {e}")
+            self.logger.error(f"print_exists: {type(e)} {e}")
             return False
 
     def form_exists(self, form_row: int):
@@ -443,7 +443,7 @@ class BambuDB:
                 ).fetchone()
             )
         except Exception as e:
-            self.logger.error(f"form_exists: {e}")
+            self.logger.error(f"form_exists: {type(e)} {e}")
             return False
 
     def get_limits_column(self):
