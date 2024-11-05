@@ -163,4 +163,5 @@ cython_debug/
 *.json
 logs/
 *.db
-BambuPrinter.log.jsonl
+/BambuPrinter.log.jsonl*
+/pid_*

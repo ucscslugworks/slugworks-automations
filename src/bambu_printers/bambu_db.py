@@ -275,7 +275,7 @@ class BambuDB:
             sql("DELETE FROM prints_current WHERE id = ?", (print_id,))
 
             sql(
-                f"INSERT INTO prints_current ({', '.join(DATA_TABLES['prints_current'])}) VALUES ({', '.join(['?'] * len(DATA_TABLES['prints_current']))})",
+                f"INSERT INTO prints_archive ({', '.join(DATA_TABLES['prints_archive'])}) VALUES ({', '.join(['?'] * len(DATA_TABLES['prints_archive']))})",
                 (print_id, status, *print_data[1:]),
             )
 

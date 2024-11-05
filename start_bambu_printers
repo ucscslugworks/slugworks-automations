@@ -1,0 +1,16 @@
+#!/bin/bash
+
+cd "$(dirname "$(readlink -f "$0")")"
+
+PID_FILE="pid_bambu_printers"
+
+if [ -f $PID_FILE ]; then
+    echo "bambu_printers is already running, please stop current instance"
+    exit 1
+fi
+
+source venv/bin/activate
+
+python -m src.bambu_printers.main &
+
+echo $! > $PID_FILE

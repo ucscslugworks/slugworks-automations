@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import threading
 import time
 from getpass import getpass
@@ -29,7 +30,19 @@ class BambuAccount:
         self.email = email
 
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": random.choice(
+                json.load(
+                    open(
+                        os.path.join(
+                            os.path.dirname(os.path.abspath(__file__)),
+                            "..",
+                            "..",
+                            "common",
+                            "useragents.json",
+                        )
+                    )
+                )
+            )["ua"]
         }
 
         self.token = ""
@@ -45,7 +58,7 @@ class BambuAccount:
 
     def login(self):
         try:
-            pw = json.load(
+            bambu_json = json.load(
                 open(
                     os.path.join(
                         os.path.dirname(os.path.abspath(__file__)),
@@ -55,19 +68,10 @@ class BambuAccount:
                         "bambu.json",
                     )
                 )
-            )["bambu"]
+            )
 
-            code = json.load(
-                open(
-                    os.path.join(
-                        os.path.dirname(os.path.abspath(__file__)),
-                        "..",
-                        "..",
-                        "common",
-                        "bambu.json",
-                    )
-                )
-            )["code"]
+            pw = bambu_json["bambu"]
+            code = bambu_json["code"]
 
             response = requests.post(
                 LOGIN_URL,
@@ -79,7 +83,12 @@ class BambuAccount:
                 },
             )
 
-            if response.json() and response.json()["loginType"] == "verifyCode":
+            if (
+                response.text
+                and response.text[0] == "{"
+                and response.json()["loginType"] == "verifyCode"
+            ):
+                self.logger.info("Verification Code requested")
                 response = requests.post(
                     CODE_URL,
                     headers=self.headers,
@@ -90,22 +99,37 @@ class BambuAccount:
                         "code": code,
                     },
                 )
+            elif "token" in bambu_json:
+                self.logger.info("Cloudflare blocking may have occurred, pre-configured token from bambu.json will be used")
+                self.token = bambu_json["token"]
+                self.refresh_token = bambu_json["refreshToken"]
+            else:
+                self.logger.info("Standard (code-less) login may have been successful, attempting to parse headers")
+                self.token = ""
+                self.refresh_token = ""
 
-            if "token" not in response.headers["Set-Cookie"]:
-                self.logger.error("login: Failed to login")
-                exit(1)
 
-            for h in response.headers["Set-Cookie"].split("; "):
-                if h.startswith("refreshToken="):
-                    self.refresh_token = h[len("refreshToken=") :]
-                elif h.startswith("Secure, token="):
-                    self.token = h[len("Secure, token=") :]
+            if not self.token:
+                if "token" not in response.headers["Set-Cookie"]:
+                    self.logger.error("login: Failed to login - no token received")
+                    exit(1)
+
+                for h in response.headers["Set-Cookie"].split("; "):
+                    if h.startswith("refreshToken="):
+                        self.refresh_token = h[len("refreshToken=") :]
+                    elif h.startswith("Secure, token="):
+                        self.token = h[len("Secure, token=") :]
 
             self.headers["Authorization"] = f"Bearer {self.token}"
+
+            self.logger.info(f"Token: \"{self.token}\"")
+            self.logger.info(f"Refresh Token: \"{self.refresh_token}\"")
 
             decoded_token = jwt.decode(
                 self.token, algorithms=["RS256"], options={"verify_signature": False}
             )
+
+            self.logger.info("Headers and token successfully parsed")
 
             self.expire_time = decoded_token["exp"]
             self.username = decoded_token["username"]

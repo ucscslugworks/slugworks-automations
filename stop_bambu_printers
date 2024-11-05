@@ -1,0 +1,13 @@
+#!/bin/bash
+
+cd "$(dirname "$(readlink -f "$0")")"
+
+PID_FILE="pid_bambu_printers"
+
+if [ ! -f $PID_FILE ]; then
+    echo "bambu_printers is not running"
+    exit 1
+fi
+
+kill $(cat $PID_FILE)
+rm $PID_FILE

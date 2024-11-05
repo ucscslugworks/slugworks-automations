@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 
 from src import constants
 from src.bambu_printers import BambuAccount, BambuDB, Printer, StartForm
@@ -41,12 +42,8 @@ try:
                 if not task["isPrintable"] or db.print_exists(task["id"]):
                     continue
 
-                start_time = time.mktime(
-                    time.strptime(task["startTime"], "%Y-%m-%dT%H:%M:%S%z")
-                ) - (time.timezone if not time.daylight else time.altzone)
-                end_time = time.mktime(
-                    time.strptime(task["endTime"], "%Y-%m-%dT%H:%M:%S%z")
-                ) - (time.timezone if not time.daylight else time.altzone)
+                start_time = datetime.fromisoformat(task["startTime"]).timestamp()
+                end_time = start_time + task["costTime"]
                 ams = task["amsDetailMapping"]
                 colors = []
                 for c in ams:
@@ -57,7 +54,7 @@ try:
                 db.add_print(
                     task["id"],
                     task["deviceName"],
-                    task["title"],
+                    f"{task["designTitle"]} {task["title"]}",
                     task["cover"],
                     int(start_time),
                     int(end_time),
@@ -107,8 +104,11 @@ try:
                 if c_print[6] + 60 > timestamp:
                     # if print start time is not more than 60 seconds ago, skip
                     continue
+                elif c_print[7] + 60 < timestamp:
+                    # if print end time is more than 60 seconds ago, mark print as succeeded
+                    db.archive_print(c_print[0], constants.PRINT_SUCCEEDED)
 
-                printer = printers[c_print[1]]
+                printer = printers[c_print[3]]
                 if printer.get_status() == constants.BAMBU_FINISH:
                     db.archive_print(c_print[0], constants.PRINT_SUCCEEDED)
                 elif printer.get_status() == constants.BAMBU_FAILED:

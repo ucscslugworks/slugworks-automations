@@ -9,7 +9,7 @@ from googleapiclient.errors import HttpError
 
 from src import log
 
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 START_FORM_SHEET_ID = "1zIMn7G5pq1A7pqQSPIGTQvbvSztVy_QlmRi4wA1HDzA"
 SHEET_NAME = "Form Responses 1"
 EXPECTED_ROW_LENGTH = 3
