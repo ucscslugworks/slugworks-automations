@@ -31,10 +31,12 @@ NO_FORM_ROW = -1
 NO_PRINT_ID = -1
 NO_CRUZID = ""
 
-BAMBU_TIMEOUT = 10 * 60
-BAMBU_DEFAULT_LIMIT = 1000
+BAMBU_TIMEOUT = (
+    10 * 60
+)  # max time between form submission & print start (or vice versa)
+BAMBU_DEFAULT_LIMIT = 1000  # quarterly weight limit for all users
 BAMBU_EXEMPT_LIMIT = float("inf")  # per-print weight limit for exempted users
-BAMBU_DELAY = 10
+BAMBU_DELAY = 10  # loop time
 
 BAMBU_FAILED = 0
 BAMBU_RUNNING = 1

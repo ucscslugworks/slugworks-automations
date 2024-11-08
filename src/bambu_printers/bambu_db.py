@@ -204,11 +204,12 @@ class BambuDB:
                 "SELECT * FROM prints_unmatched WHERE id = ?", (print_id,)
             ).fetchone()
 
-            form_data = sql(
-                "SELECT * FROM form_unmatched WHERE form_row = ?", (form_row,)
-            ).fetchone()
+            if form_row != -1:
+                form_data = sql(
+                    "SELECT * FROM form_unmatched WHERE form_row = ?", (form_row,)
+                ).fetchone()
 
-            if not print_data or not form_data:
+            if not print_data or (form_row != -1 and not form_data):
                 self.logger.warning(
                     f"match: Print {print_id} or form {form_row} not found"
                 )
@@ -216,16 +217,24 @@ class BambuDB:
 
             sql(
                 f"INSERT INTO prints_current ({', '.join(DATA_TABLES['prints_current'])}) VALUES ({', '.join(['?'] * len(DATA_TABLES['prints_current']))})",
-                (print_id, form_row, form_data[3], *print_data[1:]),
+                (
+                    print_id,
+                    form_row,
+                    "" if form_row == -1 else form_data[3],
+                    *print_data[1:],
+                ),
             )
 
-            sql(
-                f"INSERT INTO form_archive ({', '.join(DATA_TABLES['form_archive'])}) VALUES ({', '.join(['?'] * len(DATA_TABLES['form_archive']))})",
-                (form_row, print_id, *form_data[1:]),
-            )
+            if form_row != -1:
+                sql(
+                    f"INSERT INTO form_archive ({', '.join(DATA_TABLES['form_archive'])}) VALUES ({', '.join(['?'] * len(DATA_TABLES['form_archive']))})",
+                    (form_row, print_id, *form_data[1:]),
+                )
 
             sql("DELETE FROM prints_unmatched WHERE id = ?", (print_id,))
-            sql("DELETE FROM form_unmatched WHERE form_row = ?", (form_row,))
+
+            if form_row != -1:
+                sql("DELETE FROM form_unmatched WHERE form_row = ?", (form_row,))
 
             self.logger.info(f"match: Matched print {print_id} with form {form_row}")
             return True

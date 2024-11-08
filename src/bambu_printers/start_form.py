@@ -103,3 +103,8 @@ class StartForm:
             self.logger.error(f"get: {type(e)} {e}")
             time.sleep(60)
             return None
+
+
+if __name__ == "__main__":
+    sf = StartForm()
+    print(sf.get())

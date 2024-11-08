@@ -1,3 +1,4 @@
+from collections import defaultdict
 import time
 from datetime import datetime
 
@@ -18,18 +19,22 @@ for name in devices:
     printers[name] = Printer(account, name, devices[name])
 
 try:
+    # main loop
     while True:
         try:
             time.sleep(constants.BAMBU_DELAY)
             logger.info("main: Running main loop")
-            # Get the latest row from the start form
+            # Get the latest rows from the start form
             rows = form.get()
+            
+            # if nothing was returned (possibly because an error occurred) set to empty list
             if not rows:
                 rows = []
 
-            for row in rows:
-                if not db.form_exists(row[0]):
-                    db.add_form(row[0], row[1], row[3], row[2])
+            for form_row in rows:
+                # if the form is not already in the db, add it
+                if not db.form_exists(form_row[0]):
+                    db.add_form(form_row[0], form_row[1], form_row[3], form_row[2])
 
             # Get the latest tasks from the account
             tasks = account.get_tasks()
@@ -72,11 +77,13 @@ try:
             timestamp = int(time.time())
 
             form_printer_rows = dict()
+            old_form_rows = dict()
 
             logger.info("main: Checking unmatched form responses for expiry")
             for u_form in db.get_unmatched_forms():
                 if timestamp > u_form[1] + constants.BAMBU_TIMEOUT:
-                    db.expire_form(u_form[0])
+                    # db.expire_form(u_form[0])
+                    old_form_rows[u_form[0]] = (u_form[2], u_form[3], u_form[1])
                 else:
                     # Store the form in a dictionary with the printer name as the key and (form row, cruzid) as the value
                     form_printer_rows[u_form[2]] = (u_form[0], u_form[3])
@@ -84,9 +91,22 @@ try:
             logger.info("main: Checking unmatched prints for expiry/matching")
             for u_print in db.get_unmatched_prints():
                 if timestamp > u_print[4] + constants.BAMBU_TIMEOUT:
-                    db.expire_print(u_print[0])
-                    if u_print[5] > timestamp:
-                        printers[u_print[1]].cancel()
+                    matched = False
+                    for form_row in old_form_rows:
+                        name, cruzid, form_time = old_form_rows[form_row]
+                        if abs(form_time - u_print[4]) <= constants.BAMBU_TIMEOUT:
+                            db.match(u_print[0], form_row)
+                            matched = True
+                            old_form_rows[form_row] = None
+
+                    if not matched:
+                        db.expire_print(u_print[0])
+                        if (
+                            u_print[5] > timestamp
+                            and abs(u_print[4] - printer.start_time) > 60
+                        ):
+                            printers[u_print[1]].cancel()
+
                 elif u_print[1] in form_printer_rows:
                     form_row, cruzid = form_printer_rows[u_print[1]]
 
@@ -99,24 +119,42 @@ try:
                     else:
                         db.subtract_limit(cruzid, u_print[6])
 
-            logger.info("main: Checking current prints for status changes")
-            for c_print in db.get_current_prints():
-                if c_print[6] + 60 > timestamp:
-                    # if print start time is not more than 60 seconds ago, skip
-                    continue
-                elif c_print[7] + 60 < timestamp:
-                    # if print end time is more than 60 seconds ago, mark print as succeeded
-                    db.archive_print(c_print[0], constants.PRINT_SUCCEEDED)
+            for form_row in old_form_rows:
+                if old_form_rows[form_row] is not None:
+                    db.expire_form(form_row)
 
-                printer = printers[c_print[3]]
-                if printer.get_status() == constants.BAMBU_FINISH:
-                    db.archive_print(c_print[0], constants.PRINT_SUCCEEDED)
-                elif printer.get_status() == constants.BAMBU_FAILED:
-                    db.archive_print(c_print[0], constants.PRINT_FAILED)
-                    db.subtract_limit(c_print[2], -1 * c_print[8])
-                elif printer.get_status() == constants.BAMBU_IDLE:
-                    db.archive_print(c_print[0], constants.PRINT_CANCELED)
-                    db.subtract_limit(c_print[2], -1 * c_print[8])
+            logger.info("main: Checking current prints for status changes")
+            current_prints = defaultdict(list)
+            for c_print in db.get_current_prints():
+                if c_print[6] <= timestamp - 60:
+                    # if print start time is more than 60 seconds ago
+
+                    printer = printers[c_print[3]]
+
+                    if abs(c_print[6] - printer.start_time) > 60:
+                        if c_print[7] > timestamp:
+                            db.archive_print(c_print[0], constants.PRINT_CANCELED)
+                            db.subtract_limit(c_print[2], -1 * c_print[8])
+                        else:
+                            db.archive_print(c_print[0], constants.PRINT_SUCCEEDED)
+                    elif printer.get_status() == constants.BAMBU_FINISH:
+                        db.archive_print(c_print[0], constants.PRINT_SUCCEEDED)
+                    elif printer.get_status() == constants.BAMBU_FAILED:
+                        db.archive_print(c_print[0], constants.PRINT_FAILED)
+                        db.subtract_limit(c_print[2], -1 * c_print[8])
+                    elif printer.get_status() == constants.BAMBU_IDLE:
+                        db.archive_print(c_print[0], constants.PRINT_CANCELED)
+                        db.subtract_limit(c_print[2], -1 * c_print[8])
+                    else:
+                        current_prints[c_print[3]].append((c_print[0], c_print[7]))
+
+            for name in current_prints:
+                while len(current_prints[name]) > 1:
+                    id, end_time = current_prints[name].pop(0)
+                    if end_time < timestamp:
+                        db.archive_print(id, constants.PRINT_SUCCEEDED)
+                    else:
+                        db.archive_print(id, constants.PRINT_CANCELED)
 
             logger.info("main: Finished main loop")
         except Exception as e:

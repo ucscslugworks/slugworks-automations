@@ -38,7 +38,8 @@ class Printer:
         self.layer_count = 0
         self.current_layer = 0
         self.percent_complete = 0
-        self.time_remaining_min = 0
+        self.time_remaining = 0
+        self.start_time = 0
         self.active_spool = 0
         self.spool_state = ""
 
@@ -75,7 +76,8 @@ class Printer:
         self.layer_count = printer.layer_count
         self.current_layer = printer.current_layer
         self.percent_complete = printer.percent_complete
-        self.time_remaining_min = printer.time_remaining
+        self.time_remaining = printer.time_remaining * 60
+        self.start_time = printer.start_time * 60
         self.active_spool = printer.active_spool
         self.spool_state = printer.spool_state
         self.logger.info(f"on_update: {self.name}")
