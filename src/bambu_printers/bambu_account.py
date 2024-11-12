@@ -3,7 +3,6 @@ import os
 import random
 import threading
 import time
-from getpass import getpass
 
 import jwt
 import requests
@@ -99,15 +98,20 @@ class BambuAccount:
                         "code": code,
                     },
                 )
-            elif "token" in bambu_json:
-                self.logger.info("Cloudflare blocking may have occurred, pre-configured token from bambu.json will be used")
-                self.token = bambu_json["token"]
-                self.refresh_token = bambu_json["refreshToken"]
+            elif "cloudflare" in response.text:
+                self.logger.info("Cloudflare blocking may have occurred.")
+                if "token" in bambu_json:
+                    self.logger.info(
+                        "Pre-configured token from bambu.json found, will be used"
+                    )
+                    self.token = bambu_json["token"]
+                    self.refresh_token = bambu_json["refreshToken"]
             else:
-                self.logger.info("Standard (code-less) login may have been successful, attempting to parse headers")
+                self.logger.info(
+                    "Standard (code-less) login may have been successful, attempting to parse headers"
+                )
                 self.token = ""
                 self.refresh_token = ""
-
 
             if not self.token:
                 if "token" not in response.headers["Set-Cookie"]:
@@ -122,18 +126,21 @@ class BambuAccount:
 
             self.headers["Authorization"] = f"Bearer {self.token}"
 
-            self.logger.info(f"Token: \"{self.token}\"")
-            self.logger.info(f"Refresh Token: \"{self.refresh_token}\"")
+            self.logger.info(f'login: Token: "{self.token}"')
+            self.logger.info(f'login: Refresh Token: "{self.refresh_token}"')
 
             decoded_token = jwt.decode(
                 self.token, algorithms=["RS256"], options={"verify_signature": False}
             )
 
-            self.logger.info("Headers and token successfully parsed")
+            self.logger.info("login: Headers and token successfully parsed")
 
             self.expire_time = decoded_token["exp"]
             self.username = decoded_token["username"]
 
+            self.logger.info(
+                f"login: Token expires at {time.strftime("%Y-%m-%d %H:%M:%S %z", time.gmtime(self.expire_time))}"
+            )
             self.logger.info(f"login: Logged in as {self.username}")
 
             self.refresh_thread = threading.Thread(target=self.refresh_loop)
@@ -157,6 +164,12 @@ class BambuAccount:
             self.token = data["accessToken"]
             self.refresh_token = data["refreshToken"]
             self.expire_time = int(time.time()) + data["refreshExpiresIn"]
+
+            self.logger.info(f'login: Token: "{self.token}"')
+            self.logger.info(f'login: Refresh Token: "{self.refresh_token}"')
+            self.logger.info(
+                f"login: Token expires at {time.strftime("%Y-%m-%d %H:%M:%S %z", time.gmtime(self.expire_time))}"
+            )
 
             self.headers["Authorization"] = f"Bearer {self.token}"
 
@@ -185,6 +198,7 @@ class BambuAccount:
     def get_devices(self):
         try:
             response = requests.get(DEVICES_URL, headers=self.headers)
+            self.logger.info(response.text)
             devices = response.json()["devices"]
 
             device_data = dict()

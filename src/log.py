@@ -61,7 +61,7 @@ class RollingFileHandler(RotatingFileHandler):
             os.remove(self.latest_filename)
 
         # Create a new symlink to the latest log file
-        os.symlink(nextName, self.latest_filename)
+        os.symlink(self.baseFilename, self.latest_filename)
 
 
 def setup_logs(name: str, level: int | None = None):
