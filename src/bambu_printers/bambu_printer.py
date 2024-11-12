@@ -83,7 +83,7 @@ class Printer:
         self.logger.info(f"on_update: {self.name}")
 
     def cancel(self):
-        # self.printer.stop_printing()
+        self.printer.stop_printing()
         self.logger.info(f"cancel: {self.name}")
 
     def get_status(self):

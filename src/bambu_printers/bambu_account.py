@@ -84,8 +84,7 @@ class BambuAccount:
 
             if (
                 response.text
-                and response.text[0] == "{"
-                and response.json()["loginType"] == "verifyCode"
+                and "verifyCode" in response.text
             ):
                 self.logger.info("Verification Code requested")
                 response = requests.post(
@@ -98,7 +97,7 @@ class BambuAccount:
                         "code": code,
                     },
                 )
-            elif "cloudflare" in response.text:
+            elif response.text and ("cloudflare" in response.text or "challenge" in response.text):
                 self.logger.info("Cloudflare blocking may have occurred.")
                 if "token" in bambu_json:
                     self.logger.info(
