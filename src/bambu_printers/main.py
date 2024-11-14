@@ -227,6 +227,10 @@ try:
                         # if the print's end time is in the future, the print probably was canceled
                         db.archive_print(id, constants.PRINT_CANCELED)
 
+            for printer in printers:
+                # iterate through all printers, updating the printer status in the db
+                printers[printer].update_db()
+
             logger.info("main: Finished main loop")
         except Exception as e:
             logger.error(f"main: {traceback.format_exc()}")

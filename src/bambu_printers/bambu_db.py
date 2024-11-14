@@ -1,7 +1,6 @@
 import json
 import os
 import sqlite3
-import threading
 import traceback
 from datetime import datetime
 
@@ -38,20 +37,7 @@ db = sqlite3.connect(
     check_same_thread=check_same_thread,
 )
 cursor = db.cursor()
-
-LOCK = threading.Lock()
-
-
-def sql(*args, **kwargs):
-    try:
-        LOCK.acquire(True)
-        response = cursor.execute(*args, **kwargs)
-        LOCK.release()
-        return response
-    except Exception:
-        LOCK.release()
-        raise
-
+sql = cursor.execute
 
 CREATE_TABLES = {
     "prints_unmatched": [
@@ -183,9 +169,7 @@ def get_db():
 class BambuDB:
     def __init__(self):
         try:
-            self.logger = log.setup_logs(
-                "bambu_db", additional_handlers=[("bambu", log.INFO)]
-            )
+            self.logger = log.setup_logs("bambu_db", additional_handlers=[("bambu", log.INFO)])
             for name in CREATE_TABLES:
                 sql(
                     f"CREATE TABLE IF NOT EXISTS {name} ({', '.join(CREATE_TABLES[name])})"

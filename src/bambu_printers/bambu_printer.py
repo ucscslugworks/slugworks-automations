@@ -1,4 +1,5 @@
 import time
+import traceback
 
 from bpm.bambuconfig import BambuConfig
 from bpm.bambuprinter import BambuPrinter
@@ -75,66 +76,76 @@ class Printer:
         self.logger.info(f"init: Initialized printer {self.name}.")
 
     def on_update(self, printer):
-        self.last_update = int(time.time())
-        self.tool_temp = float(printer.tool_temp)
-        self.tool_temp_target = float(printer.tool_temp_target)
-        self.bed_temp = float(printer.bed_temp)
-        self.bed_temp_target = float(printer.bed_temp_target)
-        self.fan_speed = int(parseFan(printer.fan_speed))
-
-        if printer.gcode_state == "FAILED":
-            self.gcode_state = constants.BAMBU_FAILED
-        elif printer.gcode_state == "RUNNING":
-            self.gcode_state = constants.BAMBU_RUNNING
-        elif printer.gcode_state == "PAUSE":
-            self.gcode_state = constants.BAMBU_PAUSE
-        elif printer.gcode_state == "IDLE":
-            self.gcode_state = constants.BAMBU_IDLE
-        elif printer.gcode_state == "FINISH":
-            self.gcode_state = constants.BAMBU_FINISH
-        else:
-            self.gcode_state = constants.BAMBU_UNKNOWN
-
-        self.speed_level = int(printer.speed_level)
-        self.light_state = int(printer.light_state == "on")
-
-        self.current_stage = str(parseStage(printer.current_stage))
-        self.gcode_file = str(printer.gcode_file)
-        self.layer_count = int(printer.layer_count)
-        self.current_layer = int(printer.current_layer)
-        self.percent_complete = int(printer.percent_complete)
-        self.time_remaining = int(printer.time_remaining * 60)
-        self.start_time = int(printer.start_time * 60)
-        self.active_spool = int(printer.active_spool)
         try:
-            self.spool_state = constants.PRINTER_SPOOL_STATES.index(printer.spool_state)
-        except ValueError:
-            self.spool_state = -1
+            self.last_update = int(time.time())
+            self.tool_temp = float(printer.tool_temp)
+            self.tool_temp_target = float(printer.tool_temp_target)
+            self.bed_temp = float(printer.bed_temp)
+            self.bed_temp_target = float(printer.bed_temp_target)
+            self.fan_speed = int(parseFan(printer.fan_speed))
 
-        self.db.update_printer(
-            self.name,
-            last_update=self.last_update,
-            gcode_state=self.gcode_state,
-            tool_temp=self.tool_temp,
-            tool_temp_target=self.tool_temp_target,
-            bed_temp=self.bed_temp,
-            bed_temp_target=self.bed_temp_target,
-            fan_speed=self.fan_speed,
-            speed_level=self.speed_level,
-            light_state=self.light_state,
-            current_stage=self.current_stage,
-            gcode_file=self.gcode_file,
-            layer_count=self.layer_count,
-            current_layer=self.current_layer,
-            percent_complete=self.percent_complete,
-            time_remaining=self.time_remaining,
-            start_time=self.start_time,
-            end_time=self.start_time + self.time_remaining,
-            active_spool=self.active_spool,
-            spool_state=self.spool_state,
-        )
+            if printer.gcode_state == "FAILED":
+                self.gcode_state = constants.BAMBU_FAILED
+            elif printer.gcode_state == "RUNNING":
+                self.gcode_state = constants.BAMBU_RUNNING
+            elif printer.gcode_state == "PAUSE":
+                self.gcode_state = constants.BAMBU_PAUSE
+            elif printer.gcode_state == "IDLE":
+                self.gcode_state = constants.BAMBU_IDLE
+            elif printer.gcode_state == "FINISH":
+                self.gcode_state = constants.BAMBU_FINISH
+            else:
+                self.gcode_state = constants.BAMBU_UNKNOWN
 
-        self.logger.info(f"on_update: {self.name}")
+            self.speed_level = int(printer.speed_level)
+            self.light_state = int(printer.light_state == "on")
+
+            self.current_stage = str(parseStage(printer.current_stage))
+            self.gcode_file = str(printer.gcode_file)
+            self.layer_count = int(printer.layer_count)
+            self.current_layer = int(printer.current_layer)
+            self.percent_complete = int(printer.percent_complete)
+            self.time_remaining = int(printer.time_remaining * 60)
+            self.start_time = int(printer.start_time * 60)
+            self.active_spool = int(printer.active_spool)
+            try:
+                self.spool_state = constants.PRINTER_SPOOL_STATES.index(
+                    printer.spool_state
+                )
+            except ValueError:
+                self.spool_state = -1
+
+            self.logger.info(f"on_update: {self.name}")
+        except Exception:
+            self.logger.error(f"on_update: {self.name} - {traceback.format_exc()}")
+
+    def update_db(self):
+        try:
+            self.db.update_printer(
+                self.name,
+                last_update=self.last_update,
+                gcode_state=self.gcode_state,
+                tool_temp=self.tool_temp,
+                tool_temp_target=self.tool_temp_target,
+                bed_temp=self.bed_temp,
+                bed_temp_target=self.bed_temp_target,
+                fan_speed=self.fan_speed,
+                speed_level=self.speed_level,
+                light_state=self.light_state,
+                current_stage=self.current_stage,
+                gcode_file=self.gcode_file,
+                layer_count=self.layer_count,
+                current_layer=self.current_layer,
+                percent_complete=self.percent_complete,
+                time_remaining=self.time_remaining,
+                start_time=self.start_time,
+                end_time=self.start_time + self.time_remaining,
+                active_spool=self.active_spool,
+                spool_state=self.spool_state,
+            )
+            self.logger.info(f"update_db: {self.name}")
+        except Exception:
+            self.logger.error(f"update_db: {self.name} - {traceback.format_exc()}")
 
     def cancel(self):
         self.printer.stop_printing()
