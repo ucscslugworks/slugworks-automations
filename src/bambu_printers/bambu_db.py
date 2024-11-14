@@ -1,6 +1,7 @@
 import json
 import os
 import sqlite3
+import threading
 import traceback
 from datetime import datetime
 
@@ -36,10 +37,20 @@ db = sqlite3.connect(
     autocommit=True,
     check_same_thread=check_same_thread,
 )
+cursor = db.cursor()
+
+LOCK = threading.Lock()
 
 
 def sql(*args, **kwargs):
-    return db.cursor().execute(*args, **kwargs)
+    try:
+        LOCK.acquire(True)
+        response = cursor.execute(*args, **kwargs)
+        LOCK.release()
+        return response
+    except Exception:
+        LOCK.release()
+        raise
 
 
 CREATE_TABLES = {
