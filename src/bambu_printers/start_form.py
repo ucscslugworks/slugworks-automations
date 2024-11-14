@@ -119,7 +119,6 @@ class StartForm:
             return values
         except Exception:
             self.logger.error(f"get: {traceback.format_exc()}")
-            time.sleep(60)
             return None
 
 
