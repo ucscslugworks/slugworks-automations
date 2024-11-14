@@ -36,7 +36,11 @@ db = sqlite3.connect(
     autocommit=True,
     check_same_thread=check_same_thread,
 )
-sql = db.cursor().execute
+
+
+def sql(*args, **kwargs):
+    return db.cursor().execute(*args, **kwargs)
+
 
 CREATE_TABLES = {
     "prints_unmatched": [
