@@ -21,12 +21,26 @@ TASKS_URL = f"{BASE_URL}/user-service/my/tasks"
 
 REFRESH_DELAY = 30  # seconds
 
+ACCOUNT_OBJECT = None
+
+
+def get_account():
+    global ACCOUNT_OBJECT
+
+    if not ACCOUNT_OBJECT:
+        ACCOUNT_OBJECT = BambuAccount()
+        ACCOUNT_OBJECT.logger.info("get_account: Created new BambuAccount object.")
+    else:
+        ACCOUNT_OBJECT.logger.info("get_account: Retrieved existing BambuAccount object.")
+    
+    return ACCOUNT_OBJECT
+
 
 class BambuAccount:
-    def __init__(self, email: str):
+    def __init__(self):
         self.logger = log.setup_logs("bambu_account")
 
-        self.email = email
+        self.email = "slugworks@ucsc.edu"
 
         self.headers = {
             "User-Agent": random.choice(
@@ -69,50 +83,81 @@ class BambuAccount:
                 )
             )
 
-            pw = bambu_json["bambu"]
-            code = bambu_json["code"]
+            if "token" in bambu_json and "refreshToken" in bambu_json:
+                self.logger.info(
+                    "login: Pre-configured token from bambu.json found, will be used"
+                )
+                self.token = bambu_json["token"]
+                self.refresh_token = bambu_json["refreshToken"]
+                self.headers["Authorization"] = f"Bearer {self.token}"
 
-            response = requests.post(
-                LOGIN_URL,
-                headers=self.headers,
-                data={
-                    "account": self.email,
-                    "password": pw,
-                    "apiError": "",
-                },
-            )
+                response = requests.get(TASKS_URL, headers=self.headers)
+                self.logger.info(response.status_code)
+                if response.status_code != 200:
+                    self.logger.info(
+                        "login: Pre-configured token from bambu.json is invalid, will attempt manual login"
+                    )
+                    self.token = ""
+                    self.refresh_token = ""
+                else:
+                    self.logger.info("login: Logged in using pre-configured token")
 
-            if (
-                response.text
-                and "verifyCode" in response.text
-            ):
-                self.logger.info("Verification Code requested")
+            if not self.token:
+                self.logger.info(
+                    "login: No pre-configured token found or token invalid, attempting manual login"
+                )
+
+                if "bambu" not in bambu_json:
+                    self.logger.error("login: No password found in bambu.json")
+                    exit(1)
+
+                pw = bambu_json["bambu"]
+
                 response = requests.post(
-                    CODE_URL,
+                    LOGIN_URL,
                     headers=self.headers,
                     data={
                         "account": self.email,
                         "password": pw,
                         "apiError": "",
-                        "code": code,
                     },
                 )
-            elif response.text and ("cloudflare" in response.text or "challenge" in response.text):
-                self.logger.info("Cloudflare blocking may have occurred.")
-                if "token" in bambu_json:
-                    self.logger.info(
-                        "Pre-configured token from bambu.json found, will be used"
-                    )
-                    self.token = bambu_json["token"]
-                    self.refresh_token = bambu_json["refreshToken"]
-            else:
-                self.logger.info(
-                    "Standard (code-less) login may have been successful, attempting to parse headers"
-                )
-                self.token = ""
-                self.refresh_token = ""
 
-            if not self.token:
+                if response.text and "verifyCode" in response.text:
+                    self.logger.info("login: Verification Code requested")
+                    if "code" not in bambu_json:
+                        self.logger.error("login: No code found in bambu.json")
+                        exit(1)
+
+                    code = bambu_json["code"]
+                    del bambu_json["code"]
+                    json.dump(bambu_json, open("bambu.json", "w"))
+
+                    self.logger.info("login: Got code, deleted from bambu.json")
+
+                    response = requests.post(
+                        CODE_URL,
+                        headers=self.headers,
+                        data={
+                            "account": self.email,
+                            "password": pw,
+                            "code": code,
+                            "apiError": "",
+                        },
+                    )
+
+                if response.text and (
+                    "cloudflare" in response.text or "challenge" in response.text
+                ):
+                    self.logger.error(
+                        "login: Cloudflare blocking may have occurred. Please generate the token manually and save it in bambu.json"
+                    )
+                    exit(1)
+                else:
+                    self.logger.info(
+                        "login: Login may have been successful, attempting to parse headers"
+                    )
+
                 if "token" not in response.headers["Set-Cookie"]:
                     self.logger.error("login: Failed to login - no token received")
                     exit(1)
@@ -123,7 +168,7 @@ class BambuAccount:
                     elif h.startswith("Secure, token="):
                         self.token = h[len("Secure, token=") :]
 
-            self.headers["Authorization"] = f"Bearer {self.token}"
+                self.headers["Authorization"] = f"Bearer {self.token}"
 
             self.logger.info(f'login: Token: "{self.token}"')
             self.logger.info(f'login: Refresh Token: "{self.refresh_token}"')
@@ -141,6 +186,12 @@ class BambuAccount:
                 f"login: Token expires at {time.strftime("%Y-%m-%d %H:%M:%S %z", time.gmtime(self.expire_time))}"
             )
             self.logger.info(f"login: Logged in as {self.username}")
+
+            bambu_json["token"] = self.token
+            bambu_json["refreshToken"] = self.refresh_token
+            json.dump(bambu_json, open("bambu.json", "w"))
+
+            self.logger.info("login: Saved token to bambu.json")
 
             self.refresh_thread = threading.Thread(target=self.refresh_loop)
             self.refresh_thread.start()
@@ -172,7 +223,12 @@ class BambuAccount:
 
             self.headers["Authorization"] = f"Bearer {self.token}"
 
-            self.logger.info("refresh: Refreshed token")
+            bambu_json = json.load(open("bambu.json", "r"))
+            bambu_json["token"] = self.token
+            bambu_json["refreshToken"] = self.refresh_token
+            json.dump(bambu_json, open("bambu.json", "w"))
+
+            self.logger.info("refresh: Refreshed token and saved to bambu.json")
         except Exception as e:
             self.logger.error(f"refresh: Failed to refresh token: {type(e)} {e}")
             exit(1)
@@ -197,7 +253,6 @@ class BambuAccount:
     def get_devices(self):
         try:
             response = requests.get(DEVICES_URL, headers=self.headers)
-            self.logger.info(response.text)
             devices = response.json()["devices"]
 
             device_data = dict()
@@ -233,3 +288,7 @@ class BambuAccount:
             self.logger.info("stop_refresh_thread: Stopped refresh thread")
         else:
             self.logger.error("stop_refresh_thread: No refresh thread to stop")
+
+
+if __name__ == "__main__":
+    account = get_account()

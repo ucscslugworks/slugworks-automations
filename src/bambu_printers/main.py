@@ -1,22 +1,22 @@
-from collections import defaultdict
 import time
+from collections import defaultdict
 from datetime import datetime
 
 from src import constants
-from src.bambu_printers import BambuAccount, BambuDB, Printer, StartForm
+from src.bambu_printers import get_account, get_db, get_printer, get_start_form
 from src.log import setup_logs
 
 logger = setup_logs("bambu_main")
 
-account = BambuAccount("slugworks@ucsc.edu")
-db = BambuDB()
-form = StartForm()
+account = get_account()
+db = get_db()
+sf = get_start_form()
 
 devices = account.get_devices()
 printers = dict()
 
 for name in devices:
-    printers[name] = Printer(account, name, devices[name])
+    printers[name] = get_printer(name, devices[name])
 
 try:
     # main loop
@@ -25,8 +25,8 @@ try:
             time.sleep(constants.BAMBU_DELAY)
             logger.info("main: Running main loop")
             # Get the latest rows from the start form
-            rows = form.get()
-            
+            rows = sf.get()
+
             # if nothing was returned (possibly because an error occurred) set to empty list
             if not rows:
                 rows = []
@@ -103,7 +103,7 @@ try:
                         db.expire_print(u_print[0])
                         if (
                             u_print[5] > timestamp
-                            and abs(u_print[4] - printer.start_time) > 60
+                            and abs(u_print[4] - printers[u_print[1]].start_time) > 60
                         ):
                             printers[u_print[1]].cancel()
 

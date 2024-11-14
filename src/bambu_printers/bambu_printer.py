@@ -3,18 +3,33 @@ from bpm.bambuprinter import BambuPrinter
 from bpm.bambutools import parseFan, parseStage
 
 from src import constants, log
-from src.bambu_printers.bambu_account import BambuAccount
+from src.bambu_printers import get_account, get_db
 
 HOSTNAME = "us.mqtt.bambulab.com"
 PORT = 8883
 
+existing_printers = dict()
+
+
+def get_printer(name: str, serial: str):
+    if name in existing_printers:
+        p = existing_printers[name]
+        p.logger.info(f"get_printer: returned duplicate printer: {name}")
+        return existing_printers[name]
+    else:
+        printer = Printer(name, serial)
+        existing_printers[name] = printer
+        printer.logger.info(f"get_printer: created new printer: {name}")
+        return printer
+
 
 class Printer:
-    def __init__(self, account: BambuAccount, name: str, serial: str):
+    def __init__(self, name: str, serial: str):
         self.logger = log.setup_logs("bambu_printer")
 
         self.name = name
 
+        account = get_account()
         config = BambuConfig(
             hostname=HOSTNAME,
             access_code=account.get_token(),
@@ -23,6 +38,8 @@ class Printer:
             mqtt_port=PORT,
         )
         self.printer = BambuPrinter(config=config)
+
+        self.db = get_db()
 
         self.tool_temp = 0
         self.tool_temp_target = 0
@@ -88,7 +105,14 @@ class Printer:
 
     def get_status(self):
         return self.gcode_state
-    
+
     def stop_thread(self):
         self.printer.quit()
         self.logger.info(f"stop_thread: {self.name}")
+
+
+if __name__ == "__main__":
+    account = get_account()
+    devices = account.get_devices()
+    printer = get_printer("Shaggy", devices["Shaggy"])
+    # printer2 = get_printer("Shaggy", devices["Shaggy"])

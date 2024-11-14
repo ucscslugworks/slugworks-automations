@@ -1,7 +1,7 @@
-from datetime import datetime
 import json
 import os
 import sqlite3
+from datetime import datetime
 
 from src import constants, log
 
@@ -125,6 +125,20 @@ EXEMPT_PATH = os.path.join(
     "bambu_limit_exempt.json",
 )
 
+DB_OBJECT = None
+
+
+def get_db():
+    global DB_OBJECT
+
+    if DB_OBJECT is None:
+        DB_OBJECT = BambuDB()
+        DB_OBJECT.logger.info("get_db: Created new DB object")
+    else:
+        DB_OBJECT.logger.info("get_db: Retrieved existing DB object")
+
+    return DB_OBJECT
+
 
 class BambuDB:
     def __init__(self):
@@ -203,29 +217,31 @@ class BambuDB:
             print_data = sql(
                 "SELECT * FROM prints_unmatched WHERE id = ?", (print_id,)
             ).fetchone()
+            if not print_data:
+                self.logger.warning(f"match: Print {print_id} not found")
+                return False
+
+            form_data = None
 
             if form_row != -1:
                 form_data = sql(
                     "SELECT * FROM form_unmatched WHERE form_row = ?", (form_row,)
                 ).fetchone()
-
-            if not print_data or (form_row != -1 and not form_data):
-                self.logger.warning(
-                    f"match: Print {print_id} or form {form_row} not found"
-                )
-                return False
+                if not form_data:
+                    self.logger.warning(f"match: Form {form_row} not found")
+                    return False
 
             sql(
                 f"INSERT INTO prints_current ({', '.join(DATA_TABLES['prints_current'])}) VALUES ({', '.join(['?'] * len(DATA_TABLES['prints_current']))})",
                 (
                     print_id,
                     form_row,
-                    "" if form_row == -1 else form_data[3],
+                    "" if not form_data else form_data[3],
                     *print_data[1:],
                 ),
             )
 
-            if form_row != -1:
+            if form_row != -1 and form_data:
                 sql(
                     f"INSERT INTO form_archive ({', '.join(DATA_TABLES['form_archive'])}) VALUES ({', '.join(['?'] * len(DATA_TABLES['form_archive']))})",
                     (form_row, print_id, *form_data[1:]),

@@ -14,6 +14,22 @@ START_FORM_SHEET_ID = "1zIMn7G5pq1A7pqQSPIGTQvbvSztVy_QlmRi4wA1HDzA"
 SHEET_NAME = "Form Responses 1"
 EXPECTED_ROW_LENGTH = 3
 
+START_FORM_OBJECT = None
+
+
+def get_start_form():
+    global START_FORM_OBJECT
+
+    if not START_FORM_OBJECT:
+        START_FORM_OBJECT = StartForm()
+        START_FORM_OBJECT.logger.info("get_start_form: Created new StartForm object.")
+    else:
+        START_FORM_OBJECT.logger.info(
+            "get_start_form: Retrieved existing StartForm object."
+        )
+
+    return START_FORM_OBJECT
+
 
 class StartForm:
     def __init__(self):
