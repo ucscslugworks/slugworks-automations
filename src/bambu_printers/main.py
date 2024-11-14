@@ -262,6 +262,7 @@ try:
                     else:
                         # if the printer status is not finish, failed, or idle, the print is still in progress
                         logger.info(f"main: Print {c_print[0]} still running")
+                        db.update_print_end_time(c_print[0], printer.get_end_time())
                         current_prints[c_print[3]].append((c_print[0], c_print[7]))
 
             for name in current_prints:

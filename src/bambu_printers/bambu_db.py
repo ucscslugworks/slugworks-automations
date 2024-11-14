@@ -518,6 +518,20 @@ class BambuDB:
     def get_limits_column(self):
         return f"weight_{datetime.now().year}_{datetime.now().month // 4 + 1}"
 
+    def update_print_end_time(self, print_id: int, end_time: int):
+        try:
+            sql(
+                "UPDATE prints_current SET end_time = ? WHERE id = ?",
+                (end_time, print_id),
+            )
+            self.logger.info(
+                f"update_print_end_time: Updated print {print_id} end time"
+            )
+            return True
+        except Exception:
+            self.logger.error(f"update_print_end_time: {traceback.format_exc()}")
+            return False
+
     def add_printer(self, name: str):
         try:
             if sql("SELECT * FROM printers WHERE name = ?", (name,)).fetchone():

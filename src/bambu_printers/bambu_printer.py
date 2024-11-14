@@ -167,6 +167,9 @@ class Printer:
     def get_status(self):
         return self.gcode_state
 
+    def get_end_time(self):
+        return self.start_time + self.time_remaining
+
     def stop_thread(self):
         self.printer.quit()
         self.logger.info(f"stop_thread: {self.name}")
