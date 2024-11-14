@@ -299,6 +299,8 @@ try:
                         print_id=-1,
                         cruzid="",
                     )
+                
+                printer.update_db()
 
             #     if c_print[6] <= timestamp - 60:
             #         # if print start time is more than 60 seconds ago (ignore very recent prints in case the printer object status hasn't updated yet)
