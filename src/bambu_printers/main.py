@@ -8,6 +8,7 @@ from src.bambu_printers import get_account, get_db, get_printer, get_start_form
 
 logger = log.setup_logs("bambu_main", additional_handlers=[("bambu", log.INFO)])
 
+logger.info("main: Starting setup")
 account = get_account()
 db = get_db()
 sf = get_start_form()
@@ -17,6 +18,8 @@ printers = dict()
 
 for name in devices:
     printers[name] = get_printer(name, devices[name])
+
+logger.info("main: Finished setup")
 
 try:
     # main loop
