@@ -275,12 +275,6 @@ class BambuDB:
                 ),
             )
 
-            self.update_printer(
-                print_data[1],
-                status=constants.PRINTER_MATCHED,
-                print_id=print_id,
-                cruzid="" if not form_data else form_data[3],
-            )
             self.logger.info(
                 f"match: Updated printer {print_data[1]} - MATCHED, print {print_id}, cruzid '{'' if not form_data else form_data[3]}'"
             )
@@ -453,7 +447,11 @@ class BambuDB:
 
     def subtract_limit(self, cruzid: str, amount: float):
         try:
-            self.get_limit(cruzid)
+            self.logger.info(f"subtract_limit: Subtracting {amount} from {cruzid}")
+            old_limit = self.get_limit(cruzid)
+            if old_limit is not None and old_limit < constants.BAMBU_DEFAULT_LIMIT:
+                amount = max(amount, old_limit - constants.BAMBU_DEFAULT_LIMIT)
+                self.logger.info(f"subtract_limit: Adjusted amount to {amount} to not exceed default limit")
 
             if cruzid in json.load(
                 open(

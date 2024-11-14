@@ -205,103 +205,192 @@ try:
                     )
 
             logger.info("main: Checking current prints for status changes")
-            current_prints = defaultdict(
-                list
+            current_prints = (
+                dict()
             )  # dict to store current prints for each printer (in case there are multiple)
 
             # iterate through all current prints
             for c_print in db.get_current_prints():
-                if c_print[6] <= timestamp - 60:
-                    # if print start time is more than 60 seconds ago (ignore very recent prints in case the printer object status hasn't updated yet)
 
-                    # get the printer object
-                    printer = printers[c_print[3]]
-
-                    if abs(c_print[6] - printer.start_time) > 60:
-                        # if the start time in the print task is not within 60 seconds of the printer's current print's start time, they must not be the same print
-                        logger.info(
-                            f"main: Print {c_print[0]} does not match printer {c_print[3]}'s current print start time"
-                        )
-                        if c_print[7] > timestamp:
+                if c_print[3] not in current_prints:
+                    # if the printer is not in the dict, add this print as the current print
+                    current_prints[c_print[3]] = c_print
+                else:
+                    # if this printer is in the dict, compare the start times
+                    if c_print[6] >= current_prints[c_print[3]][6]:
+                        # if this print's start time is more recent, archive the old print and add this print as the current print
+                        if current_prints[c_print[3]][7] > timestamp:
                             # if the print's end time is in the future, the print probably was canceled
 
                             logger.info(
-                                f"main: Print {c_print[0]} was probably canceled"
+                                f"main: Print {current_prints[c_print[3]][0]} was probably canceled"
                             )
-                            db.archive_print(c_print[0], constants.PRINT_CANCELED)
+                            db.archive_print(
+                                current_prints[c_print[3]][0], constants.PRINT_CANCELED
+                            )
                             # add the print weight back to the user's limit
-                            db.subtract_limit(c_print[2], -1 * c_print[8])
+                            db.subtract_limit(
+                                current_prints[c_print[3]][2],
+                                -1 * current_prints[c_print[3]][8],
+                            )
                         else:
                             # if the print's end time is in the past, the print probably succeeded
 
-                            logger.info(f"main: Print {c_print[0]} probably succeeded")
-                            db.archive_print(c_print[0], constants.PRINT_SUCCEEDED)
+                            logger.info(
+                                f"main: Print {current_prints[c_print[3]][0]} probably succeeded"
+                            )
+                            db.archive_print(
+                                current_prints[c_print[3]][0], constants.PRINT_SUCCEEDED
+                            )
 
-                    elif printer.get_status() == constants.GCODE_FINISH:
-                        # if the printer status is finish, the print succeeded
+                        logger.info(
+                            f"main: Replacing print {current_prints[c_print[3]][0]} with print {c_print[0]} as the current print for {c_print[3]}"
+                        )
+                        current_prints[c_print[3]] = c_print
 
-                        logger.info(f"main: Print {c_print[0]} succeeded")
-                        db.archive_print(c_print[0], constants.PRINT_SUCCEEDED)
+            for name in printers:
+                printer = printers[name]
+                running = False
 
-                    elif printer.get_status() == constants.GCODE_FAILED:
-                        # if the printer status is failed, the print failed
+                if name in current_prints:
+                    print_details = current_prints[name]
 
-                        logger.info(f"main: Print {c_print[0]} failed")
-                        db.archive_print(c_print[0], constants.PRINT_FAILED)
-                        # add the print weight back to the user's limit
-                        db.subtract_limit(c_print[2], -1 * c_print[8])
+                    if print_details[6] <= timestamp - 60:
+                        # if print start time is more than 60 seconds ago (ignore very recent prints in case the printer object status hasn't updated yet)
+                        if printer.get_status() == constants.GCODE_FINISH:
+                            # if the printer status is finish, the print succeeded
+                            logger.info(f"main: Print {print_details[0]} succeeded")
+                            db.archive_print(
+                                print_details[0], constants.PRINT_SUCCEEDED
+                            )
+                        elif printer.get_status() == constants.GCODE_FAILED:
+                            # if the printer status is failed, the print failed
+                            logger.info(f"main: Print {print_details[0]} failed")
+                            db.archive_print(print_details[0], constants.PRINT_FAILED)
+                            # add the print weight back to the user's limit
+                            db.subtract_limit(print_details[2], -1 * print_details[8])
+                        elif printer.get_status() == constants.GCODE_IDLE:
+                            # if the printer status is idle, the print was canceled
+                            logger.info(f"main: Print {print_details[0]} canceled")
+                            db.archive_print(print_details[0], constants.PRINT_CANCELED)
+                            # add the print weight back to the user's limit
+                            db.subtract_limit(print_details[2], -1 * print_details[8])
+                        else:
+                            # if the printer status is not finish, failed, or idle, the print is still in progress
+                            running = True
+                            logger.info(
+                                f"main: Print {print_details[0]} still running on printer {name}, updating end time and status"
+                            )
+                            db.update_print_end_time(
+                                print_details[0], printer.get_end_time()
+                            )
+                            db.update_printer(
+                                name,
+                                status=constants.PRINTER_MATCHED,
+                                print_id=print_details[0],
+                                cruzid=print_details[2],
+                            )
 
-                    elif printer.get_status() == constants.GCODE_IDLE:
-                        # if the printer status is idle, the print was canceled
-
-                        logger.info(f"main: Print {c_print[0]} canceled")
-                        db.archive_print(c_print[0], constants.PRINT_CANCELED)
-                        # add the print weight back to the user's limit
-                        db.subtract_limit(c_print[2], -1 * c_print[8])
-
-                    else:
-                        # if the printer status is not finish, failed, or idle, the print is still in progress
-                        logger.info(f"main: Print {c_print[0]} still running")
-                        current_prints[c_print[3]].append((c_print[0], c_print[7]))
-
-            for name in current_prints:
-                # iterate through all current prints for each printer
-                while len(current_prints[name]) > 1:
-                    # if there are multiple current prints for the same printer
-                    # get the print id and end time for the oldest print
-                    id, end_time = current_prints[name].pop(0)
-                    logger.info(
-                        f"main: Multiple ongoing prints found for printer {name}, id {id} is older"
-                    )
-                    if end_time < timestamp:
-                        # if the print's end time is in the past, the print probably succeeded
-                        logger.info(f"main: Print {id} probably succeeded")
-                        db.archive_print(id, constants.PRINT_SUCCEEDED)
-                    else:
-                        logger.info(f"main: Print {id} was probably canceled")
-                        # if the print's end time is in the future, the print probably was canceled
-                        db.archive_print(id, constants.PRINT_CANCELED)
-
-            for printer in printers:
-                # iterate through all printers, updating the printer status in the db
-                if printer not in current_prints or len(current_prints[printer]) == 0:
-                    # if there are no current prints for the printer, update the printer status to idle
-                    logger.info(f"main: Printer {printer} is idle")
+                if not running:
+                    logger.info(f"main: Marking printer {name} as idle")
                     db.update_printer(
-                        printer,
+                        name,
                         status=constants.PRINTER_IDLE,
                         print_id=-1,
                         cruzid="",
                     )
-                else:
-                    # if there is a current print for the printer, update the print's end time in the db
-                    logger.info(
-                        f"main: Printer {printer} is running, updating end time"
-                    )
-                    id, end_time = current_prints[printer][0]
-                    db.update_print_end_time(id, printers[printer].get_end_time())
 
-                printers[printer].update_db()
+            #     if c_print[6] <= timestamp - 60:
+            #         # if print start time is more than 60 seconds ago (ignore very recent prints in case the printer object status hasn't updated yet)
+
+            #         # get the printer object
+            #         printer = printers[c_print[3]]
+
+            #         if abs(c_print[6] - printer.start_time) > 60:
+            #             # if the start time in the print task is not within 60 seconds of the printer's current print's start time, they must not be the same print
+            #             logger.info(
+            #                 f"main: Print {c_print[0]} does not match printer {c_print[3]}'s current print start time"
+            #             )
+            #             if c_print[7] > timestamp:
+            #                 # if the print's end time is in the future, the print probably was canceled
+
+            #                 logger.info(
+            #                     f"main: Print {c_print[0]} was probably canceled"
+            #                 )
+            #                 db.archive_print(c_print[0], constants.PRINT_CANCELED)
+            #                 # add the print weight back to the user's limit
+            #                 db.subtract_limit(c_print[2], -1 * c_print[8])
+            #             else:
+            #                 # if the print's end time is in the past, the print probably succeeded
+
+            #                 logger.info(f"main: Print {c_print[0]} probably succeeded")
+            #                 db.archive_print(c_print[0], constants.PRINT_SUCCEEDED)
+
+            #         elif printer.get_status() == constants.GCODE_FINISH:
+            #             # if the printer status is finish, the print succeeded
+
+            #             logger.info(f"main: Print {c_print[0]} succeeded")
+            #             db.archive_print(c_print[0], constants.PRINT_SUCCEEDED)
+
+            #         elif printer.get_status() == constants.GCODE_FAILED:
+            #             # if the printer status is failed, the print failed
+
+            #             logger.info(f"main: Print {c_print[0]} failed")
+            #             db.archive_print(c_print[0], constants.PRINT_FAILED)
+            #             # add the print weight back to the user's limit
+            #             db.subtract_limit(c_print[2], -1 * c_print[8])
+
+            #         elif printer.get_status() == constants.GCODE_IDLE:
+            #             # if the printer status is idle, the print was canceled
+
+            #             logger.info(f"main: Print {c_print[0]} canceled")
+            #             db.archive_print(c_print[0], constants.PRINT_CANCELED)
+            #             # add the print weight back to the user's limit
+            #             db.subtract_limit(c_print[2], -1 * c_print[8])
+
+            #         else:
+            #             # if the printer status is not finish, failed, or idle, the print is still in progress
+            #             logger.info(f"main: Print {c_print[0]} still running")
+            #             current_prints[c_print[3]].append((c_print[0], c_print[7]))
+
+            # for name in current_prints:
+            #     # iterate through all current prints for each printer
+            #     while len(current_prints[name]) > 1:
+            #         # if there are multiple current prints for the same printer
+            #         # get the print id and end time for the oldest print
+            #         id, end_time = current_prints[name].pop(0)
+            #         logger.info(
+            #             f"main: Multiple ongoing prints found for printer {name}, id {id} is older"
+            #         )
+            #         if end_time < timestamp:
+            #             # if the print's end time is in the past, the print probably succeeded
+            #             logger.info(f"main: Print {id} probably succeeded")
+            #             db.archive_print(id, constants.PRINT_SUCCEEDED)
+            #         else:
+            #             logger.info(f"main: Print {id} was probably canceled")
+            #             # if the print's end time is in the future, the print probably was canceled
+            #             db.archive_print(id, constants.PRINT_CANCELED)
+
+            # for printer in printers:
+            #     # iterate through all printers, updating the printer status in the db
+            #     if printer not in current_prints or len(current_prints[printer]) == 0:
+            #         # if there are no current prints for the printer, update the printer status to idle
+            #         logger.info(f"main: Printer {printer} is idle")
+            #         db.update_printer(
+            #             printer,
+            #             status=constants.PRINTER_IDLE,
+            #             print_id=-1,
+            #             cruzid="",
+            #         )
+            #     else:
+            #         # if there is a current print for the printer, update the print's end time in the db
+            #         logger.info(
+            #             f"main: Printer {printer} is running, updating end time"
+            #         )
+            #         id, end_time = current_prints[printer][0]
+            #         db.update_print_end_time(id, printers[printer].get_end_time())
+
+            #     printers[printer].update_db()
 
             logger.info("main: Finished main loop")
         except Exception as e:
