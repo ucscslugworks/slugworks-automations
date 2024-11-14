@@ -44,3 +44,16 @@ BAMBU_PAUSE = 2
 BAMBU_IDLE = 3
 BAMBU_FINISH = 4
 BAMBU_UNKNOWN = 5
+
+PRINTER_OFFLINE = 0
+PRINTER_IDLE = 1
+PRINTER_UNMATCHED = 2
+PRINTER_MATCHED = 3
+
+PRINTER_SPOOL_STATES = [
+    "Loaded",
+    "Loading",
+    "Unloading",
+    "Unloaded",
+    "Error",
+]  # last element must be Error for -1 index to work

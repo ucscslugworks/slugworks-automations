@@ -3,6 +3,7 @@ import os
 import random
 import threading
 import time
+import traceback
 
 import jwt
 import requests
@@ -31,14 +32,18 @@ def get_account():
         ACCOUNT_OBJECT = BambuAccount()
         ACCOUNT_OBJECT.logger.info("get_account: Created new BambuAccount object.")
     else:
-        ACCOUNT_OBJECT.logger.info("get_account: Retrieved existing BambuAccount object.")
-    
+        ACCOUNT_OBJECT.logger.info(
+            "get_account: Retrieved existing BambuAccount object."
+        )
+
     return ACCOUNT_OBJECT
 
 
 class BambuAccount:
     def __init__(self):
-        self.logger = log.setup_logs("bambu_account")
+        self.logger = log.setup_logs(
+            "bambu_account", additional_handlers=[("bambu", log.INFO)]
+        )
 
         self.email = "slugworks@ucsc.edu"
 
@@ -197,8 +202,8 @@ class BambuAccount:
             self.refresh_thread.start()
 
             self.logger.info("login: Started refresh thread")
-        except Exception as e:
-            self.logger.error(f"login: Failed to login: {type(e)} {e}")
+        except Exception:
+            self.logger.error(f"login: Failed to login: {traceback.format_exc()}")
             exit(1)
 
     def refresh(self):
@@ -229,8 +234,10 @@ class BambuAccount:
             json.dump(bambu_json, open("bambu.json", "w"))
 
             self.logger.info("refresh: Refreshed token and saved to bambu.json")
-        except Exception as e:
-            self.logger.error(f"refresh: Failed to refresh token: {type(e)} {e}")
+        except Exception:
+            self.logger.error(
+                f"refresh: Failed to refresh token: {traceback.format_exc()}"
+            )
             exit(1)
 
     def refresh_loop(self):
@@ -240,8 +247,10 @@ class BambuAccount:
                     self.refresh()
 
                 time.sleep(REFRESH_DELAY)
-            except Exception as e:
-                self.logger.error(f"refresh_loop: Refresh loop error: {type(e)} {e}")
+            except Exception:
+                self.logger.error(
+                    f"refresh_loop: Refresh loop error: {traceback.format_exc()}"
+                )
                 exit(1)
 
     def get_token(self):
@@ -262,8 +271,10 @@ class BambuAccount:
             self.logger.info(f"get_devices: Got {len(device_data)} devices")
 
             return device_data
-        except Exception as e:
-            self.logger.error(f"get_devices: Failed to get devices: {type(e)} {e}")
+        except Exception:
+            self.logger.error(
+                f"get_devices: Failed to get devices: {traceback.format_exc()}"
+            )
             exit(1)
 
     def get_tasks(self):
@@ -278,16 +289,24 @@ class BambuAccount:
             self.logger.info(f"get_tasks: Got {len(tasks)} tasks")
 
             return tasks
-        except Exception as e:
-            self.logger.error(f"get_tasks: Failed to get tasks: {type(e)} {e}")
+        except Exception:
+            self.logger.error(
+                f"get_tasks: Failed to get tasks: {traceback.format_exc()}"
+            )
 
     def stop_refresh_thread(self):
-        if self.refresh_thread:
-            self.stop_refresh_loop = True
-            self.refresh_thread.join()
-            self.logger.info("stop_refresh_thread: Stopped refresh thread")
-        else:
-            self.logger.error("stop_refresh_thread: No refresh thread to stop")
+        try:
+            if self.refresh_thread:
+                self.stop_refresh_loop = True
+                self.refresh_thread.join()
+                self.logger.info("stop_refresh_thread: Stopped refresh thread")
+            else:
+                self.logger.error("stop_refresh_thread: No refresh thread to stop")
+        except Exception:
+            self.logger.error(
+                f"stop_refresh_thread: Failed to stop refresh thread: {traceback.format_exc()}"
+            )
+            exit(1)
 
 
 if __name__ == "__main__":

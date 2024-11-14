@@ -1,5 +1,6 @@
 import os
 import time
+import traceback
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -33,7 +34,7 @@ def get_start_form():
 
 class StartForm:
     def __init__(self):
-        self.logger = log.setup_logs("start_form")
+        self.logger = log.setup_logs("start_form", additional_handlers=[("bambu", log.INFO)])
         common_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "..", "..", "common"
         )
@@ -68,8 +69,8 @@ class StartForm:
             # Call the Sheets API
             self.g_sheets = service.spreadsheets()
 
-        except HttpError as e:
-            self.logger.error(f"init: {type(e)} {e}")
+        except Exception:
+            self.logger.error(f"init: {traceback.format_exc()}")
             exit(1)
 
         self.latest_row = 1
@@ -115,8 +116,8 @@ class StartForm:
             self.latest_row += len(values)
             self.logger.info(f"get: Got {len(values)} new rows.")
             return values
-        except Exception as e:
-            self.logger.error(f"get: {type(e)} {e}")
+        except Exception:
+            self.logger.error(f"get: {traceback.format_exc()}")
             time.sleep(60)
             return None
 

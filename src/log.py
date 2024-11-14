@@ -13,6 +13,7 @@ DEBUG = logging.DEBUG
 NOTSET = logging.NOTSET
 
 loggers = {}
+file_handlers = {}
 
 
 class RollingFileHandler(RotatingFileHandler):
@@ -64,48 +65,68 @@ class RollingFileHandler(RotatingFileHandler):
         os.symlink(self.baseFilename, self.latest_filename)
 
 
-def setup_logs(name: str, level: int | None = None):
-
+def setup_logs(
+    name: str,
+    level: int = INFO,
+    additional_handlers: list[tuple[str, int]] = [],
+):
     if name in loggers:
         return loggers[name]
 
     # Change directory to repository root
-    path = os.path.abspath(
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logs", name)
+    logs_path = os.path.abspath(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logs")
     )
 
     timestamp = datetime.datetime.now()
     folder = timestamp.strftime("%Y-%m-%d")
     filename = timestamp.strftime("%Y-%m-%d %H:%M:%S")
 
-    # Create a new directory for logs if it doesn't exist
-    if not os.path.exists(os.path.join(path, folder)):
-        os.makedirs(os.path.join(path, folder))
-
     # create new logger with all levels
     logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(DEBUG)
 
-    # create file handler which logs debug messages (and above - everything)
-    fh = RollingFileHandler(
-        os.path.join(path, folder, filename),
-        os.path.join(path, "latest.log"),
-        maxBytes=10 * 1000 * 1000,  # max log file size of 10MB
-    )
-    fh.setLevel(level if level else logging.INFO)
+    # create formatter
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s: %(message)s")
+
+    # create list of handlers
+    handlers = []
+
+    additional_handlers.append((name, level))
+
+    for h_name, h_level in additional_handlers:
+        if h_name in file_handlers:
+            handlers.append(file_handlers[h_name])
+        else:
+            # Create a new directory for file handler if it doesn't exist
+            if not os.path.exists(os.path.join(logs_path, h_name, folder)):
+                os.makedirs(os.path.join(logs_path, h_name, folder))
+
+            # create file handler which logs debug messages (and above - everything)
+            fh = RollingFileHandler(
+                os.path.join(logs_path, h_name, folder, filename),
+                os.path.join(logs_path, h_name, "latest.log"),
+                maxBytes=10 * 1000 * 1000,  # max log file size of 10MB
+            )
+            # set the level of the file handler (info by default) and the formatter
+            fh.setLevel(h_level)
+            fh.setFormatter(formatter)
+            # add the file handler to the list of handlers for this logger
+            handlers.append(fh)
+            # add the file handler to the list of additional handlers
+            file_handlers[h_name] = fh
 
     # create console handler which only logs warnings (and above)
     ch = logging.StreamHandler()
-    ch.setLevel(logging.WARNING)
-
-    # create formatter and add it to the handlers
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s: %(message)s")
-    fh.setFormatter(formatter)
+    # set the level of the console handler (warnings and above) and the formatter
+    ch.setLevel(WARNING)
     ch.setFormatter(formatter)
+    # add the console handler to the list of handlers
+    handlers.append(ch)
 
-    # add the handlers to the logger
-    logger.addHandler(fh)
-    logger.addHandler(ch)
+    for handler in handlers:
+        # add the handlers to the logger
+        logger.addHandler(handler)
 
     loggers[name] = logger
 

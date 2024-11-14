@@ -1,8 +1,8 @@
 from __future__ import print_function
 
 import base64
-import logging
 import os
+import traceback
 from email.message import EmailMessage
 
 from google.auth.transport.requests import Request
@@ -83,8 +83,8 @@ def gmail_send_message(
             service.users().messages().send(userId="me", body=create_message).execute()
         )
         logger.info(f'gmail: Message ID: {send_message["id"]}')
-    except HttpError as error:
-        logger.error(f"gmail: An error occurred: {error}")
+    except Exception:
+        logger.error(f"gmail: An error occurred: {traceback.format_exc()}")
         send_message = None
     return send_message
 
