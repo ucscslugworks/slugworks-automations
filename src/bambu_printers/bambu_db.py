@@ -169,7 +169,9 @@ def get_db():
 class BambuDB:
     def __init__(self):
         try:
-            self.logger = log.setup_logs("bambu_db", additional_handlers=[("bambu", log.INFO)])
+            self.logger = log.setup_logs(
+                "bambu_db", additional_handlers=[("bambu", log.INFO)]
+            )
             for name in CREATE_TABLES:
                 sql(
                     f"CREATE TABLE IF NOT EXISTS {name} ({', '.join(CREATE_TABLES[name])})"
@@ -222,7 +224,7 @@ class BambuDB:
             )
             self.logger.info(f"add_print: Added print {id}")
             self.update_printer(
-                printer, status=constants.PRINTER_UNMATCHED, print_id=id
+                printer, status=constants.PRINTER_UNMATCHED, print_id=id, cruzid=""
             )
             self.logger.info(
                 f"add_print: Updated printer {printer} - UNMATCHED, print {id}"
@@ -530,7 +532,7 @@ class BambuDB:
                     -1,  # last_update
                     -1,  # print_id
                     constants.NO_CRUZID,  # cruzid
-                    constants.BAMBU_UNKNOWN,  # gcode_state
+                    constants.GCODE_UNKNOWN,  # gcode_state
                     -1,  # tool_temp
                     -1,  # tool_temp_target
                     -1,  # bed_temp

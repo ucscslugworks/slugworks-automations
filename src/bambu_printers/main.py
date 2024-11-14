@@ -197,17 +197,17 @@ try:
                             # if the print's end time is in the past, the print probably succeeded
                             db.archive_print(c_print[0], constants.PRINT_SUCCEEDED)
 
-                    elif printer.get_status() == constants.BAMBU_FINISH:
+                    elif printer.get_status() == constants.GCODE_FINISH:
                         # if the printer status is finish, the print succeeded
                         db.archive_print(c_print[0], constants.PRINT_SUCCEEDED)
 
-                    elif printer.get_status() == constants.BAMBU_FAILED:
+                    elif printer.get_status() == constants.GCODE_FAILED:
                         # if the printer status is failed, the print failed
                         db.archive_print(c_print[0], constants.PRINT_FAILED)
                         # add the print weight back to the user's limit
                         db.subtract_limit(c_print[2], -1 * c_print[8])
 
-                    elif printer.get_status() == constants.BAMBU_IDLE:
+                    elif printer.get_status() == constants.GCODE_IDLE:
                         # if the printer status is idle, the print was canceled
                         db.archive_print(c_print[0], constants.PRINT_CANCELED)
                         # add the print weight back to the user's limit
@@ -232,6 +232,15 @@ try:
 
             for printer in printers:
                 # iterate through all printers, updating the printer status in the db
+                if printer not in current_prints or len(current_prints[printer]) == 0:
+                    # if there are no current prints for the printer, update the printer status to idle
+                    db.update_printer(
+                        printer,
+                        status=constants.PRINTER_IDLE,
+                        print_id=-1,
+                        cruzid="",
+                    )
+
                 printers[printer].update_db()
 
             logger.info("main: Finished main loop")

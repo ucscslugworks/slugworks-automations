@@ -56,7 +56,7 @@ class Printer:
         self.bed_temp = -1
         self.bed_temp_target = -1
         self.fan_speed = -1
-        self.gcode_state = constants.BAMBU_UNKNOWN
+        self.gcode_state = constants.GCODE_UNKNOWN
         self.speed_level = -1
         self.light_state = False
 
@@ -85,17 +85,17 @@ class Printer:
             self.fan_speed = int(parseFan(printer.fan_speed))
 
             if printer.gcode_state == "FAILED":
-                self.gcode_state = constants.BAMBU_FAILED
+                self.gcode_state = constants.GCODE_FAILED
             elif printer.gcode_state == "RUNNING":
-                self.gcode_state = constants.BAMBU_RUNNING
+                self.gcode_state = constants.GCODE_RUNNING
             elif printer.gcode_state == "PAUSE":
-                self.gcode_state = constants.BAMBU_PAUSE
+                self.gcode_state = constants.GCODE_PAUSE
             elif printer.gcode_state == "IDLE":
-                self.gcode_state = constants.BAMBU_IDLE
+                self.gcode_state = constants.GCODE_IDLE
             elif printer.gcode_state == "FINISH":
-                self.gcode_state = constants.BAMBU_FINISH
+                self.gcode_state = constants.GCODE_FINISH
             else:
-                self.gcode_state = constants.BAMBU_UNKNOWN
+                self.gcode_state = constants.GCODE_UNKNOWN
 
             self.speed_level = int(printer.speed_level)
             self.light_state = int(printer.light_state == "on")
@@ -121,8 +121,20 @@ class Printer:
 
     def update_db(self):
         try:
+            status = constants.PRINTER_IDLE
+            if self.last_update + 60 <= int(time.time()):
+                status = constants.PRINTER_OFFLINE
+            elif self.gcode_state in [constants.GCODE_RUNNING, constants.GCODE_PAUSE]:
+                data = self.db.get_printer_data(self.name)
+                if data:
+                    if data["cruzid"]:
+                        status = constants.PRINTER_MATCHED
+                    else:
+                        status = constants.PRINTER_UNMATCHED
+
             self.db.update_printer(
                 self.name,
+                status=status,
                 last_update=self.last_update,
                 gcode_state=self.gcode_state,
                 tool_temp=self.tool_temp,
@@ -150,7 +162,7 @@ class Printer:
     def cancel(self):
         self.printer.stop_printing()
         self.db.update_printer(self.name, status=constants.PRINTER_IDLE)
-        self.logger.info(f"cancel: {self.name}")
+        self.logger.warning(f"cancel: {self.name}")
 
     def get_status(self):
         return self.gcode_state

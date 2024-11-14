@@ -38,12 +38,12 @@ BAMBU_DEFAULT_LIMIT = 1000  # quarterly weight limit for all users
 BAMBU_EXEMPT_LIMIT = float("inf")  # per-print weight limit for exempted users
 BAMBU_DELAY = 10  # loop time
 
-BAMBU_FAILED = 0
-BAMBU_RUNNING = 1
-BAMBU_PAUSE = 2
-BAMBU_IDLE = 3
-BAMBU_FINISH = 4
-BAMBU_UNKNOWN = 5
+GCODE_FAILED = 0
+GCODE_RUNNING = 1
+GCODE_PAUSE = 2
+GCODE_IDLE = 3
+GCODE_FINISH = 4
+GCODE_UNKNOWN = 5
 
 PRINTER_OFFLINE = 0
 PRINTER_IDLE = 1
