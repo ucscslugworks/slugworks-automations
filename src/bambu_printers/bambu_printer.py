@@ -115,7 +115,7 @@ class Printer:
             except ValueError:
                 self.spool_state = -1
 
-            self.logger.info(f"on_update: {self.name}")
+            self.logger.debug(f"on_update: {self.name}")
         except Exception:
             self.logger.error(f"on_update: {self.name} - {traceback.format_exc()}")
 

@@ -118,7 +118,7 @@ try:
                 # iterate through all unmatched prints
                 if timestamp > u_print[4] + constants.BAMBU_TIMEOUT:
                     # if the print was submitted more than 10 minutes ago (timeout), compare with old forms
-                    logger.info(
+                    logger.debug(
                         f"main: Print {u_print[0]} is older than timeout, checking old forms"
                     )
                     matched = False  # flag to check if the print was matched
@@ -131,7 +131,7 @@ try:
                         name, cruzid, form_time = old_form_rows[form_row]
                         if abs(form_time - u_print[4]) <= constants.BAMBU_TIMEOUT:
                             # if the form was submitted within 10 minutes of the print, match them
-                            logger.info(
+                            logger.debug(
                                 f"main: Matching print {u_print[0]} with form {form_row} - old form/print"
                             )
                             db.match(u_print[0], form_row)
@@ -149,7 +149,7 @@ try:
 
                     if not matched:
                         # if the form was not matched, expire it
-                        logger.info(
+                        logger.debug(
                             f"main: Expiring print {u_print[0]} - old print, no form found"
                         )
                         db.expire_print(u_print[0])
@@ -157,7 +157,7 @@ try:
                             # if the start time in the print task is within 60 seconds of the printer's current print's start time, they must be the same print
                             # cancel the print (no form was submitted/matched)
                             printers[u_print[1]].cancel()
-                            logger.info(
+                            logger.debug(
                                 f"main: Canceling printer {u_print[1]}, id {u_print[0]} - old print, no form found, still running"
                             )
 
@@ -173,7 +173,7 @@ try:
                     db.match(u_print[0], form_row)
                     del form_printer_rows[u_print[1]]
 
-                    logger.info(
+                    logger.debug(
                         f"main: Matching print {u_print[0]} with form {form_row} - new form/print, still running"
                     )
 
@@ -184,14 +184,14 @@ try:
                         # archive the print as canceled
                         db.archive_print(u_print[0], constants.PRINT_CANCELED)
 
-                        logger.info(
+                        logger.debug(
                             f"main: Canceling printer {u_print[1]}, id {u_print[0]} - new form/print, still running, user {cruzid} has insufficient weight"
                         )
                     else:
                         # if the user has enough weight left, subtract the print weight from their limit
                         db.subtract_limit(cruzid, u_print[6])
 
-                        logger.info(
+                        logger.debug(
                             f"main: User {cruzid} has sufficient weight for print {u_print[0]}"
                         )
 
@@ -200,7 +200,7 @@ try:
                 # check if the form was used
                 if old_form_rows[form_row] is not None:
                     db.expire_form(form_row)
-                    logger.info(
+                    logger.debug(
                         f"main: Expiring form {form_row} - old form, no print found"
                     )
 
@@ -222,7 +222,7 @@ try:
                         if current_prints[c_print[3]][7] > timestamp:
                             # if the print's end time is in the future, the print probably was canceled
 
-                            logger.info(
+                            logger.debug(
                                 f"main: Print {current_prints[c_print[3]][0]} was probably canceled"
                             )
                             db.archive_print(
@@ -236,14 +236,14 @@ try:
                         else:
                             # if the print's end time is in the past, the print probably succeeded
 
-                            logger.info(
+                            logger.debug(
                                 f"main: Print {current_prints[c_print[3]][0]} probably succeeded"
                             )
                             db.archive_print(
                                 current_prints[c_print[3]][0], constants.PRINT_SUCCEEDED
                             )
 
-                        logger.info(
+                        logger.debug(
                             f"main: Replacing print {current_prints[c_print[3]][0]} with print {c_print[0]} as the current print for {c_print[3]}"
                         )
                         current_prints[c_print[3]] = c_print
@@ -259,26 +259,26 @@ try:
                         # if print start time is more than 60 seconds ago (ignore very recent prints in case the printer object status hasn't updated yet)
                         if printer.get_status() == constants.GCODE_FINISH:
                             # if the printer status is finish, the print succeeded
-                            logger.info(f"main: Print {print_details[0]} succeeded")
+                            logger.debug(f"main: Print {print_details[0]} succeeded")
                             db.archive_print(
                                 print_details[0], constants.PRINT_SUCCEEDED
                             )
                         elif printer.get_status() == constants.GCODE_FAILED:
                             # if the printer status is failed, the print failed
-                            logger.info(f"main: Print {print_details[0]} failed")
+                            logger.debug(f"main: Print {print_details[0]} failed")
                             db.archive_print(print_details[0], constants.PRINT_FAILED)
                             # add the print weight back to the user's limit
                             db.subtract_limit(print_details[2], -1 * print_details[8])
                         elif printer.get_status() == constants.GCODE_IDLE:
                             # if the printer status is idle, the print was canceled
-                            logger.info(f"main: Print {print_details[0]} canceled")
+                            logger.debug(f"main: Print {print_details[0]} canceled")
                             db.archive_print(print_details[0], constants.PRINT_CANCELED)
                             # add the print weight back to the user's limit
                             db.subtract_limit(print_details[2], -1 * print_details[8])
                         else:
                             # if the printer status is not finish, failed, or idle, the print is still in progress
                             running = True
-                            logger.info(
+                            logger.debug(
                                 f"main: Print {print_details[0]} still running on printer {name}, updating end time and status"
                             )
                             db.update_print_end_time(
@@ -292,7 +292,7 @@ try:
                             )
 
                 if not running:
-                    logger.info(f"main: Marking printer {name} as idle")
+                    logger.debug(f"main: Marking printer {name} as idle")
                     db.update_printer(
                         name,
                         status=constants.PRINTER_IDLE,
