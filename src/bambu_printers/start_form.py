@@ -6,7 +6,6 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
 
 from src import log
 
@@ -34,7 +33,9 @@ def get_start_form():
 
 class StartForm:
     def __init__(self):
-        self.logger = log.setup_logs("start_form", additional_handlers=[("bambu", log.INFO)])
+        self.logger = log.setup_logs(
+            "start_form", additional_handlers=[("bambu", log.INFO)]
+        )
         common_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "..", "..", "common"
         )

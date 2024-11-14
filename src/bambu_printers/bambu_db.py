@@ -36,8 +36,7 @@ db = sqlite3.connect(
     autocommit=True,
     check_same_thread=check_same_thread,
 )
-cursor = db.cursor()
-sql = cursor.execute
+sql = db.cursor().execute
 
 CREATE_TABLES = {
     "prints_unmatched": [
@@ -169,7 +168,9 @@ def get_db():
 class BambuDB:
     def __init__(self):
         try:
-            self.logger = log.setup_logs("bambu_db", additional_handlers=[("bambu", log.INFO)])
+            self.logger = log.setup_logs(
+                "bambu_db", additional_handlers=[("bambu", log.INFO)]
+            )
             for name in CREATE_TABLES:
                 sql(
                     f"CREATE TABLE IF NOT EXISTS {name} ({', '.join(CREATE_TABLES[name])})"

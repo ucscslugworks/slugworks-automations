@@ -29,7 +29,9 @@ def get_printer(name: str, serial: str):
 
 class Printer:
     def __init__(self, name: str, serial: str):
-        self.logger = log.setup_logs("bambu_printer", additional_handlers=[("bambu", log.INFO)])
+        self.logger = log.setup_logs(
+            "bambu_printer", additional_handlers=[("bambu", log.INFO)]
+        )
 
         self.name = name
 
@@ -44,7 +46,8 @@ class Printer:
         self.printer = BambuPrinter(config=config)
 
         self.db = get_db()
-        self.db.add_printer(name)
+        if not self.db.get_printer_data(name):
+            self.db.add_printer(name)
 
         self.last_update = -1
         self.tool_temp = -1
