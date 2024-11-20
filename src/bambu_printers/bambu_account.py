@@ -99,6 +99,7 @@ class BambuAccount:
                 response = requests.get(TASKS_URL, headers=self.headers)
                 self.logger.info(response.status_code)
                 if response.status_code != 200:
+                    self.logger.info(response.text)
                     self.logger.info(
                         "login: Pre-configured token from bambu.json is invalid, will attempt manual login"
                     )
