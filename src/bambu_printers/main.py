@@ -29,6 +29,9 @@ try:
             time.sleep(constants.BAMBU_DELAY)
             logger.info("main: Running main loop")
 
+            # loop timestamp - ensure consistent time comparisons for all operations in this loop
+            timestamp = int(time.time())
+
             # Get the latest rows from the start form
             rows = sf.get()
 
@@ -88,9 +91,6 @@ try:
                     colors[3][0],  # color 3 hex code
                     colors[3][1],  # color 3 weight
                 )
-
-            # loop timestamp - ensure consistent time comparisons for all operations in this loop
-            timestamp = int(time.time())
 
             # dict to store form rows and printer names (as submitted in form) for unmatched forms
             form_printer_rows = dict()
@@ -153,8 +153,11 @@ try:
                             f"main: Expiring print {u_print[0]} - old print, no form found"
                         )
                         db.expire_print(u_print[0])
-                        if abs(u_print[4] - printers[u_print[1]].start_time) <= 60:
-                            # if the start time in the print task is within 60 seconds of the printer's current print's start time, they must be the same print
+                        logger.debug(
+                            f"main: print started at {u_print[4]}, printer started at {printers[u_print[1]].start_time}"
+                        )
+                        if abs(u_print[4] - printers[u_print[1]].start_time) <= 90:
+                            # if the start time in the print task is within 90 seconds of the printer's current print's start time, they must be the same print
                             # cancel the print (no form was submitted/matched)
                             printers[u_print[1]].cancel()
                             logger.debug(
@@ -163,7 +166,7 @@ try:
 
                 elif (
                     u_print[1] in form_printer_rows
-                    and abs(u_print[4] - printers[u_print[1]].start_time) <= 60
+                    and abs(u_print[4] - printers[u_print[1]].start_time) <= 90
                 ):
                     # if the print was submitted within the last 10 minutes and there is a form for the same printer (and the print is still running)
                     # get the form details
@@ -198,7 +201,10 @@ try:
             # expire any forms that were not matched and are older than 10 minutes
             for form_row in old_form_rows:
                 # check if the form was used
-                if old_form_rows[form_row] is not None:
+                if (
+                    old_form_rows[form_row] is not None
+                    and old_form_rows[form_row][2] + constants.BAMBU_TIMEOUT < timestamp
+                ):
                     db.expire_form(form_row)
                     logger.debug(
                         f"main: Expiring form {form_row} - old form, no print found"
@@ -255,8 +261,8 @@ try:
                 if name in current_prints:
                     print_details = current_prints[name]
 
-                    if print_details[6] <= timestamp - 60:
-                        # if print start time is more than 60 seconds ago (ignore very recent prints in case the printer object status hasn't updated yet)
+                    if print_details[6] <= timestamp - 90:
+                        # if print start time is more than 90 seconds ago (ignore very recent prints in case the printer object status hasn't updated yet)
                         if printer.get_status() == constants.GCODE_FINISH:
                             # if the printer status is finish, the print succeeded
                             logger.debug(f"main: Print {print_details[0]} succeeded")
@@ -301,6 +307,7 @@ try:
                     )
 
                 printer.update_db()
+                printer.restart_bpm_object()
 
             logger.info("main: Finished main loop")
         except Exception as e:

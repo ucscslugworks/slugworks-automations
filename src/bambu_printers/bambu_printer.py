@@ -35,20 +35,21 @@ class Printer:
         )
 
         self.name = name
+        self.serial = serial
 
         account = get_account()
         config = BambuConfig(
             hostname=HOSTNAME,
             access_code=account.get_token(),
-            serial_number=serial,
+            serial_number=self.serial,
             mqtt_username=account.get_username(),
             mqtt_port=PORT,
         )
         self.printer = BambuPrinter(config=config)
 
         self.db = get_db()
-        if not self.db.get_printer_data(name):
-            self.db.add_printer(name)
+        if not self.db.get_printer_data(self.name):
+            self.db.add_printer(self.name)
 
         self.last_update = -1
         self.tool_temp = -1
@@ -173,6 +174,26 @@ class Printer:
     def stop_thread(self):
         self.printer.quit()
         self.logger.info(f"stop_thread: {self.name}")
+
+    def restart_bpm_object(self):
+        self.logger.debug(f"restart_bpm_object: {self.name}")
+        if self.printer.client and not self.printer.client.is_connected():
+            self.logger.warning(f"restart_bpm_object: {self.name} - not connected")
+            self.stop_thread()
+
+            account = get_account()
+            config = BambuConfig(
+                hostname=HOSTNAME,
+                access_code=account.get_token(),
+                serial_number=self.serial,
+                mqtt_username=account.get_username(),
+                mqtt_port=PORT,
+            )
+            self.printer = BambuPrinter(config=config)
+
+            self.printer.on_update = self.on_update
+            self.printer.start_session()
+            self.logger.info(f"restart_bpm_object: restarted {self.name}")
 
 
 if __name__ == "__main__":
