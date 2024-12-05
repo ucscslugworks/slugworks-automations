@@ -161,7 +161,7 @@ class Printer:
             self.logger.error(f"update_db: {self.name} - {traceback.format_exc()}")
 
     def cancel(self):
-        # self.printer.stop_printing()
+        self.printer.stop_printing()
         self.db.update_printer(self.name, status=constants.PRINTER_IDLE)
         self.logger.warning(f"cancel: {self.name}")
 

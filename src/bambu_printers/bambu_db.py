@@ -514,7 +514,7 @@ class BambuDB:
             return False
 
     def get_limits_column(self):
-        return f"weight_{datetime.now().year}_{datetime.now().month // 4 + 1}"
+        return f"weight_{datetime.now().year}_{(datetime.now().month - 1) // 3}"
 
     def update_print_end_time(self, print_id: int, end_time: int):
         try:

@@ -1,3 +1,4 @@
+import os.path
 import time
 import traceback
 from collections import defaultdict
@@ -310,6 +311,27 @@ try:
                 printer.restart_bpm_object()
 
             logger.info("main: Finished main loop")
+
+            if os.path.exists(
+                os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)),
+                    "..",
+                    "..",
+                    "common",
+                    "SPECIAL_BAMBU_STOP",
+                )
+            ):
+                logger.warning("main: SPECIAL_BAMBU_STOP file found, stopping")
+                os.remove(
+                    os.path.join(
+                        os.path.dirname(os.path.abspath(__file__)),
+                        "..",
+                        "..",
+                        "common",
+                        "SPECIAL_BAMBU_STOP",
+                    )
+                )
+                raise KeyboardInterrupt
         except Exception as e:
             logger.error(f"main: {traceback.format_exc()}")
 

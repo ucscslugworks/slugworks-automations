@@ -9,5 +9,5 @@ if [ ! -f $PID_FILE ]; then
     exit 1
 fi
 
-kill $(cat $PID_FILE)
+touch common/SPECIAL_BAMBU_STOP
 rm $PID_FILE
