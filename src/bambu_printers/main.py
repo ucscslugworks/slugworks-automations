@@ -321,7 +321,7 @@ try:
                     "SPECIAL_BAMBU_STOP",
                 )
             ):
-                logger.warning("main: SPECIAL_BAMBU_STOP file found, stopping")
+                logger.warning("main: SPECIAL_BAMBU_STOP file found, triggering KeyboardInterrupt")
                 os.remove(
                     os.path.join(
                         os.path.dirname(os.path.abspath(__file__)),
