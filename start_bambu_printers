@@ -3,6 +3,11 @@
 cd "$(dirname "$(readlink -f "$0")")"
 
 PID_FILE="pid_bambu_printers"
+STOP_FILE="common/SPECIAL_BAMBU_STOP"
+
+if [ -f $STOP_FILE ]; then
+    rm $STOP_FILE
+fi
 
 if [ -f $PID_FILE ]; then
     echo "bambu_printers is already running, please stop current instance"

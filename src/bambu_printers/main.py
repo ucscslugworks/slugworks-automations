@@ -349,7 +349,23 @@ except KeyboardInterrupt:
     logger.info("main: Stopping account refresh thread")
     account.stop_refresh_thread()
 
-    exit(0)
 except Exception:
     logger.error(f"main: {traceback.format_exc()}")
-    exit(1)
+
+if os.path.exists(
+    os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..",
+        "..",
+        "pid_bambu_printers",
+    )
+):
+    logger.info("main: pid_bambu_printers file found, deleting")
+    os.remove(
+        os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..",
+            "..",
+            "pid_bambu_printers",
+        )
+    )

@@ -3,11 +3,12 @@
 cd "$(dirname "$(readlink -f "$0")")"
 
 PID_FILE="pid_bambu_printers"
+STOP_FILE="common/SPECIAL_BAMBU_STOP"
 
 if [ ! -f $PID_FILE ]; then
     echo "bambu_printers is not running"
     exit 1
 fi
 
-touch common/SPECIAL_BAMBU_STOP
+touch $STOP_FILE
 rm $PID_FILE
