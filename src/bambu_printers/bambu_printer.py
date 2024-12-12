@@ -18,10 +18,13 @@ def get_printer(name: str, serial: str):
     global PRINTER_OBJECTS
 
     if name in PRINTER_OBJECTS:
+        while PRINTER_OBJECTS[name] is None:
+            time.sleep(1)
         p = PRINTER_OBJECTS[name]
         p.logger.info(f"get_printer: returned duplicate printer: {name}")
         return PRINTER_OBJECTS[name]
     else:
+        PRINTER_OBJECTS[name] = None
         printer = Printer(name, serial)
         PRINTER_OBJECTS[name] = printer
         printer.logger.info(f"get_printer: created new printer: {name}")

@@ -23,15 +23,20 @@ TASKS_URL = f"{BASE_URL}/user-service/my/tasks"
 REFRESH_DELAY = 30  # seconds
 
 ACCOUNT_OBJECT = None
+ACCOUNT_STARTED = False
 
 
 def get_account():
-    global ACCOUNT_OBJECT
+    global ACCOUNT_OBJECT, ACCOUNT_STARTED
 
-    if not ACCOUNT_OBJECT:
+    if not ACCOUNT_STARTED:
+        ACCOUNT_STARTED = True
         ACCOUNT_OBJECT = BambuAccount()
         ACCOUNT_OBJECT.logger.info("get_account: Created new BambuAccount object.")
     else:
+        while ACCOUNT_OBJECT is None:
+            time.sleep(1)
+        
         ACCOUNT_OBJECT.logger.info(
             "get_account: Retrieved existing BambuAccount object."
         )
@@ -96,7 +101,16 @@ class BambuAccount:
                 self.refresh_token = bambu_json["refreshToken"]
                 self.headers["Authorization"] = f"Bearer {self.token}"
 
-                response = requests.get(TASKS_URL, headers=self.headers)
+                response = None
+                while not response:
+                    try:
+                        response = requests.get(TASKS_URL, headers=self.headers)
+                    except (
+                        requests.exceptions.ConnectionError
+                    ):
+                        self.logger.error("login: Connection error, retrying...")
+                        time.sleep(60)
+                
                 self.logger.info(response.status_code)
                 if response.status_code != 200:
                     self.logger.info(response.text)

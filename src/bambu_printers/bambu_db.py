@@ -1,6 +1,7 @@
 import json
 import os
 import sqlite3
+import time
 import traceback
 from datetime import datetime
 
@@ -152,15 +153,20 @@ EXEMPT_PATH = os.path.join(
 )
 
 DB_OBJECT = None
+DB_STARTED = False
 
 
 def get_db():
-    global DB_OBJECT
+    global DB_OBJECT, DB_STARTED
 
-    if DB_OBJECT is None:
+    if not DB_STARTED:
+        DB_STARTED = True
         DB_OBJECT = BambuDB()
         DB_OBJECT.logger.info("get_db: Created new DB object")
     else:
+        while DB_OBJECT is None:
+            time.sleep(1)
+        
         DB_OBJECT.logger.info("get_db: Retrieved existing DB object")
 
     return DB_OBJECT

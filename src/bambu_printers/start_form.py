@@ -15,15 +15,19 @@ SHEET_NAME = "Form Responses 1"
 EXPECTED_ROW_LENGTH = 3
 
 START_FORM_OBJECT = None
+START_FORM_STARTED = False
 
 
 def get_start_form():
-    global START_FORM_OBJECT
+    global START_FORM_OBJECT, START_FORM_STARTED
 
-    if not START_FORM_OBJECT:
+    if not START_FORM_STARTED:
+        START_FORM_STARTED = True
         START_FORM_OBJECT = StartForm()
         START_FORM_OBJECT.logger.info("get_start_form: Created new StartForm object.")
     else:
+        while START_FORM_OBJECT is None:
+            time.sleep(1)
         START_FORM_OBJECT.logger.info(
             "get_start_form: Retrieved existing StartForm object."
         )
