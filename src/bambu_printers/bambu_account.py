@@ -22,6 +22,14 @@ TASKS_URL = f"{BASE_URL}/user-service/my/tasks"
 
 REFRESH_DELAY = 30  # seconds
 
+BAMBU_JSON = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "..",
+    "..",
+    "common",
+    "bambu.json",
+)
+
 ACCOUNT_OBJECT = None
 ACCOUNT_STARTED = False
 
@@ -36,7 +44,7 @@ def get_account():
     else:
         while ACCOUNT_OBJECT is None:
             time.sleep(1)
-        
+
         ACCOUNT_OBJECT.logger.info(
             "get_account: Retrieved existing BambuAccount object."
         )
@@ -83,13 +91,7 @@ class BambuAccount:
         try:
             bambu_json = json.load(
                 open(
-                    os.path.join(
-                        os.path.dirname(os.path.abspath(__file__)),
-                        "..",
-                        "..",
-                        "common",
-                        "bambu.json",
-                    )
+                    BAMBU_JSON,
                 )
             )
 
@@ -105,12 +107,10 @@ class BambuAccount:
                 while not response:
                     try:
                         response = requests.get(TASKS_URL, headers=self.headers)
-                    except (
-                        requests.exceptions.ConnectionError
-                    ):
+                    except requests.exceptions.ConnectionError:
                         self.logger.error("login: Connection error, retrying...")
                         time.sleep(60)
-                
+
                 self.logger.info(response.status_code)
                 if response.status_code != 200:
                     self.logger.info(response.text)
@@ -151,7 +151,13 @@ class BambuAccount:
 
                     code = bambu_json["code"]
                     del bambu_json["code"]
-                    json.dump(bambu_json, open("bambu.json", "w"))
+                    json.dump(
+                        bambu_json,
+                        open(
+                            BAMBU_JSON,
+                            "w",
+                        ),
+                    )
 
                     self.logger.info("login: Got code, deleted from bambu.json")
 
@@ -209,7 +215,13 @@ class BambuAccount:
 
             bambu_json["token"] = self.token
             bambu_json["refreshToken"] = self.refresh_token
-            json.dump(bambu_json, open("bambu.json", "w"))
+            json.dump(
+                bambu_json,
+                open(
+                    BAMBU_JSON,
+                    "w",
+                ),
+            )
 
             self.logger.info("login: Saved token to bambu.json")
 
@@ -243,10 +255,21 @@ class BambuAccount:
 
             self.headers["Authorization"] = f"Bearer {self.token}"
 
-            bambu_json = json.load(open("bambu.json", "r"))
+            bambu_json = json.load(
+                open(
+                    BAMBU_JSON,
+                    "r",
+                ),
+            )
             bambu_json["token"] = self.token
             bambu_json["refreshToken"] = self.refresh_token
-            json.dump(bambu_json, open("bambu.json", "w"))
+            json.dump(
+                bambu_json,
+                open(
+                    BAMBU_JSON,
+                    "w",
+                ),
+            )
 
             self.logger.info("refresh: Refreshed token and saved to bambu.json")
         except Exception:
