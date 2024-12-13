@@ -16,6 +16,6 @@ fi
 
 source venv/bin/activate
 
-python -m src.bambu_printers.main &
+python -m src.bambu_printers.manager &
 
 echo $! > $PID_FILE

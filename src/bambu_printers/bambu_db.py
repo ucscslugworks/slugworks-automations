@@ -36,7 +36,9 @@ db = sqlite3.connect(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "bambu.db"),
     autocommit=True,
     check_same_thread=check_same_thread,
+    isolation_level=None,
 )
+db.execute('PRAGMA journal_mode=WAL')
 cursor = db.cursor()
 sql = cursor.execute
 
