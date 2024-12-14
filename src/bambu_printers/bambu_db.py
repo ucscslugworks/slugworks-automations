@@ -38,7 +38,7 @@ db = sqlite3.connect(
     check_same_thread=check_same_thread,
     isolation_level=None,
 )
-db.execute('PRAGMA journal_mode=WAL')
+db.execute("PRAGMA journal_mode=WAL")
 cursor = db.cursor()
 sql = cursor.execute
 
@@ -168,7 +168,7 @@ def get_db():
     else:
         while DB_OBJECT is None:
             time.sleep(1)
-        
+
         DB_OBJECT.logger.info("get_db: Retrieved existing DB object")
 
     return DB_OBJECT
@@ -459,7 +459,9 @@ class BambuDB:
             old_limit = self.get_limit(cruzid)
             if old_limit is not None and old_limit < constants.BAMBU_DEFAULT_LIMIT:
                 amount = max(amount, old_limit - constants.BAMBU_DEFAULT_LIMIT)
-                self.logger.info(f"subtract_limit: Adjusted amount to {amount} to not exceed default limit")
+                self.logger.info(
+                    f"subtract_limit: Adjusted amount to {amount} to not exceed default limit"
+                )
 
             if cruzid in json.load(
                 open(
@@ -609,3 +611,24 @@ class BambuDB:
         except Exception:
             self.logger.error(f"get_printer_data: {traceback.format_exc()}")
             return None
+
+    def get_printer_list(self):
+        try:
+            return sql("SELECT name FROM printers").fetchall()
+        except Exception:
+            self.logger.error(f"get_printer_list: {traceback.format_exc()}")
+            return []
+
+    def check_offline_printers(self):
+        try:
+            for printer, last_update in sql("SELECT name FROM printers").fetchall():
+                if last_update < time.time() - constants.BAMBU_OFFLINE_TIMEOUT:
+                    self.logger.warning(
+                        f"check_offline_printers: Printer {printer} offline"
+                    )
+                    sql(
+                        "UPDATE printers SET status = ? WHERE name = ?",
+                        (constants.PRINTER_OFFLINE, printer),
+                    )
+        except Exception:
+            self.logger.error(f"check_offline_printers: {traceback.format_exc()}")

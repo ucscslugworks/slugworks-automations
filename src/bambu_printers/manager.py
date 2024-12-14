@@ -278,7 +278,9 @@ def manager():
                                 )
                             elif printer.get_status() == constants.GCODE_FAILED:
                                 # if the printer status is failed, the print failed
-                                logger.debug(f"manager: Print {print_details[0]} failed")
+                                logger.debug(
+                                    f"manager: Print {print_details[0]} failed"
+                                )
                                 db.archive_print(
                                     print_details[0], constants.PRINT_FAILED
                                 )
@@ -288,7 +290,9 @@ def manager():
                                 )
                             elif printer.get_status() == constants.GCODE_IDLE:
                                 # if the printer status is idle, the print was canceled
-                                logger.debug(f"manager: Print {print_details[0]} canceled")
+                                logger.debug(
+                                    f"manager: Print {print_details[0]} canceled"
+                                )
                                 db.archive_print(
                                     print_details[0], constants.PRINT_CANCELED
                                 )
@@ -324,6 +328,7 @@ def manager():
                     printer.update_db()
                     printer.restart_bpm_object()
 
+                db.check_offline_printers()
                 logger.info("manager: Finished main loop")
 
                 if os.path.exists(
