@@ -56,8 +56,12 @@ def manager():
 
                 logger.info(f"manager: {len(tasks)} tasks found")
                 for task in tasks:
-                    if not task["isPrintable"] or db.print_exists(task["id"]):
-                        # if the task is not a print or is already in the db, skip
+                    if not task["isPrintable"]:
+                        # if the task is not a print, skip
+                        continue
+                    elif db.print_exists(task["id"]):
+                        # if the task is already in the db, update the cover photo link
+                        db.update_cover(task["id"], task["cover"])
                         continue
 
                     # parse the start time and calculate the end time

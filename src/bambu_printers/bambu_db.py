@@ -139,7 +139,7 @@ CREATE_TABLES = {
         "end_time INTEGER",
         "active_spool INTEGER",
         "spool_state INTEGER",
-        "colors TEXT"
+        "colors TEXT",
     ],
 }
 
@@ -407,6 +407,13 @@ class BambuDB:
             self.logger.error(f"get_unmatched_forms: {traceback.format_exc()}")
             return []
 
+    def get_print_archive(self):
+        try:
+            return sql("SELECT * FROM prints_archive ORDER BY id DESC").fetchall()
+        except Exception:
+            self.logger.error(f"get_print_archive: {traceback.format_exc()}")
+            return []
+
     def get_limit(self, cruzid: str):
         try:
             if cruzid in json.load(
@@ -622,7 +629,9 @@ class BambuDB:
 
     def check_offline_printers(self):
         try:
-            for printer, last_update in sql("SELECT name, last_update FROM printers").fetchall():
+            for printer, last_update in sql(
+                "SELECT name, last_update FROM printers"
+            ).fetchall():
                 if last_update < time.time() - constants.BAMBU_OFFLINE_TIMEOUT:
                     self.logger.warning(
                         f"check_offline_printers: Printer {printer} offline"
@@ -633,3 +642,34 @@ class BambuDB:
                     )
         except Exception:
             self.logger.error(f"check_offline_printers: {traceback.format_exc()}")
+
+    def update_cover(self, id: int, cover: str):
+        try:
+            if not sql("SELECT * from prints_current WHERE id = ?", (id,)).fetchone():
+                self.logger.warning(f"update_cover: Print {id} already archived")
+                return True
+
+            sql(
+                "UPDATE prints_current SET cover = ? WHERE id = ?",
+                (cover, id),
+            )
+            self.logger.info(f"update_cover: Updated cover for {id}")
+            return True
+        except Exception:
+            self.logger.error(f"update_cover: {traceback.format_exc()}")
+            return False
+
+    def get_cover(self, id: int):
+        try:
+            if not sql("SELECT * from prints_current WHERE id = ?", (id,)).fetchone():
+                self.logger.warning(
+                    f"get_cover: Print {id} already archived or doesn't exist"
+                )
+                return None
+
+            return sql(
+                "SELECT cover from prints_current WHERE id = ?", (id,)
+            ).fetchone()[0]
+        except Exception:
+            self.logger.error(f"get_cover: {traceback.format_exc()}")
+            return None
