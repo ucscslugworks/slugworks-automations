@@ -73,6 +73,7 @@ class Printer:
         self.start_time = -1
         self.active_spool = -1
         self.spool_state = ""
+        self.colors = []
 
         self.printer.on_update = self.on_update
         self.printer.start_session()
@@ -119,6 +120,8 @@ class Printer:
             except ValueError:
                 self.spool_state = -1
 
+            self.colors = [s.color for s in printer.spools]
+
             self.logger.debug(f"on_update: {self.name}")
         except Exception:
             self.logger.error(f"on_update: {self.name} - {traceback.format_exc()}")
@@ -158,6 +161,7 @@ class Printer:
                 end_time=self.start_time + self.time_remaining,
                 active_spool=self.active_spool,
                 spool_state=self.spool_state,
+                colors=",".join(self.colors),
             )
             self.logger.info(f"update_db: {self.name}")
         except Exception:

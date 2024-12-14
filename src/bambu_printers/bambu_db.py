@@ -139,6 +139,7 @@ CREATE_TABLES = {
         "end_time INTEGER",
         "active_spool INTEGER",
         "spool_state INTEGER",
+        "colors TEXT"
     ],
 }
 
