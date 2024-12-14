@@ -531,7 +531,7 @@ class BambuDB:
                 (end_time, print_id),
             )
             self.logger.info(
-                f"update_print_end_time: Updated print {print_id} end time"
+                f"update_print_end_time: Updated print {print_id} end time to {end_time}"
             )
             return True
         except Exception:
