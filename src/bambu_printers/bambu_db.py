@@ -621,7 +621,7 @@ class BambuDB:
 
     def check_offline_printers(self):
         try:
-            for printer, last_update in sql("SELECT name FROM printers").fetchall():
+            for printer, last_update in sql("SELECT name, last_update FROM printers").fetchall():
                 if last_update < time.time() - constants.BAMBU_OFFLINE_TIMEOUT:
                     self.logger.warning(
                         f"check_offline_printers: Printer {printer} offline"
