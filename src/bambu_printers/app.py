@@ -1,7 +1,7 @@
 import logging
 import os
 
-from flask import Flask, render_template
+from flask import Flask, render_template, url_for
 
 from src import constants, log
 from src.bambu_printers import get_db
@@ -42,13 +42,17 @@ def dashboard():
             if color:
                 colors.append(color)
 
+        data["cover"] = db.get_cover(data["print_id"])
+        if not data["cover"]:
+            data["cover"] = url_for("static", filename=f"{name}.png")
+
         printer_data.append(
             {
                 "name": name,
                 "status": data["status"],
                 "progress": data["percent_complete"],
                 "time": "%dh %02dm" % divmod(data["time_remaining"] / 60, 60),
-                "cover": db.get_cover(data["print_id"]), # if none, replace with image of the character
+                "cover": data["cover"],
                 "colors": colors,
             }
         )
