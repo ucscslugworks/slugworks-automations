@@ -63,7 +63,7 @@ def dashboard():
 
 @app.route("/usage", methods=["GET"])
 def usage():
-    return "Hello, world!"
+    return render_template("usage.html")
 
 
 if __name__ == "__main__":

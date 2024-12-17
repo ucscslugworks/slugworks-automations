@@ -1,0 +1,179 @@
+{% extends "_base.html" %}
+
+{% block head %}
+<title>Slugworks Filament Usage</title>
+<style>
+    .vcenter {
+        vertical-align: middle !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<p class="title">
+    Slugworks Filament Usage
+</p>
+<p class="subtitle">
+    Please contact the Slugworks staff if you have any questions or concerns.
+</p>
+<canvas id="chart"></canvas>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+
+    const MONTHS = [
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December'
+    ];
+
+    function months(config) {
+        var cfg = config || {};
+        var count = cfg.count || 12;
+        var section = cfg.section;
+        var values = [];
+        var i, value;
+
+        for (i = 0; i < count; ++i) {
+            value = MONTHS[Math.ceil(i) % 12];
+            values.push(value.substring(0, section));
+        }
+
+        return values;
+    }
+
+    const CHART_COLORS = {
+        red: 'rgb(255, 99, 132)',
+        orange: 'rgb(255, 159, 64)',
+        yellow: 'rgb(255, 205, 86)',
+        green: 'rgb(75, 192, 192)',
+        blue: 'rgb(54, 162, 235)',
+        purple: 'rgb(153, 102, 255)',
+        grey: 'rgb(201, 203, 207)'
+    };
+
+    function valueOrDefault(x, d) {
+        return typeof x === 'undefined' ? d : x;
+    }
+
+    var _seed = Date.now();
+    function rand(min, max) {
+        min = valueOrDefault(min, 0);
+        max = valueOrDefault(max, 0);
+        _seed = (_seed * 9301 + 49297) % 233280;
+        return min + (_seed / 233280) * (max - min);
+    }
+
+    function numbers(config) {
+        var cfg = config || {};
+        var min = valueOrDefault(cfg.min, 0);
+        var max = valueOrDefault(cfg.max, 100);
+        var from = valueOrDefault(cfg.from, []);
+        var count = valueOrDefault(cfg.count, 8);
+        var decimals = valueOrDefault(cfg.decimals, 8);
+        var continuity = valueOrDefault(cfg.continuity, 1);
+        var dfactor = Math.pow(10, decimals) || 0;
+        var data = [];
+        var i, value;
+
+        for (i = 0; i < count; ++i) {
+            value = (from[i] || 0) + this.rand(min, max);
+            if (this.rand() <= continuity) {
+                data.push(Math.round(dfactor * value) / dfactor);
+            } else {
+                data.push(null);
+            }
+        }
+
+        return data;
+    }
+
+    const ctx = document.getElementById('chart');
+
+    const DATA_COUNT = 7;
+    const NUMBER_CFG = { count: DATA_COUNT, min: -100, max: 100 };
+
+    const labels = months({ count: 7 });
+    const data = {
+        labels: labels,
+        datasets: [
+            {
+                label: 'My First dataset',
+                data: numbers(NUMBER_CFG),
+                borderColor: CHART_COLORS.red,
+                backgroundColor: CHART_COLORS.red,
+                fill: true
+            },
+            {
+                label: 'My Second dataset',
+                data: numbers(NUMBER_CFG),
+                borderColor: CHART_COLORS.blue,
+                backgroundColor: CHART_COLORS.blue,
+                fill: true
+            },
+            {
+                label: 'My Third dataset',
+                data: numbers(NUMBER_CFG),
+                borderColor: CHART_COLORS.green,
+                backgroundColor: CHART_COLORS.green,
+                fill: true
+            },
+            {
+                label: 'My Fourth dataset',
+                data: numbers(NUMBER_CFG),
+                borderColor: CHART_COLORS.yellow,
+                backgroundColor: CHART_COLORS.yellow,
+                fill: true
+            }
+        ]
+    };
+
+    new Chart(ctx, {
+        type: 'line',
+        data: data,
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: (ctx) => 'Chart.js Line Chart - stacked=' + ctx.chart.options.scales.y.stacked
+                },
+                tooltip: {
+                    mode: 'index'
+                },
+            },
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false
+            },
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Month'
+                    }
+                },
+                y: {
+                    stacked: true,
+                    title: {
+                        display: true,
+                        text: 'Value'
+                    }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
