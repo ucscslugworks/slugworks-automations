@@ -1,53 +1,44 @@
-<!DOCTYPE html>
-<html>
+{% extends "_base.html" %}
 
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Slugworks 3D Printer Dashboard</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css">
-</head>
+{% block head %}
+<title>Slugworks 3D Printer Dashboard</title>
+{% endblock %}
 
-<body>
-    <section class="section">
-        <div class="container">
-            <h1 class="title">
-                Slugworks 3D Printer Dashboard
-            </h1>
-            <p class="subtitle">
-                Please contact the Slugworks staff if you have any questions or concerns.
-            </p>
-            <table class="table is-hoverable is-fullwidth is-striped">
-                <thead>
-                    <tr>
-                        <th>Printer</th>
-                        <th>Status</th>
-                        <th>Progress</th>
-                        <th>Print Image</th>
-                        <th>Filament Colors</th>
-                    </tr>
-                <tbody>
-                    {% for line in printers %}
-                    <tr>
-                        <td>{{ line.name }}</td>
-                        <td>{{ line.status }}</td>
-                        <td>
-                            <progress class="progress is-primary" value="{{ line.progress }}" max="100">{{ line.progress }}%</progress> {{ line.time }} left
-                        </td>
-                        <td>
-                            <img class="image is-square" src="{{ line.cover }}" alt="{{ line.name }}" style="height: 128px;">
-                        </td>
-                        <td>
-                            {% for color in line.colors %}
-                            <span class="tag is-primary" style="background-color: {{ color }};" title="{{ color }}"></span>
-                            {% endfor %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </section>
-</body>
-
-</html>
+{% block content %}
+<h1 class="title">
+    Slugworks 3D Printer Dashboard
+</h1>
+<p class="subtitle">
+    Please contact the Slugworks staff if you have any questions or concerns.
+</p>
+<table class="table is-hoverable is-fullwidth is-striped">
+    <thead>
+        <tr>
+            <th>Printer</th>
+            <th>Status</th>
+            <th>Progress</th>
+            <th>Print Image</th>
+            <th>Filament Colors</th>
+        </tr>
+    <tbody>
+        {% for line in printers %}
+        <tr>
+            <td>{{ line.name }}</td>
+            <td>{{ line.status }}</td>
+            <td>
+                <progress class="progress is-primary" value="{{ line.progress }}" max="100">{{ line.progress
+                    }}%</progress> {{ line.time }} left
+            </td>
+            <td>
+                <img class="image is-square" src="{{ line.cover }}" alt="{{ line.name }}" style="height: 128px;">
+            </td>
+            <td>
+                {% for color in line.colors %}
+                <span class="tag is-primary" style="background-color: {{ color }};" title="{{ color }}"></span>
+                {% endfor %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
