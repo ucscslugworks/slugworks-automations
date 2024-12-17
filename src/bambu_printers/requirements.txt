@@ -6,3 +6,4 @@ PyJWT
 cryptography
 git+https://github.com/ucscslugworks/bambu-printer-manager.git
 flask
+gunicorn

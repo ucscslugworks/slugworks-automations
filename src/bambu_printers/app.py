@@ -13,8 +13,7 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.urandom(24).hex()
 app.url_map.strict_slashes = True
 
-logger = log.setup_logs("ui")
-# logger = logging.getLogger("gunicorn.error")
+logger = logging.getLogger("gunicorn.error")
 
 
 @app.route("/", methods=["GET"])
