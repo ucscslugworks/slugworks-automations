@@ -1,3 +1,4 @@
+import datetime
 import logging
 import os
 
@@ -63,8 +64,30 @@ def dashboard():
 
 @app.route("/usage", methods=["GET"])
 def usage():
-    return render_template("usage.html")
+    data = db.get_usage()
+    if not data:
+        return render_template("usage.html", usage=[])
+
+    today = datetime.datetime.now().date()
+    dates = [
+        (today - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(30)
+    ]
+    colors = [c[:6] for c in data[0][1:]]
+    indexed = {date: u for date, *u in data[1]}
+    organized = {color: [] for color in colors}
+    for date in dates:
+        if date in indexed:
+            for i, u in enumerate(indexed[date]):
+                organized[colors[i]].append(0 if u is None else u)
+        else:
+            for color in colors:
+                organized[color].append(0)
+
+    organized = {color: u for color, u in organized.items() if any(u)}
+    colors = list(organized.keys())
+
+    return render_template("usage.html", labels=dates, usage=organized)
 
 
 if __name__ == "__main__":
-    app.run(debug=False, host="0.0.0.0", port=5001)
+    app.run(debug=True, host="0.0.0.0", port=5001)

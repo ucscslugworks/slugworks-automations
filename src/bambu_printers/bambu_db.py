@@ -141,6 +141,9 @@ CREATE_TABLES = {
         "spool_state INTEGER",
         "colors TEXT",
     ],
+    "usage": [
+        "date TEXT PRIMARY KEY",
+    ],
 }
 
 DATA_TABLES = {
@@ -519,10 +522,8 @@ class BambuDB:
     def is_current_print(self, print_id: int):
         try:
             return bool(
-                    sql(
-                        "SELECT * FROM prints_current WHERE id = ?", (print_id,)
-                    ).fetchone()
-                )
+                sql("SELECT * FROM prints_current WHERE id = ?", (print_id,)).fetchone()
+            )
         except Exception:
             self.logger.error(f"is_current_print: {traceback.format_exc()}")
             return False
@@ -684,3 +685,64 @@ class BambuDB:
         except Exception:
             self.logger.error(f"get_cover: {traceback.format_exc()}")
             return None
+
+    def get_usage(self):
+        try:
+            return [
+                p[0]
+                for p in sql("SELECT name from pragma_table_info('usage')").fetchall()
+            ], sql("SELECT * FROM usage").fetchall()
+        except Exception:
+            self.logger.error(f"get_limit: {traceback.format_exc()}")
+            return None
+
+    def update_usage(
+        self, color: str, amount: float, date: str = datetime.now().strftime("%Y-%m-%d")
+    ):
+        try:
+            print(color, amount, date)
+            if color not in [
+                p[0]
+                for p in sql("SELECT name from pragma_table_info('usage')").fetchall()
+            ]:
+                print(f"no color {color}")
+                sql(f"ALTER TABLE usage ADD COLUMN \"{color}\" REAL")
+
+            if date not in [p[0] for p in sql("SELECT date FROM usage").fetchall()]:
+                print(f"no date {date}")
+                sql(
+                    f"INSERT INTO usage ({', '.join(DATA_TABLES['usage'])}) VALUES ({', '.join(['?'] * len(DATA_TABLES['usage']))})",
+                    (date,),
+                )
+
+            # if not sql("SELECT * FROM usage WHERE date = ?", (date,)).fetchone():
+            #     sql(
+            #         f"INSERT INTO usage ({', '.join(DATA_TABLES['usage'])}, \"{color}\") VALUES ({', '.join(['?'] * len(DATA_TABLES['usage']) + ['?'])})",
+            #         (date, amount),
+            #     )
+            # el
+            print('a', sql(f"SELECT \"{color}\" FROM usage WHERE date = ?", (date,)).fetchone())
+            if (
+                sql(f"SELECT \"{color}\" FROM usage WHERE date = ?", (date,)).fetchone()[
+                    0
+                ]
+                is None
+            ):
+                print(f"no color/date {color} {date}")
+                sql(
+                    f"UPDATE usage SET \"{color}\" = ? WHERE date = ?",
+                    (amount, date),
+                )
+            else:
+                print(f"updating {color} {date}")
+                sql(
+                    f"UPDATE usage SET \"{color}\" = \"{color}\" + ? WHERE date = ?",
+                    (amount, date),
+                )
+            print('b', sql(f"SELECT \"{color}\" FROM usage WHERE date = ?", (date,)).fetchone())
+
+            self.logger.info(f"update_usage: Updated usage for '{color}'")
+            return True
+        except Exception:
+            self.logger.error(f"update_usage: {traceback.format_exc()}")
+            return False

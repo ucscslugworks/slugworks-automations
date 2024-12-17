@@ -104,38 +104,41 @@
     const DATA_COUNT = 7;
     const NUMBER_CFG = { count: DATA_COUNT, min: -100, max: 100 };
 
-    const labels = months({ count: 7 });
     const data = {
-        labels: labels,
+        labels: [{% for l in labels %}
+            "{{ l }}",
+        {% endfor %}],
         datasets: [
+            {% for color in usage %}
             {
-                label: 'My First dataset',
-                data: numbers(NUMBER_CFG),
-                borderColor: CHART_COLORS.red,
-                backgroundColor: CHART_COLORS.red,
+                label: "{{ color }}",
+                data: {{ usage[color] }},
+                borderColor: "{{ color }}",
+                backgroundColor: "{{ color }}",
                 fill: true
             },
-            {
-                label: 'My Second dataset',
-                data: numbers(NUMBER_CFG),
-                borderColor: CHART_COLORS.blue,
-                backgroundColor: CHART_COLORS.blue,
-                fill: true
-            },
-            {
-                label: 'My Third dataset',
-                data: numbers(NUMBER_CFG),
-                borderColor: CHART_COLORS.green,
-                backgroundColor: CHART_COLORS.green,
-                fill: true
-            },
-            {
-                label: 'My Fourth dataset',
-                data: numbers(NUMBER_CFG),
-                borderColor: CHART_COLORS.yellow,
-                backgroundColor: CHART_COLORS.yellow,
-                fill: true
-            }
+            {% endfor %}
+            // {
+            //     label: 'My Second dataset',
+            //     data: numbers(NUMBER_CFG),
+            //     borderColor: CHART_COLORS.blue,
+            //     backgroundColor: CHART_COLORS.blue,
+            //     fill: true
+            // },
+            // {
+            //     label: 'My Third dataset',
+            //     data: numbers(NUMBER_CFG),
+            //     borderColor: CHART_COLORS.green,
+            //     backgroundColor: CHART_COLORS.green,
+            //     fill: true
+            // },
+            // {
+            //     label: 'My Fourth dataset',
+            //     data: numbers(NUMBER_CFG),
+            //     borderColor: CHART_COLORS.yellow,
+            //     backgroundColor: CHART_COLORS.yellow,
+            //     fill: true
+            // }
         ]
     };
 
