@@ -28,11 +28,11 @@ def dashboard():
             continue
 
         if data["status"] == constants.PRINTER_IDLE:
-            data["status"] = "Idle"
+            data["status"] = "Printer Idle"
             data["percent_complete"] = 100
             data["time_remaining"] = 0
         elif data["gcode_state"] == constants.GCODE_PAUSE:
-            data["status"] = "Paused"
+            data["status"] = "Print Paused"
         else:
             data["status"] = "Printing"
 

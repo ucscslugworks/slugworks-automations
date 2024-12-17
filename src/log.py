@@ -40,12 +40,16 @@ class RollingFileHandler(RotatingFileHandler):
             encoding=encoding,
             delay=delay,
         )
-        # Remove the latest.log symlink if it exists
-        if os.path.exists(self.latest_filename):
-            os.remove(self.latest_filename)
 
-        # Create a new symlink to the latest log file
-        os.symlink(str(filename) + ".log", self.latest_filename)
+        try:
+            # Remove the latest.log symlink if it exists
+            if os.path.exists(self.latest_filename):
+                os.remove(self.latest_filename)
+
+            # Create a new symlink to the latest log file
+            os.symlink(str(filename) + ".log", self.latest_filename)
+        except:
+            pass
 
     # override
     def doRollover(self):
