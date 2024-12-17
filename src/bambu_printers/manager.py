@@ -8,7 +8,7 @@ from src.bambu_printers import get_account, get_db, get_printer, get_start_form
 
 
 def manager():
-    logger = log.setup_logs("bambu_main", additional_handlers=[("bambu", log.INFO)])
+    logger = log.setup_logs("bambu_manager", additional_handlers=[("bambu", log.INFO)])
 
     logger.info("manager: Starting setup")
     account = get_account()
@@ -59,9 +59,12 @@ def manager():
                     if not task["isPrintable"]:
                         # if the task is not a print, skip
                         continue
-                    elif db.print_exists(task["id"]):
-                        # if the task is already in the db, update the cover photo link
+                    elif db.is_current_print(task["id"]):
+                        # if the task is a current print & already in the db, update the cover photo link and skip
                         db.update_cover(task["id"], task["cover"])
+                        continue
+                    elif db.print_exists(task["id"]):
+                        # if the task is already in the db (but wasn't a current print), skip
                         continue
 
                     # parse the start time and calculate the end time
@@ -364,7 +367,7 @@ def manager():
                     raise e
 
     except KeyboardInterrupt:
-        logger.warning("manager: Keyboard interrupt (may up to 60 seconds to stop)")
+        logger.warning("manager: Keyboard interrupt (may up to 2 minutes to stop)")
 
         for name in printers:
             # stop all printer threads

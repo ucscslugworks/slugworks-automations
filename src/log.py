@@ -68,9 +68,10 @@ class RollingFileHandler(RotatingFileHandler):
 def setup_logs(
     name: str,
     level: int = INFO,
+    path_only=False,
     additional_handlers: list[tuple[str, int]] = [],
 ):
-    if name in loggers:
+    if name in loggers and not path_only:
         return loggers[name]
 
     # Change directory to repository root
@@ -81,6 +82,24 @@ def setup_logs(
     timestamp = datetime.datetime.now()
     folder = timestamp.strftime("%Y-%m-%d")
     filename = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+
+    if path_only:
+        # Create a new directory for date if it doesn't exist
+        if not os.path.exists(os.path.join(logs_path, name, folder)):
+            os.makedirs(os.path.join(logs_path, name, folder))
+
+        # check for and remove existing latest symlink
+        if os.path.islink(
+            os.path.join(logs_path, name, "latest.log")
+        ) or os.path.exists(os.path.join(logs_path, name, "latest.log")):
+            os.remove(os.path.join(logs_path, name, "latest.log"))
+
+        # Create a new symlink to the latest log file
+        os.symlink(
+            os.path.join(logs_path, name, folder, filename + ".log"),
+            os.path.join(logs_path, name, "latest.log"),
+        )
+        return os.path.join(logs_path, name, folder, filename + ".log")
 
     # create new logger with all levels
     logger = logging.getLogger(name)

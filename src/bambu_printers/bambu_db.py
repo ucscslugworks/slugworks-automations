@@ -516,6 +516,17 @@ class BambuDB:
             self.logger.error(f"print_exists: {traceback.format_exc()}")
             return False
 
+    def is_current_print(self, print_id: int):
+        try:
+            return bool(
+                    sql(
+                        "SELECT * FROM prints_current WHERE id = ?", (print_id,)
+                    ).fetchone()
+                )
+        except Exception:
+            self.logger.error(f"is_current_print: {traceback.format_exc()}")
+            return False
+
     def form_exists(self, form_row: int):
         try:
             return bool(

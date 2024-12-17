@@ -320,10 +320,6 @@ class BambuAccount:
             response = requests.get(TASKS_URL, headers=self.headers)
             tasks = response.json()["hits"]
 
-            tasks = [t for t in tasks if t["id"] > self.latest_task]
-            if tasks:
-                self.latest_task = tasks[0]["id"]
-
             self.logger.info(f"get_tasks: Got {len(tasks)} tasks")
 
             return tasks

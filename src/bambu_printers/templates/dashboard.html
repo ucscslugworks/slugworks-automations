@@ -35,11 +35,11 @@
                             <progress class="progress is-primary" value="{{ line.progress }}" max="100">{{ line.progress }}%</progress> {{ line.time }} left
                         </td>
                         <td>
-                            <img class="image is-128x128" src="{{ line.cover }}" alt="{{ line.name }}">
+                            <img class="image is-square" src="{{ line.cover }}" alt="{{ line.name }}">
                         </td>
                         <td>
                             {% for color in line.colors %}
-                            <span class="tag is-primary" style="background-color: {{ color }};"></span>
+                            <span class="tag is-primary" style="background-color: {{ color }};" title="{{ color }}"></span>
                             {% endfor %}
                         </td>
                     </tr>

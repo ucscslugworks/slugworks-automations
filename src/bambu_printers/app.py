@@ -42,8 +42,10 @@ def dashboard():
             if color:
                 colors.append(color)
 
-        data["cover"] = db.get_cover(data["print_id"])
-        if not data["cover"]:
+        if data["print_id"] != constants.NO_PRINT_ID:
+            data["cover"] = db.get_cover(data["print_id"])
+        
+        if "cover" not in data or not data["cover"]:
             data["cover"] = url_for("static", filename=f"{name}.png")
 
         printer_data.append(
@@ -61,4 +63,4 @@ def dashboard():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5001)
+    app.run(debug=False, host="0.0.0.0", port=5001)

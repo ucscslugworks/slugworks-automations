@@ -120,7 +120,7 @@ class Printer:
             except ValueError:
                 self.spool_state = -1
 
-            self.colors = [s.color for s in printer.spools]
+            self.colors = [s.color for s in printer.spools if s.name or s.type or s.color != "black"]
 
             self.logger.debug(f"on_update: {self.name}")
         except Exception:
