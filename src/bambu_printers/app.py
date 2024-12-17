@@ -43,7 +43,7 @@ def dashboard():
 
         if data["print_id"] != constants.NO_PRINT_ID:
             data["cover"] = db.get_cover(data["print_id"])
-        
+
         if "cover" not in data or not data["cover"]:
             data["cover"] = url_for("static", filename=f"{name}.png")
 
@@ -59,6 +59,11 @@ def dashboard():
         )
     # print(printer_data)
     return render_template("dashboard.html", printers=printer_data)
+
+
+@app.route("/usage", methods=["GET"])
+def usage():
+    return "Hello, world!"
 
 
 if __name__ == "__main__":
