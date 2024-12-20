@@ -124,7 +124,7 @@ def usage():
     max_val = 0
     rolling_sum = 0
     for i, date in enumerate(dates):
-        if date[1] == 6 or date[1] == len(dates) - 1:
+        if date[1] == 6 or i == len(dates) - 1:
             max_val = max([max_val, rolling_sum])
             rolling_sum = 0
 
