@@ -3,7 +3,7 @@ from src.bambu_printers import get_db
 from src.bambu_printers.bambu_db import sql
 import json
 
-sql("DROP TABLE IF EXISTS usage")
+# sql("DROP TABLE IF EXISTS usage")
 db = get_db()
 # print(json.dumps(db.get_print_archive(), indent=4))
 for row in db.get_print_archive():

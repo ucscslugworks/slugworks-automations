@@ -1,5 +1,7 @@
+import colorsys
 import datetime
 import logging
+import math
 import os
 
 from flask import Flask, render_template, url_for
@@ -62,6 +64,23 @@ def dashboard():
     return render_template("dashboard.html", printers=printer_data)
 
 
+weeks_count = 10
+COLORS = {
+    "000000": "Black",
+    "FFFFFF": "White",
+    "5E43B7": "Basic Purple",
+    "68724D": "Matte Dark Green",
+    "A3D8E1": "Matte Ice Blue",
+    "F99963": "Matte Mandarin Orange",
+    "E8AFCF": "Matte Sakura Pink",
+    "3F8E43": "Basic Green",
+    "61C680": "Matte Grass Green",
+    "E4BD68": "Basic Gold",
+    "0A2989": "Basic Blue",
+    "C12E1F": "Basic Red",
+}
+
+
 @app.route("/usage", methods=["GET"])
 def usage():
     data = db.get_usage()
@@ -69,24 +88,60 @@ def usage():
         return render_template("usage.html", usage=[])
 
     today = datetime.datetime.now().date()
-    dates = [
-        (today - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(30)
+    date_objs = [
+        (today - datetime.timedelta(days=i)) for i in range((weeks_count + 1) * 7)
     ]
-    colors = [c[:6] for c in data[0][1:]]
+    dates = []
+    counter = 0
+    for i, date in enumerate(date_objs):
+        if date.weekday() == 0:
+            counter += 1
+        if counter == weeks_count:
+            break
+        dates.append((date.strftime("%Y-%m-%d"), date.weekday()))
+    colors = [f"#{c[:6]}" for c in data[0][1:]]
     indexed = {date: u for date, *u in data[1]}
     organized = {color: [] for color in colors}
-    for date in dates:
+    for date, wkdy in dates:
         if date in indexed:
             for i, u in enumerate(indexed[date]):
-                organized[colors[i]].append(0 if u is None else u)
+                if wkdy == 6 or not organized[colors[i]]:
+                    organized[colors[i]].append(0 if u is None else u)
+                else:
+                    organized[colors[i]][-1] += 0 if u is None else u
         else:
             for color in colors:
-                organized[color].append(0)
+                if wkdy == 6 or not organized[color]:
+                    organized[color].append(0)
 
     organized = {color: u for color, u in organized.items() if any(u)}
-    colors = list(organized.keys())
+    colors.sort(key=step)
+    colors.reverse()
+    colors = [(c, c) if c[1:] not in COLORS else (c, COLORS[c[1:]]) for c in colors]
 
-    return render_template("usage.html", labels=dates, usage=organized)
+    labels = []
+    start_date = dates[0][0]
+    for i, date in enumerate(dates):
+        # print(start_date, date[0])
+        if date[1] == 0:
+            labels.append(f"{start_date} to {date[0]}")
+        elif date[1] == 6:
+            start_date = date[0]
+
+    return render_template("usage.html", labels=labels, usage=organized, colors=colors)
+
+
+def step(hexrgb: str):
+    hexrgb = hexrgb.lstrip("#")  # in case you have Web color specs
+    r, g, b = (int(hexrgb[i : i + 2], 16) / 255.0 for i in range(0, 5, 2))
+    lum = math.sqrt(0.241 * r + 0.691 * g + 0.068 * b)
+    h, s, v = colorsys.rgb_to_hsv(r, g, b)
+
+    repetitions = 8
+    h2 = int(h * repetitions)
+    lum2 = int(lum * repetitions)
+    v2 = int(v * repetitions)
+    return (h2, lum, v2)
 
 
 if __name__ == "__main__":
