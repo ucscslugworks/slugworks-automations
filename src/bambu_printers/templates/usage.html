@@ -36,7 +36,7 @@
                 label: "{{ name }}",
                 data: {{ usage[color] }},
                 borderColor: "{{ color }}",
-                backgroundColor: "{{ color }}",
+                backgroundColor: "{{ color }}CC",
                 fill: true
             },
             {% endfor %}
@@ -73,7 +73,8 @@
                     title: {
                         display: true,
                         text: 'Value'
-                    }
+                    },
+                    suggestedMax: {{ max }}
                 }
             }
         }

@@ -22,8 +22,6 @@ logger = logging.getLogger("gunicorn.error")
 @app.route("/", methods=["GET"])
 def dashboard():
     printer_names = db.get_printer_list()
-    # print(printer_names)
-    # printer_data = [db.get_printer_data(name) for name, in printer_names]
     printer_data = []
     for (name,) in printer_names:
         data = db.get_printer_data(name)
@@ -60,7 +58,6 @@ def dashboard():
                 "colors": colors,
             }
         )
-    # print(printer_data)
     return render_template("dashboard.html", printers=printer_data)
 
 
@@ -99,9 +96,11 @@ def usage():
         if counter == weeks_count:
             break
         dates.append((date.strftime("%Y-%m-%d"), date.weekday()))
+    dates.reverse()
     colors = [f"#{c[:6]}" for c in data[0][1:]]
     indexed = {date: u for date, *u in data[1]}
     organized = {color: [] for color in colors}
+
     for date, wkdy in dates:
         if date in indexed:
             for i, u in enumerate(indexed[date]):
@@ -115,20 +114,30 @@ def usage():
                     organized[color].append(0)
 
     organized = {color: u for color, u in organized.items() if any(u)}
+    colors = [c for c in colors if c in organized]
     colors.sort(key=step)
     colors.reverse()
     colors = [(c, c) if c[1:] not in COLORS else (c, COLORS[c[1:]]) for c in colors]
 
     labels = []
-    start_date = dates[0][0]
+    start_date = ""
+    max_val = 0
+    rolling_sum = 0
     for i, date in enumerate(dates):
-        # print(start_date, date[0])
-        if date[1] == 0:
+        if date[1] == 6 or date[1] == len(dates) - 1:
+            max_val = max([max_val, rolling_sum])
+            rolling_sum = 0
+
             labels.append(f"{start_date} to {date[0]}")
-        elif date[1] == 6:
+        elif date[1] == 0:
             start_date = date[0]
 
-    return render_template("usage.html", labels=labels, usage=organized, colors=colors)
+        if date[0] in indexed:
+            rolling_sum += sum([0 if v is None else v for v in indexed[date[0]]])
+
+    return render_template(
+        "usage.html", labels=labels, usage=organized, colors=colors, max=max_val * 1.1
+    )
 
 
 def step(hexrgb: str):
