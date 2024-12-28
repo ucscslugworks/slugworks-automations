@@ -3,20 +3,26 @@ import os
 
 import requests
 from flask import Blueprint, redirect, request, url_for
-from flask_login import login_required, login_user, logout_user
+from flask_login import current_user, login_required, login_user, logout_user
 from oauthlib.oauth2 import WebApplicationClient
 
 from src.bambu_printers.auth_user import User
 
 google_json = json.load(
     open(
-        os.path.join(os.path.dirname(__file__), "..", "..", "common", "google.json"),
+        os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..",
+            "..",
+            "common",
+            "google_login.json",
+        ),
         "r",
     )
 )
 
-GOOGLE_CLIENT_ID = google_json["client_id"]
-GOOGLE_CLIENT_SECRET = google_json["client_secret"]
+GOOGLE_CLIENT_ID = google_json["web"]["client_id"]
+GOOGLE_CLIENT_SECRET = google_json["web"]["client_secret"]
 GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
 
 auth = Blueprint("auth", __name__)
@@ -100,11 +106,11 @@ def callback():
     login_user(user)
 
     # Send user back to homepage
-    return redirect(url_for("dashboard"))
+    return redirect(url_for("bambu.dashboard"))
 
 
 @auth.route("/logout")
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for("dashboard"))
+    return redirect(url_for("bambu.dashboard"))

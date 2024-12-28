@@ -29,7 +29,7 @@ loglevel = "debug"
 capture_output = True
 
 # set number of worker threads
-workers = multiprocessing.cpu_count() * 2 + 1
+workers = 1
 
 # define Flask app path
 wsgi_app = "src.bambu_printers.app:create_app()"
@@ -40,3 +40,6 @@ bind = "0.0.0.0:5001"
 
 # start gunicorn as a background process
 # daemon = True
+
+keyfile = os.path.join(path, "common", "private_key.pem")
+certfile = os.path.join(path, "common", "certificate.pem")

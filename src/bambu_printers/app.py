@@ -10,7 +10,6 @@ from src.bambu_printers.auth_user import User
 
 
 def create_app():
-
     logger = logging.getLogger("gunicorn.error")
 
     app = Flask(__name__)

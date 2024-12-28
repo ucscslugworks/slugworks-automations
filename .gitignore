@@ -168,3 +168,4 @@ logs/
 *.db-wal
 /BambuPrinter.log.jsonl*
 /pid_*
+*.pem
