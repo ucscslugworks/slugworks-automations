@@ -32,10 +32,11 @@ capture_output = True
 workers = multiprocessing.cpu_count() * 2 + 1
 
 # define Flask app path
-wsgi_app = "src.bambu_printers.app:app"
+wsgi_app = "src.bambu_printers.app:create_app()"
 
 # 0.0.0.0 makes site available externally, and bind to port 80 (default http port)
-bind = "0.0.0.0:80"
+# bind = "0.0.0.0:80"
+bind = "0.0.0.0:5001"
 
 # start gunicorn as a background process
-daemon = True
+# daemon = True
