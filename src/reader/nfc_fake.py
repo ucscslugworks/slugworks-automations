@@ -1,8 +1,15 @@
+import os
 from multiprocessing import Process, Queue
 
 
 def read_card():
-    return input("Enter card ID: ")
+    # return input("Enter card ID: ")
+    if os.path.exists("card.txt"):
+        with open("card.txt", "r") as f:
+            card = f.readline().strip()
+        os.remove("card.txt")
+        return card
+    return None
 
 
 def read_card_queue(q):
@@ -28,8 +35,10 @@ def read_card_queue_timeout(time):
     r = q.get()
     return r if not r else r.upper()
 
+
 def clear_timestamps():
     pass
+
 
 def close():
     pass

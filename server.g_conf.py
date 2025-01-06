@@ -2,19 +2,16 @@
 # https://docs.gunicorn.org/en/stable/configure.html#configuration-file
 # https://docs.gunicorn.org/en/stable/settings.html
 import multiprocessing
-from datetime import datetime
+import os
+
+from src import log
 
 max_requests = 1000
 max_requests_jitter = 50
 
-# Change directory to current file location
-chdir = "../.."
-
-# get date & datetime strings
-now = datetime.now()
-
 # Set log path using timestamp
-log_path = f"logs/flask/{now.strftime("%Y-%m-%d")}/{now.strftime("%Y-%m-%d %H:%M:%S")}.log"
+log_path = log.get_log_path("flask")
+
 errorlog = log_path
 accesslog = log_path
 
@@ -29,12 +26,14 @@ capture_output = True
 
 # set number of worker threads
 workers = multiprocessing.cpu_count() * 2 + 1
+# workers = 1
 
 # define Flask app path
-wsgi_app = "app:app"
+wsgi_app = "src.server.app:app"
 
 # 0.0.0.0 makes site available externally, and bind to port 80 (default http port)
-bind = "0.0.0.0:80"
+# bind = "0.0.0.0:80"
+bind = "0.0.0.0:5001"
 
-# run in background as daemon, rather than in foreground as shell process
-daemon = True
+# start gunicorn as a background process
+# daemon = True

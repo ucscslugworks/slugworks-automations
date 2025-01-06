@@ -1,14 +1,9 @@
 import os
 import sqlite3
 import time
+from typing import Literal
 
 from src import constants, log
-
-# Change directory to repository root
-path = os.path.abspath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
-)
-os.chdir(path)
 
 logger = log.setup_logs("server", log.INFO)
 
@@ -38,7 +33,9 @@ else:
     check_same_thread = True
 
 db = sqlite3.connect(
-    "src/server/access.db", autocommit=True, check_same_thread=check_same_thread
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "access.db"),
+    autocommit=True,
+    check_same_thread=check_same_thread,
 )
 cursor = db.cursor()
 sql = cursor.execute
@@ -96,11 +93,16 @@ if not sql("SELECT * FROM desk_uid_scan").fetchone():
 # TODO: should access logs be stored in a database or in a .log file?
 
 
-def add_student(cruzid: str, firstname: str, lastname: str, uid: str | None = None):
+def add_student(
+    cruzid: str,
+    firstname: str,
+    lastname: str,
+    uid: str | Literal[False] | None = None,
+):
     """
     Add a new student to the database
     """
-    if uid is None:
+    if not uid:
         uid = ""
 
     cruzid = cruzid.lower()
@@ -198,11 +200,16 @@ def clamp_students(student_list: list):
     return True
 
 
-def add_staff(cruzid: str, firstname: str, lastname: str, uid: str | None = None):
+def add_staff(
+    cruzid: str,
+    firstname: str,
+    lastname: str,
+    uid: str | Literal[False] | None = None,
+):
     """
     Add a new staff member to the database
     """
-    if uid is None:
+    if not uid:
         uid = ""
 
     cruzid = cruzid.lower()
@@ -689,7 +696,7 @@ def get_canvas_status():
 
     if not sql("SELECT * FROM canvas_status").fetchone():
         logger.error("No Canvas status present")
-        return False
+        return constants.CANVAS_OK, constants.NEVER
 
     return sql("SELECT status, timestamp FROM canvas_status").fetchone()
 
@@ -959,11 +966,13 @@ def scan_uid(reader_id: int, uid: str):
             )
             return False
         elif details[0]:
+            logger.info(
+                f"scan_uid: {details} for reader_id {reader_id} and uid {uid} (staff)"
+            )
             return details
 
     elif is_student(uid=uid):
         for room in sql("SELECT name FROM rooms").fetchall():
-
             access = get_access(room[0], uid=uid)
             if access is False:
                 logger.error(
@@ -980,6 +989,9 @@ def scan_uid(reader_id: int, uid: str):
                 )
                 return False
             elif details[0]:
+                logger.info(
+                    f"scan_uid: {details} for reader_id {reader_id} and uid {uid} (student - access {access})"
+                )
                 return details
 
     details = get_access_details(reader_id, "no_access")
@@ -988,15 +1000,17 @@ def scan_uid(reader_id: int, uid: str):
             f"scan_uid: get_access_details failed for reader {reader_id} and uid {uid} (no_access)"
         )
         return False
+
+    logger.info(f"scan_uid: no access - {details}")
     return details
 
 
 def get_alarm_status(reader_id: int):
-    if not sql("SELECT * FROM readers WHERE reader_id = ?", reader_id).fetchone():
+    if not sql("SELECT * FROM readers WHERE reader_id = ?", (reader_id,)).fetchone():
         logger.error(f"get_alarm_status: Reader {reader_id} does not exist in db")
 
     status = sql(
-        "SELECT alarm_status FROM readers WHERE reader_id = ?", reader_id
+        "SELECT alarm_status FROM readers WHERE reader_id = ?", (reader_id,)
     ).fetchone()
     if status is None:
         return constants.ALARM_STATUS_OK
@@ -1050,7 +1064,7 @@ if __name__ == "__main__":
     # remove_staff("imadan1")
     # remove_room("be_49")
 
-    # print(add_reader("BE 51", True, 10))
+    # print(add_reader("BE 49", True, 10))
     # print(get_reader_settings(0))
     # print(check_in(0))
     # print(set_reader_online_statuses())
@@ -1080,7 +1094,7 @@ if __name__ == "__main__":
     # add_room("be_55", "")
     # add_room("bambu_printing", "13")
 
-    # set_access("be_53", constants.ACCESS_YES, "ewachtel")
+    # set_access("be_49", constants.ACCESS_YES, "ewachtel")
     # print(evaluate_modules(range(1, 16, 2), "ewachtel", 15))
 
     # set_access("be_52", constants.ACCESS_YES_OVERRIDE, "ewachtel")

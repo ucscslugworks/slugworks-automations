@@ -2,10 +2,16 @@ import logging
 
 import requests
 
-SERVER_IP = "localhost"
+
+class DummyObject(object):
+    def __getattr__(self, name):
+        return lambda *args, **kwargs: None
+
+
+SERVER_IP = "http://localhost:5001"
 base_url = f"{SERVER_IP}/api"
 
-logger = None
+logger = DummyObject()
 
 
 def set_logger(module_logger: logging.Logger):
@@ -15,15 +21,15 @@ def set_logger(module_logger: logging.Logger):
 
 def handle_response(response: requests.Response):
     try:
-        response = response.json()
-        success = response["success"]
+        response_json = response.json()
+        success = response_json["success"]
         return (
             success,
-            response,
+            response_json,
         )
     except Exception as e:
         logger.error(f"api - handle_response - {e}")
-    return (False, "")
+    return (False, {})
 
 
 def desk_uid_scan(uid: str):
@@ -33,7 +39,7 @@ def desk_uid_scan(uid: str):
             return handle_response(response)
     except Exception as e:
         logger.error(f"api - desk_uid_scan - {e}")
-    return (False, "")
+    return (False, {})
 
 
 def tagout():
@@ -43,7 +49,7 @@ def tagout():
             return handle_response(response)
     except Exception as e:
         logger.error(f"api - tagout - {e}")
-    return (False, "")
+    return (False, {})
 
 
 def scan(uid: str):
@@ -53,7 +59,7 @@ def scan(uid: str):
             return handle_response(response)
     except Exception as e:
         logger.error(f"api - scan - {e}")
-    return (False, "")
+    return (False, {})
 
 
 def checkin(status: int):
@@ -63,4 +69,4 @@ def checkin(status: int):
             return handle_response(response)
     except Exception as e:
         logger.error(f"api - checkin - {e}")
-    return (False, "")
+    return (False, {})

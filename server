@@ -2,12 +2,10 @@
 
 cd "$(dirname "$(readlink -f "$0")")"
 source venv/bin/activate
-cd src/server
 
 case "$OSTYPE" in
-    darwin*) gunicorn ;;
-    linux*) authbind gunicorn ;;
+    darwin*) gunicorn -c server.g_conf.py ;;
+    linux*) authbind gunicorn -c server.g_conf.py ;;
     *) echo "unsupported OS - server not started" && exit 0 ;;
 esac
-cd ../..
 # python -m src.server.canvas &

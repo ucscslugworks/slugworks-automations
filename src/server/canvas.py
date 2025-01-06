@@ -11,19 +11,19 @@ from src.server import server
 # TODO: remove (when the canvas course id is set in the UI)
 server.set_canvas_course_id(67429)
 
-# Change directory to repository root
-path = os.path.abspath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
-)
-os.chdir(path)
-
 # Create a new logger for the canvas module
 logger = log.setup_logs("canvas", log.INFO)
 
 # Set up the canvas API client using a saved auth token
 canvas = Canvas(
     "https://canvas.ucsc.edu",
-    json.load(open("src/server/canvas_token.json"))["token"],
+    json.load(
+        open(
+            os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "common", "canvas.json"
+            )
+        )
+    )["auth_token"],
 )
 course = canvas.get_course(server.get_canvas_course_id())
 
@@ -221,7 +221,7 @@ def auto_updater():
                 if type(e) == KeyboardInterrupt:  # if it's a keyboard interrupt, exit
                     raise e
                 # otherwise, log the error, sleep for 60 seconds, and mark the canvas status as no longer updating
-                logger.error(f"Error: {e}")
+                logger.error(f"auto-updater loop: {e}")
                 time.sleep(60)
                 server.set_canvas_status(constants.CANVAS_OK)
 

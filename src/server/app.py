@@ -1,18 +1,14 @@
+import logging
 import os
 
-from flask import Flask, jsonify, redirect, render_template, request, url_for
+from flask import Flask, jsonify, request
 
-from src import log
+from src import constants, log
 from src.server import server
 
-# Change directory to repository root
-path = os.path.abspath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
-)
-os.chdir(path)
-
 # Create a new logger for the flask module
-logger = log.setup_logs("flask", log.INFO)
+# logger = log.setup_logs("flask", log.INFO)
+logger = logging.getLogger("gunicorn.error")
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -21,6 +17,7 @@ app.secret_key = os.urandom(12).hex()
 
 # TODO: need to set up the ui pages
 # TODO: add a way (api endpoint?) to set the canvas course id
+
 
 # main dashboard page
 @app.route("/")
@@ -47,7 +44,8 @@ def identify():
 
 
 def api_success(args: dict = {}):
-    return jsonify({"success": True} + args)
+    args["success"] = True
+    return jsonify(args)
 
 
 def api_fail(reason: str = ""):
@@ -88,7 +86,7 @@ def scan():
 
 @app.route("/api/checkin")
 def checkin():
-    status = request.args.get("status", server.ALARM_STATUS_OK, type=int)
+    status = request.args.get("status", constants.ALARM_STATUS_OK, type=int)
     reader_id = 0
 
     if not server.check_in(reader_id, status):

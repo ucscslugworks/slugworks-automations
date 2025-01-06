@@ -1,38 +1,33 @@
-import os
+import logging
 from datetime import datetime, timedelta
 from threading import Thread
 from time import sleep, time
 
-import board  # type: ignore
-import neopixel  # type: ignore
-
-import nfc
 from src import api, constants, log
 
-# import nfc_fake as nfc
-
 try:
+    import board  # type: ignore
+    import neopixel  # type: ignore
     import RPi.GPIO as GPIO  # type: ignore
-except RuntimeError:
-    print(
-        "Error importing RPi.GPIO!  This is probably because you need superuser privileges.  You can achieve this by using 'sudo' to run your script"
-    )
 
+    from src.reader import nfc  # type: ignore
 
-# Change directory to repository root
-path = os.path.abspath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
-)
-os.chdir(path)
+except ImportError:
+    from src.reader import nfc_fake as nfc
 
-# Create a new logger for the reader module
-logger = log.setup_logs("reader", log.INFO)
+    board = None
+    neopixel = None
+    GPIO = None
 
-# pass logger to api
-api.set_logger(logger)
+    if __name__ == "__main__":
+        print(
+            "Unable to import RPi.GPIO, neopixel, or board. Running in fake mode. Run on a Raspberry Pi to use real hardware."
+        )
+
 
 SHEET_UPDATE_HOUR = 4  # pull new data from sheet at 4am
 CHECKIN_TIMEOUT = 30  # check in every 30 seconds
+LOOP_TIMEOUT = 1  # loop every 1 second
 
 SCAN_COLOR_HOLD = 2  # seconds to hold color after scan
 BREATHE_DELAY = 0.05  # seconds to wait between LED brightness changes
@@ -42,44 +37,40 @@ BRIGHTNESS_HIGH = 0.5  # high brightness while holding color
 DOOR_SENSOR_PIN = 16  # GPIO pin for door sensor
 DOOR_SENSOR_DEBOUNCE = 0.5  # seconds to debounce door sensor
 
-TAGOUT = api.tagout()
+TAGOUT = ""
 
 EXIT = False  # exit flag
 breathe = True  # breathe LEDs when no card is scanned
 scan_time = None  # time of last scan to hold color
-alarm_enable = True
-alarm_delay_min = 60
-alarm_status = constants.ALARM_STATUS_OK
-door_open = False  # True if door is open
-door_change_time = time()  # time of last door state change
-door_time_limit = 0  # time limit for door open before alarm based on card scan
-last_checkin_time = None
-
-ORDER = neopixel.GRB  # RGB color order
-pixel_pin = board.D18  # LEDs are on GPIO pin 18
-num_pixels = 30  # 30 LEDs
-pixels = neopixel.NeoPixel(
-    pixel_pin,
-    num_pixels,
-    brightness=BRIGHTNESS_LOW,
-    auto_write=False,
-    pixel_order=ORDER,
-)  # initialize LEDs
-GPIO.setmode(GPIO.BCM)  # set GPIO mode to BCM (GPIO numbering)
 
 
-def checkin(status: int):
-    global alarm_enable, alarm_delay_min
+if board and neopixel and GPIO:
+    ORDER = neopixel.GRB  # RGB color order
+    pixel_pin = board.D18  # LEDs are on GPIO pin 18
+    num_pixels = 30  # 30 LEDs
+    pixels = neopixel.NeoPixel(
+        pixel_pin,
+        num_pixels,
+        brightness=BRIGHTNESS_LOW,
+        auto_write=False,
+        pixel_order=ORDER,
+    )  # initialize LEDs
+    GPIO.setmode(GPIO.BCM)  # set GPIO mode to BCM (GPIO numbering)
+else:
+    pixels = None
+
+
+def checkin(status: int, logger: logging.Logger):
     success, response = api.checkin(status)
     if not success:
         logger.error("checkin failed")
+        return None, 0
     else:
-        alarm_enable = response["alarm_enable"]
-        alarm_delay_min = response["alarm_delay_min"]
+        return response["alarm_enable"], response["alarm_delay_min"]  # type: ignore
 
 
 # thread to breathe LEDs in background
-def breathe_leds():
+def breathe_leds(logger: logging.Logger):
     global breathe, scan_time, EXIT
     # try except for clean exit on keyboard interrupt
     try:
@@ -107,11 +98,12 @@ def breathe_leds():
                         # update last change time
                         last_change_time = time()
 
-                        # set all LEDs to i (gradient from black to white)
-                        pixels.fill((i, i, i))
+                        if pixels:
+                            # set all LEDs to i (gradient from black to white)
+                            pixels.fill((i, i, i))
 
-                        # write pixel values to LEDs
-                        pixels.show()
+                            # write pixel values to LEDs
+                            pixels.show()
 
                     # decrease "brightness" in steps of 5
                     for i in range(255, 0, -5):
@@ -128,11 +120,12 @@ def breathe_leds():
                         # update last change time
                         last_change_time = time()
 
-                        # set all LEDs to i (gradient from white to black)
-                        pixels.fill((i, i, i))
+                        if pixels:
+                            # set all LEDs to i (gradient from white to black)
+                            pixels.fill((i, i, i))
 
-                        # write pixel values to LEDs
-                        pixels.show()
+                            # write pixel values to LEDs
+                            pixels.show()
                 elif scan_time and datetime.now() - scan_time > timedelta(
                     0, SCAN_COLOR_HOLD, 0, 0, 0, 0, 0
                 ):  # if scan time is set (a card was scanned) and SCAN_COLOR_HOLD seconds have passed
@@ -143,37 +136,55 @@ def breathe_leds():
                     # clear scan time
                     scan_time = None
 
-                    # set LED brightness back to low
-                    pixels.brightness = BRIGHTNESS_LOW
+                    if pixels:
+                        # set LED brightness back to low
+                        pixels.brightness = BRIGHTNESS_LOW
+
             except Exception as e:  # catch any exceptions
                 # if exception is KeyboardInterrupt, raise it to exit cleanly
                 if type(e) == KeyboardInterrupt:
                     raise e
                 # otherwise, print error and sleep for 60 seconds to prevent spamming
-                logger.error(f"Error: {e}")
+                logger.error(f"breathe: {e}")
                 sleep(60)
     except KeyboardInterrupt:
         # set exit flag to True - this will exit the main loop and cause the end of this thread
         EXIT = True
 
 
-if __name__ == "__main__":
+def main(logger: logging.Logger):
+    global EXIT, breathe, scan_time
+
+    # set initial values for door sensor and alarm
+    alarm_enable = True
+    alarm_delay_min = 60
+    alarm_status = constants.ALARM_STATUS_OK
+    door_open = False  # True if door is open
+    door_change_time = time()  # time of last door state change
+    door_time_limit = 0  # time limit for door open before alarm based on card scan
+    last_checkin_time = None
+
     # try except for red error LED on exception
     try:
         # check in
-        checkin(alarm_status)
+        e, d = checkin(alarm_status, logger)
+        if e is not None:
+            alarm_enable = e
+            alarm_delay_min = d
 
         # start breathe LEDs thread
-        Thread(target=breathe_leds).start()
+        Thread(target=breathe_leds, args=(logger,)).start()
     except Exception as e:
         # print error, set red LEDs, sleep for 5 seconds, and set exit flag
-        logger.error(e)
-        pixels.fill((255, 0, 0))
-        pixels.show()
+        logger.error(f"reader checkin: {e}")
+        if pixels:
+            pixels.fill((255, 0, 0))
+            pixels.show()
         sleep(5)
         EXIT = True
 
-    GPIO.setup(DOOR_SENSOR_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    if GPIO:
+        GPIO.setup(DOOR_SENSOR_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
     # try except for clean exit on keyboard interrupt
     try:
@@ -184,13 +195,18 @@ if __name__ == "__main__":
         while not EXIT:
             # try except to handle errors and continue
             try:
+                loop_time = time()
+
                 # if sheet has never been updated or sheet data is older than today and it is past SHEET_UPDATE_HOUR
                 if not last_checkin_time or datetime.now() - last_checkin_time > timedelta(
                     0, CHECKIN_TIMEOUT, 0, 0, 0, 0, 0
                 ):  # if last checkin time is not set or it has been CHECKIN_TIMEOUT seconds since last checkin
                     # check in
                     logger.info("Checking in...")
-                    checkin(alarm_status)
+                    e, d = checkin(alarm_status, logger)
+                    if e is not None:
+                        alarm_enable = e
+                        alarm_delay_min = d
 
                 # read card ID from NFC reader with a timeout of 1 second
                 card_id = nfc.read_card_queue_timeout(1)
@@ -201,7 +217,7 @@ if __name__ == "__main__":
                     last_ids.append(card_id)
                     last_ids.pop(0)
 
-                    if card_id == TAGOUT:
+                    if card_id.upper() == TAGOUT.upper():
                         alarm_status = (
                             constants.ALARM_STATUS_OK
                             if alarm_status == constants.ALARM_STATUS_TAGGEDOUT
@@ -212,9 +228,11 @@ if __name__ == "__main__":
                         # scan card ID in sheet - returns color and alarm timeout
                         success, response = api.scan(card_id)
 
+                        print(response)
+
                         if not success:  # api returned fail
                             logger.error("error - could not get api response")
-                        elif not response[
+                        elif not response[  # type: ignore
                             "color"
                         ]:  # if response is not a color/alarm timeout tuple
                             # print an error - likely caused by the card being in the database but not having a color for this room
@@ -230,6 +248,7 @@ if __name__ == "__main__":
 
                             # print color and timeout for debugging
                             # print(color, timeout)
+                            logger.info(f"color: {color}, timeout: {timeout}")
 
                             # convert color from hex to RGB tuple
                             colors = tuple(
@@ -244,10 +263,11 @@ if __name__ == "__main__":
                             scan_time = datetime.now()
                             sleep(BREATHE_DELAY * 2)
 
-                            # set LED brightness to high, fill LEDs with color, and show LEDs
-                            pixels.brightness = BRIGHTNESS_HIGH
-                            pixels.fill(colors)
-                            pixels.show()
+                            if pixels:
+                                # set LED brightness to high, fill LEDs with color, and show LEDs
+                                pixels.brightness = BRIGHTNESS_HIGH
+                                pixels.fill(colors)
+                                pixels.show()
 
                             # if user had a specified timeout and it was greater than the existing timeout
                             if timeout and timeout * 60 > door_time_limit:
@@ -257,7 +277,10 @@ if __name__ == "__main__":
 
                                 if alarm_status == constants.ALARM_STATUS_ALARM:
                                     alarm_status = constants.ALARM_STATUS_OK
-                                    checkin(alarm_status)
+                                    e, d = checkin(alarm_status, logger)
+                                    if e is not None:
+                                        alarm_enable = e
+                                        alarm_delay_min = d
                                     logger.info("Alarm untriggered")
 
                 elif card_id is None:  # scanned too soon or no card scanned
@@ -267,8 +290,12 @@ if __name__ == "__main__":
                 elif card_id is False:  # some error occurred, exit loop
                     EXIT = True
 
-                # check if door sensor is open
-                input_state = bool(GPIO.input(DOOR_SENSOR_PIN))
+                if GPIO:
+                    # check if door sensor is open
+                    input_state = bool(GPIO.input(DOOR_SENSOR_PIN))
+                else:
+                    input_state = False
+
                 if (
                     input_state != door_open
                     and time() - door_change_time > DOOR_SENSOR_DEBOUNCE
@@ -279,7 +306,10 @@ if __name__ == "__main__":
 
                     if not door_open and alarm_status == constants.ALARM_STATUS_ALARM:
                         alarm_status = constants.ALARM_STATUS_OK
-                        checkin(alarm_status)
+                        e, d = checkin(alarm_status, logger)
+                        if e is not None:
+                            alarm_enable = e
+                            alarm_delay_min = d
                         logger.info("Alarm untriggered")
 
                 if (
@@ -291,8 +321,14 @@ if __name__ == "__main__":
                 ):
                     door_time_limit = 0
                     alarm_status = constants.ALARM_STATUS_ALARM
-                    checkin(alarm_status)
+                    e, d = checkin(alarm_status, logger)
+                    if e is not None:
+                        alarm_enable = e
+                        alarm_delay_min = d
                     logger.info("Alarm triggered")
+
+                # sleep until next loop
+                sleep(max(0, LOOP_TIMEOUT - (time() - loop_time)))
 
             except Exception as e:  # catch any exceptions
                 # if exception is KeyboardInterrupt, raise it to exit cleanly
@@ -300,7 +336,7 @@ if __name__ == "__main__":
                     raise e
 
                 # otherwise, print error and sleep for 60 seconds to prevent spamming
-                logger.error(f"Error: {e}")
+                logger.error(f"reader loop: {e}")
                 sleep(60)
 
     except KeyboardInterrupt:  # if KeyboardInterrupt is raised, set exit flag to True
@@ -313,12 +349,28 @@ if __name__ == "__main__":
     # wait until breathing thread has stopped
     sleep(BREATHE_DELAY * 2)
 
-    # set LEDs to black and show them - this is the "off" state
-    pixels.fill((0, 0, 0))
-    pixels.show()
+    if pixels and GPIO:
+        # set LEDs to black and show them - this is the "off" state
+        pixels.fill((0, 0, 0))
+        pixels.show()
 
-    # close NFC reader - needed to prevent errors on next run
-    nfc.close()
+        # close NFC reader - needed to prevent errors on next run
+        nfc.close()
 
-    # cleanup GPIO
-    GPIO.cleanup()
+        # cleanup GPIO
+        GPIO.cleanup()
+
+
+if __name__ == "__main__":
+    # Create a new logger for the reader module
+    logger = log.setup_logs("reader", log.INFO)
+
+    # pass logger to api
+    api.set_logger(logger)
+
+    s, j = api.tagout()
+    if s:
+        TAGOUT = j["uid"]
+
+    # main loop
+    main(logger)

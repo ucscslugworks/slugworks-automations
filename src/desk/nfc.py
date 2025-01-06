@@ -3,7 +3,11 @@ import subprocess
 import time
 from multiprocessing import Process, Queue
 
-import serial  # type: ignore
+try:
+    import serial  # type: ignore
+except ImportError:
+    print("pyserial is not installed. Please install it with 'pip install pyserial'")
+    raise
 
 # https://eccel.co.uk/product/chilli-usb-b1/ - product page for the USB NFC reader
 # https://eccel.co.uk/wp-content/downloads/USB-B1-v2-User-manual.pdf - user manual for the USB NFC reader

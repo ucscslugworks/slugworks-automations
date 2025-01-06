@@ -1,7 +1,11 @@
 from multiprocessing import Process, Queue
 
-import RPi.GPIO as GPIO  # type: ignore
-from mfrc522 import SimpleMFRC522  # type: ignore
+try:
+    import RPi.GPIO as GPIO  # type: ignore
+    from mfrc522 import SimpleMFRC522  # type: ignore
+except ImportError:
+    print("RPi.GPIO or MFRC522 library not found, exiting")
+    raise
 
 # https://github.com/pimylifeup/MFRC522-python
 # https://www.nxp.com/docs/en/data-sheet/MFRC522.pdf
