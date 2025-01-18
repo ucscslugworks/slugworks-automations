@@ -9,6 +9,7 @@ from src import log, constants
 from src.server import server
 
 # TODO: remove (when the canvas course id is set in the UI)
+# TODO: update - this is the old canvas course, not the 24-25 course
 server.set_canvas_course_id(67429)
 
 # Create a new logger for the canvas module

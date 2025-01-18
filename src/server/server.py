@@ -165,11 +165,19 @@ def is_student(cruzid: str | None = None, uid: str | None = None):
     Check if a given cruzid or uid belongs to a student in the database
     """
 
-    if cruzid:
-        cruzid = cruzid.lower()
+    logger.debug(f"is_student: cruzid {cruzid}, uid {uid}")
 
-    if uid:
+    if cruzid is not None:
+        cruzid = cruzid.lower()
+        logger.debug(
+            f"{cruzid.isalnum()}, {sql("SELECT * FROM students WHERE cruzid = ?", (cruzid,)).fetchone()}"
+        )
+
+    if uid is not None:
         uid = uid.lower()
+        logger.debug(
+            f"{uid.isalnum()}, {len(uid) == constants.UID_LEN}, {sql("SELECT * FROM students WHERE uid = ?", (uid,)).fetchone()}"
+        )
 
     return bool(
         (
@@ -180,7 +188,7 @@ def is_student(cruzid: str | None = None, uid: str | None = None):
         or (
             uid
             and uid.isalnum()
-            and len(uid) != constants.UID_LEN
+            and len(uid) == constants.UID_LEN
             and sql("SELECT * FROM students WHERE uid = ?", (uid,)).fetchone()
         )
     )
@@ -268,11 +276,19 @@ def is_staff(cruzid: str | None = None, uid: str | None = None):
     Check if a given cruzid or uid belongs to a staff member in the database
     """
 
+    logger.debug(f"is_staff: cruzid {cruzid}, uid {uid}")
+
     if cruzid:
         cruzid = cruzid.lower()
+        logger.debug(
+            f"{cruzid.isalnum()}, {sql('SELECT * FROM staff WHERE cruzid = ?', (cruzid,)).fetchone()}"
+        )
 
     if uid:
         uid = uid.lower()
+        logger.debug(
+            f"{uid.isalnum()}, {len(uid) == constants.UID_LEN}, {sql('SELECT * FROM staff WHERE uid = ?', (uid,)).fetchone()}"
+        )
 
     return bool(
         (
@@ -283,7 +299,7 @@ def is_staff(cruzid: str | None = None, uid: str | None = None):
         or (
             uid
             and uid.isalnum()
-            and len(uid) != constants.UID_LEN
+            and len(uid) == constants.UID_LEN
             and sql("SELECT * FROM staff WHERE uid = ?", (uid,)).fetchone()
         )
     )
@@ -957,6 +973,7 @@ def get_access_details(reader_id: int, room: str):
 
 def scan_uid(reader_id: int, uid: str):
     uid = uid.lower()
+    logger.debug(f"scan_uid: Scanning UID {uid} with reader ID {reader_id}")
 
     if is_staff(uid=uid):
         details = get_access_details(reader_id, "staff")
