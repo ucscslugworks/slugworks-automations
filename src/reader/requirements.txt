@@ -2,3 +2,4 @@ requests
 spidev
 mfrc522
 RPi.GPIO
+adafruit-python-shell

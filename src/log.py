@@ -110,8 +110,7 @@ def setup_logs(
             handlers.append(file_handlers[h_name])
         else:
             # Create a new directory for file handler if it doesn't exist
-            if not os.path.exists(os.path.join(logs_path, h_name, folder)):
-                os.makedirs(os.path.join(logs_path, h_name, folder))
+            os.makedirs(os.path.join(logs_path, h_name, folder), exist_ok=True)
 
             # create file handler which logs debug messages (and above - everything)
             fh = RollingFileHandler(
@@ -155,8 +154,7 @@ def get_log_path(name: str):
     filename = timestamp.strftime("%Y-%m-%d %H:%M:%S")
 
     # Create a new directory for date if it doesn't exist
-    if not os.path.exists(os.path.join(logs_path, name, folder)):
-        os.makedirs(os.path.join(logs_path, name, folder))
+    os.makedirs(os.path.join(logs_path, name, folder), exist_ok=True)
 
     # check for and remove existing latest symlink
     if os.path.islink(os.path.join(logs_path, name, "latest.log")) or os.path.exists(
