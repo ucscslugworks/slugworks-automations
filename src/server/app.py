@@ -1,102 +1,44 @@
 import logging
 import os
+import sqlite3
 
-from flask import Flask, jsonify, request
+from flask import Flask
+from flask_login import LoginManager
 
-from src import constants, log
-from src.server import server
-
-# Create a new logger for the flask module
-# logger = log.setup_logs("flask", log.INFO)
-logger = logging.getLogger("gunicorn.error")
-
-# Initialize Flask app
-app = Flask(__name__)
-# Generate a random secret key for the session
-app.secret_key = os.urandom(12).hex()
-
-# TODO: need to set up the ui pages
-# TODO: add a way (api endpoint?) to set the canvas course id
+from src.server.auth_db import init_db_command
+from src.server.auth_user import User
 
 
-# main dashboard page
-@app.route("/")
-def dashboard():
-    return "dashboard"
+def create_app():
+    logger = logging.getLogger("gunicorn.error")
 
+    app = Flask(__name__)
+    app.secret_key = os.urandom(24).hex()
+    app.url_map.strict_slashes = True
 
-# new user page
-@app.route("/new")
-def new():
-    return "new"
+    login_manager = LoginManager()
+    login_manager.init_app(app)
 
+    try:
+        init_db_command(app)
+    except sqlite3.OperationalError:
+        logger.info("Database already exists")
+        pass
 
-# edit user page
-@app.route("/edit")
-def edit():
-    return "edit"
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User.get(user_id)
 
+    # blueprint for auth routes in our app
+    from src.server.app_auth import auth as auth_blueprint
 
-# identify user page
-@app.route("/identify")
-def identify():
-    return "identify"
+    app.register_blueprint(auth_blueprint)
 
+    # blueprints for non-auth parts of app
+    from src.server.app_api import api as api_blueprint
+    from src.server.app_ui import ui as ui_blueprint
 
-def api_success(args: dict = {}):
-    args["success"] = True
-    return jsonify(args)
+    app.register_blueprint(api_blueprint)
+    app.register_blueprint(ui_blueprint)
 
-
-def api_fail(reason: str = ""):
-    return jsonify({"success": False, "reason": reason})
-
-
-# API endpoint - upload most recently scanned card uid from desk scanner
-@app.route("/api/desk_uid_scan")
-def desk_uid_scan():
-    uid = request.args.get("uid", "", type=str)
-    if server.set_desk_uid_scan(uid):
-        return api_success()
-    else:
-        return api_fail("failed to set desk scan uid")
-
-
-@app.route("/api/scan")
-def scan():
-    uid = request.args.get("uid", "", type=str)
-    reader_id = 0  # TODO: how do we want to get the reader id? should it be passed as an arg in addition to the auth token, or do we just use the auth token to identify the reader
-
-    result = server.scan_uid(reader_id, uid)
-    if result:
-        color, delay, tagout = result
-        return api_success({"color": color, "delay": delay, "tagout": tagout})
-    else:
-        return api_fail("no color/delay available")
-
-
-@app.route("/api/checkin")
-def checkin():
-    status = request.args.get("status", constants.ALARM_STATUS_OK, type=int)
-    reader_id = 0
-
-    if not server.check_in(reader_id, status):
-        return api_fail("check-in failed")
-
-    result = server.get_reader_settings(reader_id)
-
-    if not result:
-        return api_fail("get_reader_settings failed")
-
-    _, alarm_enable, alarm_delay_min = result
-
-    return api_success(
-        {
-            "alarm_enable": alarm_enable,
-            "alarm_delay_min": alarm_delay_min,
-        }
-    )
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    return app
