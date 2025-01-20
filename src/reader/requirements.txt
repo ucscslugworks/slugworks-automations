@@ -3,3 +3,4 @@ spidev
 mfrc522
 RPi.GPIO
 adafruit-python-shell
+adafruit-circuitpython-neopixel
