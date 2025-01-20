@@ -42,16 +42,6 @@ def desk_uid_scan(uid: str):
     return (False, {})
 
 
-def tagout():
-    try:
-        response = requests.get(f"{base_url}/tagout")
-        if response.status_code == 200:
-            return handle_response(response)
-    except Exception as e:
-        logger.error(f"api - tagout - {e}")
-    return (False, {})
-
-
 def scan(uid: str):
     try:
         response = requests.get(f"{base_url}/scan", params={"uid": uid})

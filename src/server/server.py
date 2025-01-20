@@ -977,6 +977,9 @@ def scan_uid(reader_id: int, uid: str):
     uid = uid.lower()
     logger.debug(f"scan_uid: Scanning UID {uid} with reader ID {reader_id}")
 
+    if uid == str(get_tagout()).lower():
+        return ("000000", 0, True)
+
     if is_staff(uid=uid):
         details = get_access_details(reader_id, "staff")
         if not details:
@@ -988,7 +991,7 @@ def scan_uid(reader_id: int, uid: str):
             logger.info(
                 f"scan_uid: {details} for reader_id {reader_id} and uid {uid} (staff)"
             )
-            return details
+            return (*details, False)
 
     elif is_student(uid=uid):
         for room in sql("SELECT name FROM rooms").fetchall():
@@ -1011,7 +1014,7 @@ def scan_uid(reader_id: int, uid: str):
                 logger.info(
                     f"scan_uid: {details} for reader_id {reader_id} and uid {uid} (student - access {access})"
                 )
-                return details
+                return (*details, False)
 
     details = get_access_details(reader_id, "no_access")
     if not details:
@@ -1021,7 +1024,7 @@ def scan_uid(reader_id: int, uid: str):
         return False
 
     logger.info(f"scan_uid: no access - {details}")
-    return details
+    return (*details, False)
 
 
 def get_alarm_status(reader_id: int):

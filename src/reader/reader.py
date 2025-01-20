@@ -37,8 +37,6 @@ BRIGHTNESS_HIGH = 0.5  # high brightness while holding color
 DOOR_SENSOR_PIN = 16  # GPIO pin for door sensor
 DOOR_SENSOR_DEBOUNCE = 0.5  # seconds to debounce door sensor
 
-TAGOUT = ""
-
 EXIT = False  # exit flag
 breathe = True  # breathe LEDs when no card is scanned
 scan_time = None  # time of last scan to hold color
@@ -217,71 +215,66 @@ def main(logger: logging.Logger):
                     last_ids.append(card_id)
                     last_ids.pop(0)
 
-                    if card_id.upper() == TAGOUT.upper():
+                    # scan card ID in sheet - returns color and alarm timeout
+                    success, response = api.scan(card_id)
+
+                    print(response)
+
+                    if not success:  # api returned fail
+                        logger.error("error - could not get api response")
+                    elif not response[
+                        "color"
+                    ]:  # if response is not a color/alarm timeout/tagout tuple
+                        # print an error - likely caused by the card being in the database but not having a color for this room
+                        logger.error("error - card not in database or something else")
+                        # TODO: flash no access color or some other unique indication
+                    elif response["tagout"]:
+                        # if response says this card is the tagout card, toggle alarm status
                         alarm_status = (
                             constants.ALARM_STATUS_OK
                             if alarm_status == constants.ALARM_STATUS_TAGGEDOUT
                             else constants.ALARM_STATUS_TAGGEDOUT
                         )
                         logger.info("tagged out")
-                    else:
-                        # scan card ID in sheet - returns color and alarm timeout
-                        success, response = api.scan(card_id)
+                        pass
+                    else:  # a response was received
+                        # unpack color and timeout from response
+                        color = response["color"]
+                        timeout = response["delay"]
 
-                        print(response)
+                        # print color and timeout for debugging
+                        # print(color, timeout)
+                        logger.info(f"color: {color}, timeout: {timeout}")
 
-                        if not success:  # api returned fail
-                            logger.error("error - could not get api response")
-                        elif not response[  # type: ignore
-                            "color"
-                        ]:  # if response is not a color/alarm timeout tuple
-                            # print an error - likely caused by the card being in the database but not having a color for this room
-                            logger.error(
-                                "error - card not in database or something else"
-                            )
-                            # TODO: flash no access color or some other unique indication
-                            pass
-                        else:  # a response was received
-                            # unpack color and timeout from response
-                            color = response["color"]
-                            timeout = response["delay"]
+                        # convert color from hex to RGB tuple
+                        colors = tuple(
+                            [int(color[i : i + 2], 16) for i in range(0, len(color), 2)]
+                        )
 
-                            # print color and timeout for debugging
-                            # print(color, timeout)
-                            logger.info(f"color: {color}, timeout: {timeout}")
+                        # stop breathing LEDs, set scan time, and sleep to give the breathing thread time to stop
+                        breathe = False
+                        scan_time = datetime.now()
+                        sleep(BREATHE_DELAY * 2)
 
-                            # convert color from hex to RGB tuple
-                            colors = tuple(
-                                [
-                                    int(color[i : i + 2], 16)
-                                    for i in range(0, len(color), 2)
-                                ]
-                            )
+                        if pixels:
+                            # set LED brightness to high, fill LEDs with color, and show LEDs
+                            pixels.brightness = BRIGHTNESS_HIGH
+                            pixels.fill(colors)
+                            pixels.show()
 
-                            # stop breathing LEDs, set scan time, and sleep to give the breathing thread time to stop
-                            breathe = False
-                            scan_time = datetime.now()
-                            sleep(BREATHE_DELAY * 2)
+                        # if user had a specified timeout and it was greater than the existing timeout
+                        if timeout and timeout * 60 > door_time_limit:
+                            door_change_time = time()
+                            door_time_limit = timeout * 60
+                            logger.info("Door time limit set to", door_time_limit)
 
-                            if pixels:
-                                # set LED brightness to high, fill LEDs with color, and show LEDs
-                                pixels.brightness = BRIGHTNESS_HIGH
-                                pixels.fill(colors)
-                                pixels.show()
-
-                            # if user had a specified timeout and it was greater than the existing timeout
-                            if timeout and timeout * 60 > door_time_limit:
-                                door_change_time = time()
-                                door_time_limit = timeout * 60
-                                logger.info("Door time limit set to", door_time_limit)
-
-                                if alarm_status == constants.ALARM_STATUS_ALARM:
-                                    alarm_status = constants.ALARM_STATUS_OK
-                                    e, d = checkin(alarm_status, logger)
-                                    if e is not None:
-                                        alarm_enable = e
-                                        alarm_delay_min = d
-                                    logger.info("Alarm untriggered")
+                            if alarm_status == constants.ALARM_STATUS_ALARM:
+                                alarm_status = constants.ALARM_STATUS_OK
+                                e, d = checkin(alarm_status, logger)
+                                if e is not None:
+                                    alarm_enable = e
+                                    alarm_delay_min = d
+                                logger.info("Alarm untriggered")
 
                 elif card_id is None:  # scanned too soon or no card scanned
                     # add None to last IDs scanned and remove the oldest one (if we didn't do this, the same person could never scan twice in a row, even if they waited a long time)
@@ -367,10 +360,6 @@ if __name__ == "__main__":
 
     # pass logger to api
     api.set_logger(logger)
-
-    s, j = api.tagout()
-    if s:
-        TAGOUT = j["uid"]
 
     # main loop
     main(logger)

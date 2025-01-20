@@ -62,15 +62,6 @@ def desk_uid_scan():
         return api_fail("failed to set desk scan uid")
 
 
-@app.route("/api/tagout")
-def tagout():
-    uid = server.get_tagout()
-    if uid is not False:
-        return api_success({"uid": uid})
-    else:
-        return api_fail("failed to get tagout uid")
-
-
 @app.route("/api/scan")
 def scan():
     uid = request.args.get("uid", "", type=str)
@@ -78,8 +69,8 @@ def scan():
 
     result = server.scan_uid(reader_id, uid)
     if result:
-        color, delay = result
-        return api_success({"color": color, "delay": delay})
+        color, delay, tagout = result
+        return api_success({"color": color, "delay": delay, "tagout": tagout})
     else:
         return api_fail("no color/delay available")
 
