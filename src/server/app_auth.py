@@ -103,7 +103,7 @@ def callback():
         User.create(unique_id, users_name, users_email, picture)
 
     # Begin user session by logging the user in
-    login_user(user)
+    login_user(user, remember=True)
 
     # Send user back to homepage
     return redirect(url_for("ui.dashboard"))

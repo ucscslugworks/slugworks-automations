@@ -1,4 +1,4 @@
-from flask import Blueprint
+from flask import Blueprint, render_template
 
 ui = Blueprint("ui", __name__)
 
@@ -8,22 +8,22 @@ ui = Blueprint("ui", __name__)
 # main dashboard page
 @ui.route("/")
 def dashboard():
-    return "dashboard"
+    return render_template("dashboard.html")
 
 
-# new user page
-@ui.route("/new")
-def new():
-    return "new"
+# users page
+@ui.route("/users")
+def users():
+    return render_template("users.html")
 
 
-# edit user page
-@ui.route("/edit")
-def edit():
-    return "edit"
+# config page
+@ui.route("/config")
+def config():
+    return render_template("config.html")
 
 
-# identify user page
-@ui.route("/identify")
-def identify():
-    return "identify"
+# logs page
+@ui.route("/logs")
+def logs():
+    return render_template("logs.html")

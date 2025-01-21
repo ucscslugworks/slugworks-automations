@@ -1,16 +1,19 @@
 import logging
 import os
 import sqlite3
+import ssl
 
-from flask import Flask
+from flask import Flask, session
 from flask_login import LoginManager
 
+from src import log
 from src.server.auth_db import init_db_command
 from src.server.auth_user import User
 
 
 def create_app():
-    logger = logging.getLogger("gunicorn.error")
+    # logger = logging.getLogger("gunicorn.error")
+    logger = log.setup_logs("flask")
 
     app = Flask(__name__)
     app.secret_key = os.urandom(24).hex()
@@ -27,6 +30,15 @@ def create_app():
 
     @login_manager.user_loader
     def load_user(user_id):
+        logger.debug(f"user_id: {user_id}")
+        logger.debug(f"session: {session}")
+        print(f"session: {session}")
+        if session:
+            u = User.get(session["_user_id"])
+            if u:
+                logger.debug(f"logged in with session id")
+                return u
+
         return User.get(user_id)
 
     # blueprint for auth routes in our app
@@ -42,3 +54,8 @@ def create_app():
     app.register_blueprint(ui_blueprint)
 
     return app
+
+
+if __name__ == "__main__":
+    app = create_app()
+    app.run(host="0.0.0.0", port=5001, debug=True, ssl_context="adhoc")

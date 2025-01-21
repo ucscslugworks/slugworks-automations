@@ -8,7 +8,7 @@ class DummyObject(object):
         return lambda *args, **kwargs: None
 
 
-SERVER_IP = "http://10.0.2.234:5001"
+SERVER_IP = "https://10.0.2.234:5001"
 base_url = f"{SERVER_IP}/api"
 
 logger = DummyObject()
