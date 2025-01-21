@@ -35,6 +35,7 @@ def handle_response(response: requests.Response):
 
 def desk_uid_scan(uid: str):
     try:
+        logger.debug(f"api - desk_uid_scan - {uid}")
         response = requests.get(
             f"{base_url}/desk_uid_scan", params={"uid": uid}, verify=not NO_VERIFY
         )
@@ -47,6 +48,7 @@ def desk_uid_scan(uid: str):
 
 def scan(uid: str):
     try:
+        logger.debug(f"api - scan - {uid}")
         response = requests.get(
             f"{base_url}/scan", params={"uid": uid}, verify=not NO_VERIFY
         )
@@ -59,6 +61,7 @@ def scan(uid: str):
 
 def checkin(status: int):
     try:
+        logger.debug(f"api - checkin - {status}")
         response = requests.get(
             f"{base_url}/checkin", params={"status": status}, verify=not NO_VERIFY
         )

@@ -45,7 +45,7 @@ scan_time = None  # time of last scan to hold color
 if board and neopixel and GPIO:
     ORDER = neopixel.GRB  # RGB color order
     pixel_pin = board.D18  # LEDs are on GPIO pin 18
-    num_pixels = 30  # 30 LEDs
+    num_pixels = 75  # 75 LEDs
     pixels = neopixel.NeoPixel(
         pixel_pin,
         num_pixels,
