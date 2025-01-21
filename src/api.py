@@ -9,6 +9,7 @@ class DummyObject(object):
 
 
 SERVER_IP = "https://10.0.2.234:5001"
+NO_VERIFY = True  # Set to True to disable SSL verification
 base_url = f"{SERVER_IP}/api"
 
 logger = DummyObject()
@@ -34,7 +35,9 @@ def handle_response(response: requests.Response):
 
 def desk_uid_scan(uid: str):
     try:
-        response = requests.get(f"{base_url}/desk_uid_scan", params={"uid": uid})
+        response = requests.get(
+            f"{base_url}/desk_uid_scan", params={"uid": uid}, verify=not NO_VERIFY
+        )
         if response.status_code == 200:
             return handle_response(response)
     except Exception as e:
@@ -44,7 +47,9 @@ def desk_uid_scan(uid: str):
 
 def scan(uid: str):
     try:
-        response = requests.get(f"{base_url}/scan", params={"uid": uid})
+        response = requests.get(
+            f"{base_url}/scan", params={"uid": uid}, verify=not NO_VERIFY
+        )
         if response.status_code == 200:
             return handle_response(response)
     except Exception as e:
@@ -54,7 +59,9 @@ def scan(uid: str):
 
 def checkin(status: int):
     try:
-        response = requests.get(f"{base_url}/checkin", params={"status": status})
+        response = requests.get(
+            f"{base_url}/checkin", params={"status": status}, verify=not NO_VERIFY
+        )
         if response.status_code == 200:
             return handle_response(response)
     except Exception as e:
