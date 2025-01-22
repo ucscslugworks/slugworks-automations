@@ -30,9 +30,9 @@ def create_app():
 
     @login_manager.user_loader
     def load_user(user_id):
-        logger.debug(f"user_id: {user_id}")
-        logger.debug(f"session: {session}")
-        print(f"session: {session}")
+        # logger.debug(f"user_id: {user_id}")
+        # logger.debug(f"session: {session}")
+        # print(f"session: {session}")
         if session:
             u = User.get(session["_user_id"])
             if u:
