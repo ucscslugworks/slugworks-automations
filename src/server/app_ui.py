@@ -31,7 +31,7 @@ def dashboard():
         canvas["time"] = "Never"
     else:
         canvas["time"] = datetime.fromtimestamp(c_time).strftime("%Y-%m-%d %H:%M")
-    
+
     if c_status == constants.CANVAS_OK:
         canvas["status"] = "OK"
     elif c_status == constants.CANVAS_UPDATING:
@@ -50,14 +50,25 @@ def dashboard():
             "status": status,
             "last_seen": datetime.fromtimestamp(last_seen).strftime("%Y-%m-%d %H:%M"),
         }
-    
+
     return render_template("dashboard.html", readers=readers, canvas=canvas)
 
 
 # users page
-@ui.route("/users")
+@ui.route("/users", methods=["GET", "POST"])
 def users():
-    return render_template("users.html")
+    cruzid = None
+    uid = None
+    if request.method == "POST":
+        cruzid = request.form.get(f"cruzid", None)
+        uid = request.form.get(f"uid", None)
+        if cruzid is not None:
+            logger.info(f"Searching for {cruzid}")
+            uid = server.get_uid(cruzid)
+        elif uid is not None:
+            logger.info(f"Searching for {uid}")
+            cruzid = server.get_cruzid(uid)
+    return render_template("users.html", cruzid=cruzid, uid=uid)
 
 
 # config page
