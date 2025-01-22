@@ -266,7 +266,7 @@ def main(logger: logging.Logger):
                         if timeout and timeout * 60 > door_time_limit:
                             door_change_time = time()
                             door_time_limit = timeout * 60
-                            logger.info("Door time limit set to", door_time_limit)
+                            logger.info(f"Door time limit set to {door_time_limit}")
 
                             if alarm_status == constants.ALARM_STATUS_ALARM:
                                 alarm_status = constants.ALARM_STATUS_OK
