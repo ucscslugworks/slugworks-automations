@@ -22,10 +22,28 @@ def home():
 @login_required
 def dashboard():
     if request.method == "POST":
-        rid = request.form.get(f"rid", -1)
-        enable = int(request.form.get(f"enable", None))
-        loc = str(request.form.get(f"loc", None))
-        delay = request.form.get(f"delay", None)
+        rid = str(request.form.get(f"rid", ""))
+        if not rid.isnumeric():
+            return redirect(url_for("ui.dashboard"))
+        else:
+            rid = int(rid)
+
+        enable = str(request.form.get(f"enable", ""))
+        if enable:
+            enable = True
+        else:
+            enable = False
+
+        loc = str(request.form.get(f"loc", ""))
+        if not loc:
+            loc = None
+
+        delay = str(request.form.get(f"delay", ""))
+        if delay and delay.isnumeric():
+            delay = int(delay)
+        else:
+            delay = None
+
         server.set_reader_settings(rid, loc, enable, delay)
         logger.info(f"{rid}, {loc}, {enable}, {delay}")
         return redirect(url_for("ui.dashboard"))
@@ -101,15 +119,6 @@ def users():
                         rooms[k] = "Unknown"
 
             data = user_data
-        # for i, r in enumerate(data):
-        #     user_type, cruzid, firstname, lastname, uid  = r
-        #     data[i] = {
-        #         "type": user_type,
-        #         "cruzid": cruzid,
-        #         "firstname": firstname,
-        #         "lastname": lastname,
-        #         "uid": uid,
-        #     }
     return render_template("users.html", data=data, rooms=rooms)
 
 
