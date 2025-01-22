@@ -8,7 +8,7 @@ ui = Blueprint("ui", __name__)
 
 
 # main dashboard page
-@ui.route("/")
+@ui.route("/", methods=["GET", "POST"])
 def dashboard():
     readers = server.get_readers()
     for i, r in enumerate(readers):
@@ -22,6 +22,11 @@ def dashboard():
             "status": status,
             "last_seen": last_seen,
         }
+        if request.method == "POST":
+            enable = request.form.get(f"enable_{rid}", enable)
+            loc = request.form.get(f"loc_{rid}", loc)
+            delay = request.form.get(f"delay_{rid}", delay)
+    
     return render_template("dashboard.html", readers=readers)
 
 

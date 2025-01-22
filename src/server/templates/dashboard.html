@@ -21,32 +21,42 @@
         <tr>
             <th>Reader</th>
             <th>Status</th>
-            <th>Alarm Status</th>
-            <th>Last Seen</th>
             <th>Location</th>
-            <th>Alarm Timeout</th>
-            <th>Alarm Enabled</th>
+            <th>Alarm enabled</th>
+            <th>Door Delay</th>
+            <th>Alarm status</th>
+            <th>Last Alive</th>
         </tr>
     </thead>
     <tbody>
         {% for reader in readers %}
         <tr>
             <td>{{ reader["rid"] }}</td>
-            <td>Status Value</td>
-            <td>Alarm Status Value</td>
-            <td>Last Seen Value</td>
-            <td>Location Value</td>
-            <td>Alarm Timeout Value</td>
+            <td>{{reader["online"]}}</td>
             <td>
-                <input
-                    type="checkbox"
-                    class="switch is-success"
-                    id="alarmSwitch{{ loop.index }}"
-                    name="alarmEnabled_{{ reader }}"
-                    {% if line.alarm_enabled %}checked{% endif %}
-                 />
-                <label for="alarmSwitch{{ loop.index }}"></label>
+                <input type="text" name="loc" value="{{ reader['loc'] }}" />
             </td>
+            <td>
+                <label class="switch">
+                    <input type="checkbox"
+                        name="enable"
+                        {% if reader["enable"] == true or reader["enable"] == 'true' or reader["enable"] == '1' %}
+                            checked
+                        {% endif %}
+                    >
+                    <span class="check"></span>
+                </label>
+            </td>
+
+            <td>
+                <input type="text" name="delay" value="{{ reader['delay'] }}" />
+            </td>
+            <td>{{reader["status"]}}</td>
+            {# <td>{{reader["last_seen"]}}</td> #}
+            
+         
+            
+            
         </tr>
         {% endfor %}
     </tbody>
