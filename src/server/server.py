@@ -57,6 +57,7 @@ CREATE_TABLES = [
     ("canvas_course_id", "(id INTEGER)"),
     ("canvas_update_hour", "(hour INTEGER)"),
     ("desk_uid_scan", "(uid TEXT, timestamp REAL)"),
+    ("authorized_users", "(email TEXT)"),
 ]
 
 for name, params in CREATE_TABLES:
@@ -535,6 +536,13 @@ def remove_room(name: str):
     sql(f"ALTER TABLE students DROP COLUMN {name}")
     logger.info(f"remove_room: Removed room {name} from the database")
     return True
+
+
+def get_rooms():
+    """
+    Get all rooms
+    """
+    return sql("SELECT name FROM rooms").fetchall()
 
 
 def change_room_modules(name: str, modules_expr: str):
@@ -1065,6 +1073,66 @@ def set_desk_uid_scan(uid: str):
             time.time(),
         ),
     )
+    return True
+
+
+def lookup_authorized_user(email: str):
+    """
+    Check if an email is an authorized user
+    """
+    email = email.lower()
+
+    if not email:
+        logger.warning(f"lookup_authorized_user: Email {email} is empty")
+        return False
+
+    return bool(
+        sql("SELECT email FROM authorized_users WHERE email = ?", (email,)).fetchone()
+    )
+
+
+def add_authorized_user(email: str):
+    """
+    Add an authorized user to the database
+    """
+    email = email.lower()
+
+    if not email:
+        logger.warning(f"add_authorized_user: Email {email} is empty")
+        return False
+
+    if lookup_authorized_user(email):
+        logger.warning(
+            f"add_authorized_user: Email {email} already exists in the database"
+        )
+        return False
+
+    sql(
+        "INSERT INTO authorized_users (email) VALUES (?)",
+        (email,),
+    )
+    logger.info(f"add_authorized_user: Added email {email} to the database")
+    return True
+
+
+def remove_authorized_user(email: str):
+    """
+    Remove an authorized user from the database
+    """
+    email = email.lower()
+
+    if not email:
+        logger.warning(f"remove_authorized_user: Email {email} is empty")
+        return False
+
+    if not lookup_authorized_user(email):
+        logger.warning(
+            f"remove_authorized_user: Email {email} does not exist in the database"
+        )
+        return False
+
+    sql("DELETE FROM authorized_users WHERE email = ?", (email,))
+    logger.info(f"remove_authorized_user: Removed email {email} from the database")
     return True
 
 

@@ -1,7 +1,10 @@
-from flask import Blueprint, render_template, request, redirect, url_for
+from datetime import datetime
+
+from flask import Blueprint, redirect, render_template, request, url_for
+from flask_login import login_required
+
 from src import constants, log
 from src.server import server
-from datetime import datetime
 
 ui = Blueprint("ui", __name__)
 
@@ -9,8 +12,14 @@ ui = Blueprint("ui", __name__)
 logger = log.setup_logs("flask")
 
 
+@ui.route("/")
+def home():
+    return render_template("home.html")
+
+
 # main dashboard page
-@ui.route("/", methods=["GET", "POST"])
+@ui.route("/dashboard", methods=["GET", "POST"])
+@login_required
 def dashboard():
     if request.method == "POST":
         rid = request.form.get(f"rid", -1)
@@ -56,28 +65,63 @@ def dashboard():
 
 # users page
 @ui.route("/users", methods=["GET", "POST"])
+@login_required
 def users():
     cruzid = None
     uid = None
+    data = {"type": "", "cruzid": "", "firstname": "", "lastname": "", "uid": ""}
+    rooms = {}
+
     if request.method == "POST":
+        logger.info(f"{request.form}")
         cruzid = request.form.get(f"cruzid", None)
         uid = request.form.get(f"uid", None)
+        user_data = {}
         if cruzid is not None:
             logger.info(f"Searching for {cruzid}")
-            uid = server.get_uid(cruzid)
+            user_data = server.get_user_data(cruzid=cruzid)
         elif uid is not None:
             logger.info(f"Searching for {uid}")
-            cruzid = server.get_cruzid(uid)
-    return render_template("users.html", cruzid=cruzid, uid=uid)
+            user_data = server.get_user_data(uid=uid)
+
+        logger.info(f"User data: {user_data}")
+
+        if type(user_data) is dict:
+            for k in user_data:
+                if k not in data:
+                    if user_data[k] == constants.ACCESS_YES:
+                        rooms[k] = "Yes"
+                    elif user_data[k] == constants.ACCESS_NO:
+                        rooms[k] = "No"
+                    elif user_data[k] == constants.ACCESS_YES_OVERRIDE:
+                        rooms[k] = "Yes (overridden)"
+                    elif user_data[k] == constants.ACCESS_NO_OVERRIDE:
+                        rooms[k] = "No (overridden)"
+                    else:
+                        rooms[k] = "Unknown"
+
+            data = user_data
+        # for i, r in enumerate(data):
+        #     user_type, cruzid, firstname, lastname, uid  = r
+        #     data[i] = {
+        #         "type": user_type,
+        #         "cruzid": cruzid,
+        #         "firstname": firstname,
+        #         "lastname": lastname,
+        #         "uid": uid,
+        #     }
+    return render_template("users.html", data=data, rooms=rooms)
 
 
 # config page
 @ui.route("/config")
+@login_required
 def config():
     return render_template("config.html")
 
 
 # logs page
 @ui.route("/logs")
+@login_required
 def logs():
     return render_template("logs.html")

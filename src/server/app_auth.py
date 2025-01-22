@@ -7,6 +7,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 from oauthlib.oauth2 import WebApplicationClient
 
 from src.server.auth_user import User
+from src.server import server
 
 google_json = json.load(
     open(
@@ -102,10 +103,13 @@ def callback():
     if not User.get(unique_id):
         User.create(unique_id, users_name, users_email, picture)
 
+    if not server.lookup_authorized_user(users_email):
+        return redirect(url_for("ui.home"))
+
     # Begin user session by logging the user in
     login_user(user, remember=True)
 
-    # Send user back to homepage
+    # Send user back to dashboard
     return redirect(url_for("ui.dashboard"))
 
 
@@ -113,4 +117,4 @@ def callback():
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for("ui.dashboard"))
+    return redirect(url_for("ui.home"))
