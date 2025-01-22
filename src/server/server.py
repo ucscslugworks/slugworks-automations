@@ -429,16 +429,15 @@ def set_uid(cruzid: str, uid: str):
 
 
 def get_uid(cruzid: str):
-    if not user_exists(cruzid=cruzid):
-        return False
-
     cruzid = cruzid.lower()
-
-    data = (
-        sql("SELECT uid FROM students WHERE cruzid = ?", (cruzid,)).fetchone()
-        + sql("SELECT uid FROM staff WHERE cruzid = ?", (cruzid,)).fetchone()
-    )
-    return data[0][0]
+    if is_staff(cruzid=cruzid):
+        data = sql("SELECT uid FROM staff WHERE cruzid = ?", (cruzid,)).fetchone()
+        return data[0] if data else False
+    elif is_student(cruzid=cruzid):
+        data = sql("SELECT uid FROM students WHERE cruzid = ?", (cruzid,)).fetchone()
+        return data[0] if data else False
+    else:
+        return False
 
 
 def get_cruzid(uid: str):
@@ -602,12 +601,13 @@ def remove_reader(reader_id: int):
 
     return True
 
+
 def get_readers():
     """
     Get all readers
     """
     return sql("SELECT * FROM readers").fetchall()
-   
+
 
 def get_reader_settings(reader_id: int):
     """

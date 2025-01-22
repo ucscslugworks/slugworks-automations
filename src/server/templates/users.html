@@ -16,4 +16,40 @@
 <p class="subtitle">
     This system is only to be used by Slugworks staff.
 </p>
+
+<div class="search-container">
+    <form method="post">
+        <div class="search-box">
+            <div class="search-box">
+                <input type="text" id="cruzid" name="cruzid" placeholder="Search for {{ cruzid }}"
+                    oninput="handleInput('cruzid')">
+                <button type="submit" id="cruzid-search">Search</button>
+            </div>
+            <div class="search-box">
+                <input type="text" id="uid" name="uid" placeholder="Search for {{ uid }}" oninput="handleInput('uid')">
+                <button type="submit" id="uid-search">Search</button>
+            </div>
+    </form>
+</div>
+
+<script>
+    function handleInput(inputId) {
+        const otherInputId = inputId === 'cruzid' ? 'uid' : 'cruzid';
+        const input = document.getElementById(inputId);
+        const otherInput = document.getElementById(otherInputId);
+        const button = document.getElementById(`${inputId}-search`);
+
+        if (input.value.trim() !== '') {
+            otherInput.disabled = true;
+            button.disabled = false;
+        } else {
+            otherInput.disabled = false;
+            button.disabled = true;
+        }
+    }
+
+
+</script>
+
+</p>
 {% endblock %}
