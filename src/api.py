@@ -8,7 +8,7 @@ class DummyObject(object):
         return lambda *args, **kwargs: None
 
 
-SERVER_IP = "https://10.0.2.234:5001"
+SERVER_IP = "https://128.114.2.90:5001"
 NO_VERIFY = True  # Set to True to disable SSL verification
 base_url = f"{SERVER_IP}/api"
 
