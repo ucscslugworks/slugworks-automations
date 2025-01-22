@@ -8,10 +8,6 @@ from canvasapi import Canvas
 from src import log, constants
 from src.server import server
 
-# TODO: remove (when the canvas course id is set in the UI)
-# TODO: update - this is the old canvas course, not the 24-25 course
-server.set_canvas_course_id(67429)
-
 # Create a new logger for the canvas module
 logger = log.setup_logs("canvas", log.INFO)
 
@@ -21,7 +17,11 @@ canvas = Canvas(
     json.load(
         open(
             os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "common", "canvas.json"
+                os.path.dirname(os.path.abspath(__file__)),
+                "..",
+                "..",
+                "common",
+                "canvas.json",
             )
         )
     )["auth_token"],
@@ -156,7 +156,7 @@ def update():
         server.evaluate_modules(completed_modules, cruzid, num_modules)
 
         # Log the student's completed modules
-        logger.info(f"student: {cruzid} completed modules: {completed_modules}")
+        logger.info(f"\t\t\t{cruzid} completed modules: {completed_modules}")
 
     # Log that the student list has been updated
     logger.info("student list updated")

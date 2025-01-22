@@ -45,7 +45,7 @@ sql = cursor.execute
 CREATE_TABLES = [
     ("students", "(cruzid TEXT, firstname TEXT, lastname TEXT, uid TEXT)"),
     ("staff", "(cruzid TEXT, firstname TEXT, lastname TEXT, uid TEXT)"),
-    ("rooms", "(name TEXT, modules_expr TEXT)"),
+    ("rooms", "(name TEXT, modules_expr TEXT, priority INTEGER)"),
     ("accesses", "(reader_id INTEGER, staff TEXT, no_access TEXT)"),
     (
         "readers",
@@ -491,7 +491,7 @@ def get_access(room: str, cruzid: str | None = None, uid: str | None = None):
         return access
 
 
-def add_room(name: str, modules_expr: str):
+def add_room(name: str, modules_expr: str, priority: int = 99):
     """
     Add a new room
     """
@@ -510,12 +510,25 @@ def add_room(name: str, modules_expr: str):
         return False
 
     sql(
-        "INSERT INTO rooms (name, modules_expr) VALUES (?, ?)",
-        (name, modules_expr),
+        "INSERT INTO rooms (name, modules_expr, priority) VALUES (?, ?, ?)",
+        (name, modules_expr, priority),
     )
     sql(f"ALTER TABLE accesses ADD COLUMN {name} TEXT")
     sql(f"ALTER TABLE students ADD COLUMN {name} INTEGER")
     logger.info(f"add_room: Added room {name} to the database")
+    return True
+
+
+def set_room_priority(name: str, priority: int):
+    """
+    Set the priority of a room
+    """
+    if not is_room(name):
+        logger.warning(f"set_room_priority: Room {name} does not exist in the database")
+        return False
+
+    sql("UPDATE rooms SET priority = ? WHERE name = ?", (priority, name))
+    logger.info(f"set_room_priority: Updated room {name} in the database")
     return True
 
 
@@ -1001,7 +1014,10 @@ def scan_uid(reader_id: int, uid: str):
             return (*details, False)
 
     elif is_student(uid=uid):
-        for room in sql("SELECT name FROM rooms").fetchall():
+        rooms = sql("SELECT name, priority FROM rooms").fetchall()
+        rooms.sort(key=lambda x: x[1])
+
+        for room in rooms:
             access = get_access(room[0], uid=uid)
             if access is False:
                 logger.error(
