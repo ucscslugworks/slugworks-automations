@@ -76,6 +76,9 @@ def update():
                 # Get the student's UID
                 uid = server.get_uid(cruzid)
 
+                # Remove the user as a student
+                server.remove_student(cruzid)
+
             # Add the user as a staff member
             server.add_staff(cruzid, firstname, lastname, uid)
 
@@ -134,6 +137,9 @@ def update():
                 # Get the staff member's UID
                 uid = server.get_uid(cruzid)
 
+                # Remove the user as a staff member
+                server.remove_staff(cruzid)
+
             # Add the user as a student
             server.add_student(cruzid, firstname, lastname, uid)
 
@@ -156,7 +162,7 @@ def update():
         server.evaluate_modules(completed_modules, cruzid, num_modules)
 
         # Log the student's completed modules
-        logger.info(f"\t\t\t{cruzid} completed modules: {completed_modules}")
+        logger.info(f"\t\t  {cruzid} completed modules: {completed_modules}")
 
     # Log that the student list has been updated
     logger.info("student list updated")

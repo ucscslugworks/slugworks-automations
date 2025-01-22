@@ -427,6 +427,8 @@ def set_uid(cruzid: str, uid: str):
     sql("UPDATE students SET uid = ? WHERE cruzid = ?", (uid, cruzid))
     sql("UPDATE staff SET uid = ? WHERE cruzid = ?", (uid, cruzid))
 
+    return True
+
 
 def get_uid(cruzid: str):
     cruzid = cruzid.lower()
@@ -853,7 +855,7 @@ def evaluate_modules(completed_modules: list, cruzid: str, num_modules: int):
         return False
 
     cruzid = cruzid.lower()
-    module_data = sql("SELECT * FROM rooms").fetchall()
+    module_data = sql("SELECT name, modules_expr FROM rooms").fetchall()
 
     for room, exp in module_data:
         exp = exp.lower().replace("and", "&").replace("or", "|").replace(" ", "")
