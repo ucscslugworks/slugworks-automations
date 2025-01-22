@@ -6,6 +6,9 @@
     .vcenter {
         vertical-align: middle !important;
     }
+    th {
+        text-align: center;
+    }
 </style>
 {% endblock %}
 
@@ -16,6 +19,9 @@
 <p class="subtitle">
     This system is only to be used by Slugworks staff.
 </p>
+<p> canvas status: {{ canvas["status"] }} </p>
+<p> canvas was last updated: {{ canvas["time"] }} </p>
+<br>
 <table class="table is-hoverable is-fullwidth is-striped">
     <thead>
         <tr>
@@ -26,37 +32,39 @@
             <th>Door Delay</th>
             <th>Alarm status</th>
             <th>Last Alive</th>
+            <th>Save</th>
         </tr>
     </thead>
+
     <tbody>
         {% for reader in readers %}
         <tr>
-            <td>{{ reader["rid"] }}</td>
-            <td>{{reader["online"]}}</td>
-            <td>
-                <input type="text" name="loc" value="{{ reader['loc'] }}" />
-            </td>
-            <td>
-                <label class="switch">
-                    <input type="checkbox"
-                        name="enable"
-                        {% if reader["enable"] == true or reader["enable"] == 'true' or reader["enable"] == '1' %}
-                            checked
-                        {% endif %}
-                    >
-                    <span class="check"></span>
-                </label>
-            </td>
+            <form method="post">
+                <input type="hidden" name="rid" value="{{ reader['id'] }}" />
+                <td>{{ reader["id"] }}</td>
+                <td>{{ reader["online"] }}</td>
+                <td>
+                    <input type="text" name="loc" value="{{ reader['loc'] }}" />
+                </td>
+                <td>
+                    <label class="switch">
+                        <input type="checkbox" name="enable" {% if reader["enable"]==true or reader["enable"]=='true' or
+                            reader["enable"]=='1' %} checked {% endif %}>
+                        <span class="check"></span>
+                    </label>
+                </td>
 
-            <td>
-                <input type="text" name="delay" value="{{ reader['delay'] }}" />
-            </td>
-            <td>{{reader["status"]}}</td>
-            {# <td>{{reader["last_seen"]}}</td> #}
-            
-         
-            
-            
+                <td>
+                    <input type="text" name="delay" value="{{ reader['delay'] }}" />
+                </td>
+                <td>{{ reader["status"] }}</td>
+                <td>{{ reader["last_seen"] }}</td>
+                <td>
+                    <button type="submit" class="button is-primary">Save</button>
+                </td>
+               
+
+            </form>
         </tr>
         {% endfor %}
     </tbody>

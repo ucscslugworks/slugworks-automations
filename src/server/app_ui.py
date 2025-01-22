@@ -1,16 +1,44 @@
-from flask import Blueprint, render_template, request
-from src import constants
+from flask import Blueprint, render_template, request, redirect, url_for
+from src import constants, log
 from src.server import server
+from datetime import datetime
 
 ui = Blueprint("ui", __name__)
 
 # TODO: need to set up the ui pages
+logger = log.setup_logs("flask")
 
 
 # main dashboard page
 @ui.route("/", methods=["GET", "POST"])
 def dashboard():
+    if request.method == "POST":
+        rid = request.form.get(f"rid", -1)
+        enable = int(request.form.get(f"enable", None))
+        loc = str(request.form.get(f"loc", None))
+        delay = request.form.get(f"delay", None)
+        server.set_reader_settings(rid, loc, enable, delay)
+        logger.info(f"{rid}, {loc}, {enable}, {delay}")
+        return redirect(url_for("ui.dashboard"))
+
     readers = server.get_readers()
+    c_status, c_time = server.get_canvas_status()
+    canvas = {
+        "status": "",
+        "time": "",
+    }
+    if c_time == constants.NEVER:
+        canvas["time"] = "Never"
+    else:
+        canvas["time"] = datetime.fromtimestamp(c_time).strftime("%Y-%m-%d %H:%M")
+    
+    if c_status == constants.CANVAS_OK:
+        canvas["status"] = "OK"
+    elif c_status == constants.CANVAS_UPDATING:
+        canvas["status"] = "Updating"
+    elif c_status == constants.CANVAS_PENDING:
+        canvas["status"] = "Pending Update"
+
     for i, r in enumerate(readers):
         rid, online, loc, enable, delay, status, last_seen = r
         readers[i] = {
@@ -20,14 +48,10 @@ def dashboard():
             "enable": enable,
             "delay": delay,
             "status": status,
-            "last_seen": last_seen,
+            "last_seen": datetime.fromtimestamp(last_seen).strftime("%Y-%m-%d %H:%M"),
         }
-        if request.method == "POST":
-            enable = request.form.get(f"enable_{rid}", enable)
-            loc = request.form.get(f"loc_{rid}", loc)
-            delay = request.form.get(f"delay_{rid}", delay)
     
-    return render_template("dashboard.html", readers=readers)
+    return render_template("dashboard.html", readers=readers, canvas=canvas)
 
 
 # users page
