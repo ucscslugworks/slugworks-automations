@@ -602,6 +602,12 @@ def remove_reader(reader_id: int):
 
     return True
 
+def get_readers():
+    """
+    Get all readers
+    """
+    return sql("SELECT * FROM readers").fetchall()
+   
 
 def get_reader_settings(reader_id: int):
     """

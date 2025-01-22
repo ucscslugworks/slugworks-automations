@@ -1,3 +1,5 @@
 canvasapi
 flask
 gunicorn
+flask_login
+oauthlib

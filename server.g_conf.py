@@ -46,3 +46,4 @@ preload_app = True
 
 keyfile = os.path.join(path, "common", "private_key.pem")
 certfile = os.path.join(path, "common", "certificate.pem")
+debug=True
