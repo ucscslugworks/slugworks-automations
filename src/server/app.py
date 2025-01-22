@@ -3,7 +3,7 @@ import os
 import sqlite3
 import ssl
 
-from flask import Flask, session
+from flask import Flask, redirect, request, session
 from flask_login import LoginManager
 
 from src import log
@@ -21,6 +21,7 @@ def create_app():
 
     login_manager = LoginManager()
     login_manager.init_app(app)
+    login_manager.login_view = "ui.home"
 
     try:
         init_db_command(app)
@@ -52,6 +53,13 @@ def create_app():
 
     app.register_blueprint(api_blueprint)
     app.register_blueprint(ui_blueprint)
+
+    @app.before_request
+    def before_request():
+        if not request.is_secure:
+            url = request.url.replace('http://', 'https://', 1)
+            code = 301
+            return redirect(url, code=code)
 
     return app
 
