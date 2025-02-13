@@ -468,7 +468,11 @@ class BambuDB:
         try:
             self.logger.info(f"subtract_limit: Subtracting {amount} from {cruzid}")
             old_limit = self.get_limit(cruzid)
-            if old_limit is not None and old_limit < constants.BAMBU_DEFAULT_LIMIT:
+            if (
+                old_limit is not None
+                and old_limit < constants.BAMBU_DEFAULT_LIMIT
+                and amount < 0
+            ):
                 amount = max(amount, old_limit - constants.BAMBU_DEFAULT_LIMIT)
                 self.logger.info(
                     f"subtract_limit: Adjusted amount to {amount} to not exceed default limit"
@@ -489,7 +493,7 @@ class BambuDB:
             )
 
             self.logger.info(
-                f"subtract_limit: Subtracted {amount} from {cruzid} for {self.column}"
+                f"subtract_limit: Subtracted {amount} from {cruzid} for {self.column}, new limit is {self.get_limit(cruzid)}"
             )
             return True
         except Exception:
@@ -706,7 +710,7 @@ class BambuDB:
                 for p in sql("SELECT name from pragma_table_info('usage')").fetchall()
             ]:
                 print(f"no color {color}")
-                sql(f"ALTER TABLE usage ADD COLUMN \"{color}\" REAL")
+                sql(f'ALTER TABLE usage ADD COLUMN "{color}" REAL')
 
             if date not in [p[0] for p in sql("SELECT date FROM usage").fetchall()]:
                 print(f"no date {date}")
@@ -721,25 +725,31 @@ class BambuDB:
             #         (date, amount),
             #     )
             # el
-            print('a', sql(f"SELECT \"{color}\" FROM usage WHERE date = ?", (date,)).fetchone())
+            print(
+                "a",
+                sql(f'SELECT "{color}" FROM usage WHERE date = ?', (date,)).fetchone(),
+            )
             if (
-                sql(f"SELECT \"{color}\" FROM usage WHERE date = ?", (date,)).fetchone()[
+                sql(f'SELECT "{color}" FROM usage WHERE date = ?', (date,)).fetchone()[
                     0
                 ]
                 is None
             ):
                 print(f"no color/date {color} {date}")
                 sql(
-                    f"UPDATE usage SET \"{color}\" = ? WHERE date = ?",
+                    f'UPDATE usage SET "{color}" = ? WHERE date = ?',
                     (amount, date),
                 )
             else:
                 print(f"updating {color} {date}")
                 sql(
-                    f"UPDATE usage SET \"{color}\" = \"{color}\" + ? WHERE date = ?",
+                    f'UPDATE usage SET "{color}" = "{color}" + ? WHERE date = ?',
                     (amount, date),
                 )
-            print('b', sql(f"SELECT \"{color}\" FROM usage WHERE date = ?", (date,)).fetchone())
+            print(
+                "b",
+                sql(f'SELECT "{color}" FROM usage WHERE date = ?', (date,)).fetchone(),
+            )
 
             self.logger.info(f"update_usage: Updated usage for '{color}'")
             return True
