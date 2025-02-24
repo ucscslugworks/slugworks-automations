@@ -17,15 +17,17 @@ def dashboard():
     printer_data = []
     for (name,) in printer_names:
         data = db.get_printer_data(name)
-        if not data or data["status"] == constants.PRINTER_OFFLINE:
+        if not data:
             continue
 
         if data["status"] == constants.PRINTER_IDLE:
-            data["status"] = "Printer Idle"
+            data["status"] = "Idle"
             data["percent_complete"] = 100
             data["time_remaining"] = 0
+        elif data["status"] == constants.PRINTER_OFFLINE:
+            data["status"] = "Offline"
         elif data["gcode_state"] == constants.GCODE_PAUSE:
-            data["status"] = "Print Paused"
+            data["status"] = "Paused"
         else:
             data["status"] = "Printing"
 

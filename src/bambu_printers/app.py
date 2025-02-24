@@ -13,7 +13,24 @@ def create_app():
     logger = logging.getLogger("gunicorn.error")
 
     app = Flask(__name__)
-    app.secret_key = os.urandom(24).hex()
+
+    secret_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..",
+        "..",
+        "common",
+        "bambu_ui_secret.json",
+    )
+
+    if os.path.exists(secret_path):
+        with open(secret_path) as f:
+            app.secret_key = f.read().strip()
+    else:
+        app.secret_key = os.urandom(24).hex()
+
+        with open(secret_path, "w") as f:
+            f.write(str(app.secret_key))
+
     app.url_map.strict_slashes = True
 
     login_manager = LoginManager()
@@ -27,6 +44,7 @@ def create_app():
 
     @login_manager.user_loader
     def load_user(user_id):
+        logger.error(f"Loading user {user_id}")
         return User.get(user_id)
 
     # blueprint for auth routes in our app

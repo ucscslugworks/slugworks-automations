@@ -29,8 +29,7 @@ loglevel = "debug"
 capture_output = True
 
 # set number of worker threads
-# workers = multiprocessing.cpu_count() * 2 + 1
-workers = 1
+workers = multiprocessing.cpu_count() * 2 + 1
 
 # define Flask app path
 wsgi_app = "src.bambu_printers.app:create_app()"
