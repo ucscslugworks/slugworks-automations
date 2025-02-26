@@ -227,6 +227,7 @@ class StatusSheet:
                 valueInputOption="USER_ENTERED",
                 body={"values": private_table},
             ).execute()
+            self.logger.info(f"update: Updated {len(private_table)} rows.")
         except Exception:
             self.logger.error(f"get: {traceback.format_exc()}")
 

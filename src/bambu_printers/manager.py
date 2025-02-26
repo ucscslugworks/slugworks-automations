@@ -344,14 +344,13 @@ def manager():
 
                 db.check_offline_printers()
 
-                printers = db.get_printer_list()
                 data = {}
-                for (printer,) in printers:
-                    data[printer] = db.get_printer_data(printer)
-                    data[printer]["weight"] = (
+                for name in printers:
+                    data[name] = db.get_printer_data(name)
+                    data[name]["weight"] = (
                         0
-                        if data[printer]["print_id"] < 0
-                        else db.get_print_weight(data[printer]["print_id"])
+                        if data[name]["print_id"] < 0
+                        else db.get_print_weight(data[name]["print_id"])
                     )
                 ss.update(data)
 
