@@ -4,7 +4,13 @@ import traceback
 from datetime import datetime
 
 from src import constants, log
-from src.bambu_printers import get_account, get_db, get_printer, get_start_form
+from src.bambu_printers import (
+    get_account,
+    get_db,
+    get_printer,
+    get_start_form,
+    get_status_sheet,
+)
 
 
 def manager():
@@ -14,6 +20,7 @@ def manager():
     account = get_account()
     db = get_db()
     sf = get_start_form()
+    ss = get_status_sheet()
 
     devices = account.get_devices()
     printers = dict()
@@ -336,6 +343,18 @@ def manager():
                     printer.restart_bpm_object()
 
                 db.check_offline_printers()
+
+                printers = db.get_printer_list()
+                data = {}
+                for (printer,) in printers:
+                    data[printer] = db.get_printer_data(printer)
+                    data[printer]["weight"] = (
+                        0
+                        if data[printer]["print_id"] < 0
+                        else db.get_print_weight(data[printer]["print_id"])
+                    )
+                ss.update(data)
+
                 logger.info("manager: Finished main loop")
 
                 if os.path.exists(
