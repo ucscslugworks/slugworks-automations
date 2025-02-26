@@ -156,37 +156,45 @@ class StatusSheet:
                 )  # last update
                 row.append(data["cruzid"])  # cruzid
                 row.append(GCODE_TEXT[data["gcode_state"]])  # print state
-                row.append(str(data["percent_complete"]) + "%")  # percent progress
-                row.append(
-                    datetime.datetime.fromtimestamp(data["start_time"]).strftime(
-                        "%H:%M:%S (%Y-%m-%d)"
-                    )
-                )  # print start time
-                time_remaining = data["time_remaining"]
-                hours = 0
-                minutes = 0
-                seconds = 0
-                time_remaining_text = ""
+                
+                if data["gcode_state"] in [
+                    constants.GCODE_RUNNING,
+                    constants.GCODE_PAUSE,
+                ]:
+                    row.append(str(data["percent_complete"]) + "%")  # percent progress
+                    row.append(
+                        datetime.datetime.fromtimestamp(data["start_time"]).strftime(
+                            "%H:%M:%S (%Y-%m-%d)"
+                        )
+                    )  # print start time
+                    time_remaining = data["time_remaining"]
+                    hours = 0
+                    minutes = 0
+                    seconds = 0
+                    time_remaining_text = ""
 
-                if time_remaining >= 60:
-                    minutes = time_remaining // 60
-                    seconds = time_remaining % 60
+                    if time_remaining >= 60:
+                        minutes = time_remaining // 60
+                        seconds = time_remaining % 60
 
-                    if minutes > 60:
-                        hours = minutes // 60
-                        minutes = minutes % 60
-                        time_remaining_text += f"{hours}h "
+                        if minutes > 60:
+                            hours = minutes // 60
+                            minutes = minutes % 60
+                            time_remaining_text += f"{hours}h "
 
-                    time_remaining_text += f"{minutes}m "
+                        time_remaining_text += f"{minutes}m "
 
-                time_remaining_text += f"{seconds}s"
-                row.append(time_remaining_text)
-                row.append(
-                    datetime.datetime.fromtimestamp(data["end_time"]).strftime(
-                        "%H:%M:%S (%Y-%m-%d)"
-                    )
-                )  # print start time
-                row.append(f"{data["weight"]}g")  # print weight
+                    time_remaining_text += f"{seconds}s"
+                    row.append(time_remaining_text)
+                    row.append(
+                        datetime.datetime.fromtimestamp(
+                            time.time() + time_remaining
+                        ).strftime("%H:%M:%S (%Y-%m-%d)")
+                    )  # print end time
+                    row.append(f"{data["weight"]}g")  # print weight
+                else:
+                    row += [""] * 5 # empty cells
+
                 row.append(
                     f"{data["tool_temp"]}°C / {data["tool_temp_target"]}°C"
                 )  # tool temp
@@ -219,45 +227,6 @@ class StatusSheet:
                 valueInputOption="USER_ENTERED",
                 body={"values": private_table},
             ).execute()
-            # result = (
-            #     self.g_sheets.values()
-            #     .get(
-            #         spreadsheetId=START_FORM_SHEET_ID,
-            #         range=f"{SHEET_NAME}!A{self.latest_row}:C",
-            #     )
-            #     .execute()
-            # )
-
-            # values = result.get("values", [])[1:]
-
-            # if not values:
-            #     self.logger.info("get: No new data found.")
-            #     return None
-
-            # for i in range(len(values)):
-            #     values[i] = list(values[i][0:EXPECTED_ROW_LENGTH])
-            #     values[i].extend([""] * (EXPECTED_ROW_LENGTH - len(values[i])))
-
-            #     values[i][0] = time.mktime(
-            #         time.strptime(str(values[i][0]), "%m/%d/%Y %H:%M:%S")
-            #     )
-
-            #     if len(values[i][1]) > 0:
-            #         values[i][1] = str(values[i][1]).lower().split("@ucsc.edu")[0]
-
-            #     values[i][2] = str(values[i][2]).split(" ")
-
-            #     if len(values[i][2]) < 1:
-            #         self.logger.error(f"get: Invalid data in row {self.latest_row + i}")
-            #         continue
-
-            #     values[i][2] = values[i][2][0]
-
-            #     values[i].insert(0, self.latest_row + i)
-
-            # self.latest_row += len(values)
-            # self.logger.info(f"get: Got {len(values)} new rows.")
-            # return values
         except Exception:
             self.logger.error(f"get: {traceback.format_exc()}")
 
