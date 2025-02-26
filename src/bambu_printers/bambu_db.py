@@ -756,3 +756,25 @@ class BambuDB:
         except Exception:
             self.logger.error(f"update_usage: {traceback.format_exc()}")
             return False
+
+    def get_print_weight(self, id: int):
+        try:
+            if sql("SELECT * from prints_current WHERE id = ?", (id,)).fetchone():
+                return sql(
+                    "SELECT weight FROM prints_current WHERE id = ?", (id,)
+                ).fetchone()[0]
+            elif sql("SELECT * from prints_archive WHERE id = ?", (id,)).fetchone():
+                return sql(
+                    "SELECT weight FROM prints_archive WHERE id = ?", (id,)
+                ).fetchone()[0]
+            elif sql("SELECT * from prints_unmatched WHERE id = ?", (id,)).fetchone():
+                return sql(
+                    "SELECT weight FROM prints_unmatched WHERE id = ?", (id,)
+                ).fetchone()[0]
+            else:
+                self.logger.warning(f"get_print_weight: Print {id} not found")
+                return 0
+
+        except Exception:
+            self.logger.error(f"get_print_weight: {traceback.format_exc()}")
+            return None

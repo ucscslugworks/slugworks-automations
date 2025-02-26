@@ -48,9 +48,9 @@ class StartForm:
         # The file token.json stores the user's access and refresh tokens, and is
         # created automatically when the authorization flow completes for the first
         # time.
-        if os.path.exists(os.path.join(common_path, "token.json")):
+        if os.path.exists(os.path.join(common_path, "start_form_token.json")):
             creds = Credentials.from_authorized_user_file(
-                os.path.join(common_path, "token.json"), SCOPES
+                os.path.join(common_path, "start_form_token.json"), SCOPES
             )
         elif not os.path.exists(os.path.join(common_path, "credentials.json")):
             self.logger.error("init: No credentials.json file found.")
@@ -65,7 +65,7 @@ class StartForm:
                 )
                 creds = flow.run_local_server(port=44649)
             # Save the credentials for the next run
-            with open(os.path.join(common_path, "token.json"), "w") as token:
+            with open(os.path.join(common_path, "start_form_token.json"), "w") as token:
                 token.write(creds.to_json())
 
         try:
