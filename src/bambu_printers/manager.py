@@ -342,16 +342,24 @@ def manager():
                     printer.update_db()
                     printer.restart_bpm_object()
 
+                # check if any printers have not been updated in a while (using offline timeout) and mark them as offline
                 db.check_offline_printers()
 
+                # update the status sheet with the latest data
+                logger.info("manager: Updating status sheet")
                 data = {}
                 for name in printers:
+                    # for each printer, get the latest data from the printer table
                     data[name] = db.get_printer_data(name)
+
+                    # if the printer currently has an ongoing print, get its print id and find the weight of the print (else 0)
                     data[name]["weight"] = (
                         0
                         if data[name]["print_id"] < 0
                         else db.get_print_weight(data[name]["print_id"])
                     )
+
+                # update status sheet
                 ss.update(data)
 
                 logger.info("manager: Finished main loop")
