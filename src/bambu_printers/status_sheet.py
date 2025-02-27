@@ -8,11 +8,13 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-from src import log, constants
+from src import constants, log
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 PRIVATE_SHEET_ID = "1znYsriJMDjESa3nekrVcSBXVW93RLQNJD3YdqRYtN_A"
 PRIVATE_SHEET_NAME = "Sheet1"
+PUBLIC_SHEET_ID = "1C077MsPnLSphsJT4Q6BA3k3cA0ctSSW_a9yFHQpn2Sk"
+PUBLIC_SHEET_NAME = "Sheet1"
 
 STATUS_SHEET_OBJECT = None
 STATUS_SHEET_STARTED = False
@@ -145,28 +147,58 @@ class StatusSheet:
         """
         try:
             private_table = []
+            public_table = []
+
             for printer, data in printer_data.items():
-                row = []
-                row.append(printer)  # printer name
-                row.append(PRINTER_TEXT[data["status"]])  # printer status
-                row.append(
+                private_row = []
+                public_row = []
+
+                # printer name
+                private_row.append(printer)
+                public_row.append(printer)
+
+                # printer status
+                private_row.append(PRINTER_TEXT[data["status"]])
+
+                # matched/unmatched should be private
+                if data["status"] not in [
+                    constants.PRINTER_MATCHED,
+                    constants.PRINTER_UNMATCHED,
+                ]:
+                    public_row.append(PRINTER_TEXT[data["status"]])
+                else:
+                    public_row.append("Printing")
+
+                # last update (not public)
+                private_row.append(
                     datetime.datetime.fromtimestamp(data["last_update"]).strftime(
                         "%H:%M:%S (%Y-%m-%d)"
                     )
-                )  # last update
-                row.append(data["cruzid"])  # cruzid
-                row.append(GCODE_TEXT[data["gcode_state"]])  # print state
-                
+                )
+
+                # cruzid (not public)
+                private_row.append(data["cruzid"])
+
+                # print state
+                private_row.append(GCODE_TEXT[data["gcode_state"]])
+                public_row.append(GCODE_TEXT[data["gcode_state"]])
+
                 if data["gcode_state"] in [
                     constants.GCODE_RUNNING,
                     constants.GCODE_PAUSE,
                 ]:
-                    row.append(str(data["percent_complete"]) + "%")  # percent progress
-                    row.append(
+                    # percent progress
+                    private_row.append(str(data["percent_complete"]) + "%")
+                    public_row.append(str(data["percent_complete"]) + "%")
+
+                    # print start time (not public)
+                    private_row.append(
                         datetime.datetime.fromtimestamp(data["start_time"]).strftime(
                             "%H:%M:%S (%Y-%m-%d)"
                         )
-                    )  # print start time
+                    )
+
+                    # parse time remaining into hours, minutes, seconds
                     time_remaining = data["time_remaining"]
                     hours = 0
                     minutes = 0
@@ -185,95 +217,92 @@ class StatusSheet:
                         time_remaining_text += f"{minutes}m "
 
                     time_remaining_text += f"{seconds}s"
-                    row.append(time_remaining_text)
-                    row.append(
+
+                    private_row.append(time_remaining_text)
+                    public_row.append(time_remaining_text)
+
+                    # print end time
+                    private_row.append(
                         datetime.datetime.fromtimestamp(
                             time.time() + time_remaining
                         ).strftime("%H:%M:%S (%Y-%m-%d)")
-                    )  # print end time
-                    row.append(f"{data["weight"]}g")  # print weight
+                    )
+                    public_row.append(
+                        datetime.datetime.fromtimestamp(
+                            time.time() + time_remaining
+                        ).strftime("%H:%M:%S (%Y-%m-%d)")
+                    )
+
+                    # print weight (not public)
+                    private_row.append(f"{data["weight"]}g")
                 else:
-                    row += [""] * 5 # empty cells
+                    # empty cells
+                    private_row += [""] * 5
+                    public_row += [""] * 3
 
-                row.append(
+                # tool temp (not public)
+                private_row.append(
                     f"{data["tool_temp"]}°C / {data["tool_temp_target"]}°C"
-                )  # tool temp
-                row.append(
-                    f"{data["bed_temp"]}°C / {data["bed_temp_target"]}°C"
-                )  # bed temp
-                row.append("On" if data["light_state"] else "Off")  # light state
+                )
 
-                for color in data["colors"].split(","):  # filament colors
+                # bed temp (not public)
+                private_row.append(
+                    f"{data["bed_temp"]}°C / {data["bed_temp_target"]}°C"
+                )
+
+                # light state (not public)
+                private_row.append("On" if data["light_state"] else "Off")
+
+                # filament colors
+                for color in data["colors"].split(","):
+                    color_text = "None"
                     if color:  # if string isn't empty
                         color = str(color)
                         if (
                             color.startswith("#") and color[1:7] in COLORS
                         ):  # if known hex code, use color name
-                            row.append(COLORS[color[1:7]])
+                            color_text = COLORS[color[1:7]]
                         else:  # if not a known hex code (or a color string), just use the provided text
-                            row.append(color)
-                    else:  # string is empty - presumably there is no filament
-                        row.append("None")
+                            color_text = color
+                    # if string was empty, leave as "None"
 
+                    private_row.append(color_text)
+                    public_row.append(color_text)
+
+                # fill in empty colors
                 if len(data["colors"].split(",")) < 4:
                     for _ in range(4 - len(data["colors"].split(","))):
-                        row.append("None")
+                        private_row.append("None")
+                        public_row.append("None")
 
-                private_table.append(row)
+                private_table.append(private_row)
+                public_table.append(public_row)
 
+            # update private sheet
             self.g_sheets.values().update(
                 spreadsheetId=PRIVATE_SHEET_ID,
                 range=f"{PRIVATE_SHEET_NAME}!A2:{chr(ord('A') + len(private_table[0]) - 1)}{len(private_table) + 1}",
                 valueInputOption="USER_ENTERED",
                 body={"values": private_table},
             ).execute()
+
+            # update public sheet
+            self.g_sheets.values().update(
+                spreadsheetId=PUBLIC_SHEET_ID,
+                range=f"{PUBLIC_SHEET_NAME}!A2:{chr(ord('A') + len(public_table[0]) - 1)}{len(public_table) + 1}",
+                valueInputOption="USER_ENTERED",
+                body={"values": public_table},
+            ).execute()
+
             self.logger.info(f"update: Updated {len(private_table)} rows.")
         except Exception:
             self.logger.error(f"get: {traceback.format_exc()}")
 
 
 if __name__ == "__main__":
-    ss = StatusSheet()
-    # ss.update(
-    #     {
-    #         "Shaggy": {
-    #             "status": constants.PRINTER_MATCHED,
-    #             "last_update": round(time.time()),
-    #             "cruzid": "imadan1",
-    #             "gcode_state": constants.GCODE_RUNNING,
-    #             "progress": 75,
-    #             "start_time": round(time.time()) - 300,
-    #             "time_remaining": 100,
-    #             "end_time": round(time.time() + 100),
-    #             "weight": 53,
-    #             "tool_temp": 225,
-    #             "tool_temp_target": 230,
-    #             "bed_temp": 35,
-    #             "bed_temp_target": 40,
-    #             "light": True,
-    #             "colors": ["#A6A9AAFF", "#E4BD68FF", "#C12E1FFF", "#A3D8E1FF"],
-    #         },
-    #         "Scooby": {
-    #             "status": constants.PRINTER_MATCHED,
-    #             "last_update": round(time.time()),
-    #             "cruzid": "imadan1",
-    #             "print_state": constants.GCODE_RUNNING,
-    #             "progress": 75,
-    #             "start_time": round(time.time()) - 300,
-    #             "time_remaining": 100,
-    #             "end_time": round(time.time() + 100),
-    #             "weight": 53,
-    #             "tool_temp": 225,
-    #             "tool_temp_target": 230,
-    #             "bed_temp": 35,
-    #             "bed_temp_target": 40,
-    #             "light": True,
-    #             "colors": ["#A6A9AAFF", "#E4BD68FF", "#C12E1FFF", "#A3D8E1FF"],
-    #         },
-    #     }
-    # )
     from src.bambu_printers import get_db
 
+    ss = StatusSheet()
     db = get_db()
     printers = db.get_printer_list()
     data = {}
