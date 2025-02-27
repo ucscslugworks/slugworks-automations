@@ -424,6 +424,8 @@ def manager():
             )
         )
 
+    logger.warning("manager: stopped")
+
 
 if __name__ == "__main__":
     manager()
