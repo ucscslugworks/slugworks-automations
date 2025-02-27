@@ -160,15 +160,6 @@ class StatusSheet:
                 # printer status
                 private_row.append(PRINTER_TEXT[data["status"]])
 
-                # matched/unmatched should be private
-                if data["status"] not in [
-                    constants.PRINTER_MATCHED,
-                    constants.PRINTER_UNMATCHED,
-                ]:
-                    public_row.append(PRINTER_TEXT[data["status"]])
-                else:
-                    public_row.append("Printing")
-
                 # last update (not public)
                 private_row.append(
                     datetime.datetime.fromtimestamp(data["last_update"]).strftime(
@@ -181,7 +172,13 @@ class StatusSheet:
 
                 # print state
                 private_row.append(GCODE_TEXT[data["gcode_state"]])
-                public_row.append(GCODE_TEXT[data["gcode_state"]])
+
+                if data["status"] == constants.PRINTER_OFFLINE:
+                    # if offline, show status as offline
+                    public_row.append("Offline")
+                else:
+                    # otherwise, just show print (gcode) status, no need to show printer status (redundant)
+                    public_row.append(GCODE_TEXT[data["gcode_state"]])
 
                 if data["gcode_state"] in [
                     constants.GCODE_RUNNING,
