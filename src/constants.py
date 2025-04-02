@@ -58,3 +58,5 @@ PRINTER_SPOOL_STATES = [
     "Unloaded",
     "Error",
 ]  # last element must be Error for -1 index to work
+
+FILAMENT_COUNT = 5

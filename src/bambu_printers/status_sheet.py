@@ -267,10 +267,12 @@ class StatusSheet:
                     public_row.append(color_text)
 
                 # fill in empty colors
-                if len(data["colors"].split(",")) < 4:
-                    for _ in range(4 - len(data["colors"].split(","))):
+                if len(data["colors"].split(",")) < constants.FILAMENT_COUNT:
+                    for _ in range(constants.FILAMENT_COUNT - len(data["colors"].split(","))):
                         private_row.append("None")
                         public_row.append("None")
+                elif len(data["colors"].split(",")) > constants.FILAMENT_COUNT:
+                    private_row = private_row[:-(len(data["colors"].split(",")) - constants.FILAMENT_COUNT)]
 
                 private_table.append(private_row)
                 public_table.append(public_row)
@@ -293,7 +295,7 @@ class StatusSheet:
 
             self.logger.info(f"update: Updated {len(private_table)} rows.")
         except Exception:
-            self.logger.error(f"get: {traceback.format_exc()}")
+            self.logger.error(f"update: {traceback.format_exc()}")
 
 
 if __name__ == "__main__":
