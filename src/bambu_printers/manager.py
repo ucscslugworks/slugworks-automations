@@ -179,6 +179,10 @@ def manager():
                                 logger.debug(
                                     f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - old print, no form found, still running"
                                 )
+                            else:
+                                logger.debug(
+                                    f"manager: Not canceling printer {u_print[1]} - job started at {u_print[4]}, printer reports start time {printers[u_print[1]].start_time}"
+                                )
 
                     elif (
                         u_print[1] in form_printer_rows
