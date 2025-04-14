@@ -1,0 +1,13 @@
+#!/bin/bash
+
+cd "$(dirname "$(readlink -f "$0")")"
+PID_FILE="pid_bambu_printers"
+STOP_FILE="common/SPECIAL_BAMBU_STOP"
+if [ -f $STOP_FILE ]; then
+    rm $STOP_FILE
+fi
+if [ -f $PID_FILE ]; then
+    rm $PID_FILE
+fi
+
+./start_bambu
