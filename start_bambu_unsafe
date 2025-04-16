@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# this script is used to start the Bambu printers manager using cron - @reboot
+
 cd "$(dirname "$(readlink -f "$0")")"
 PID_FILE="pid_bambu_printers"
 STOP_FILE="common/SPECIAL_BAMBU_STOP"
