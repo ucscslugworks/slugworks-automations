@@ -108,43 +108,43 @@ def get_new_prints(account: bambu_account.BambuAccount, db: bambu_db.BambuDB):
 
 def categorize_forms(db: bambu_db.BambuDB, timestamp: float):
     # dict to store form rows and printer names (as submitted in form) for unmatched forms
-    current_form_rows = dict()
+    current_rows = dict()
 
     # dict to store forms from before the timeout for matching with prints before the timeout
     # used if the program hasn't been run for a while and there are unmatched forms + prints that shouldn't be canceled
-    old_form_rows = dict()
+    old_rows = dict()
 
     for u_form in db.get_unmatched_forms():
         # iterate through all unmatched forms
         if timestamp > u_form[1] + constants.BAMBU_TIMEOUT:
             # if the form was submitted more than 10 minutes ago (timeout), mark as old
             # store the form in a dictionary with the form row as the key and (name, cruzid, form time) as the value
-            old_form_rows[u_form[0]] = (u_form[2], u_form[3], u_form[1])
+            old_rows[u_form[0]] = (u_form[2], u_form[3], u_form[1])
         else:
             # Store the form in a dictionary with the printer name as the key and (form row, cruzid) as the value
             # newer forms for the same printer will overwrite older forms - only the most recent form is used
-            current_form_rows[u_form[2]] = (u_form[0], u_form[3])
-            # also store the form in old_form_rows, in case they are within 10 minutes of the print (even if the print is older than 10 min)
-            old_form_rows[u_form[0]] = (u_form[2], u_form[3], u_form[1])
+            current_rows[u_form[2]] = (u_form[0], u_form[3])
+            # also store the form in old_rows, in case they are within 10 minutes of the print (even if the print is older than 10 min)
+            old_rows[u_form[0]] = (u_form[2], u_form[3], u_form[1])
 
-    return current_form_rows, old_form_rows
+    return current_rows, old_rows
 
 
 def eval_old_print(
-    old_form_rows: dict[int, tuple],
+    old_rows: dict[int, tuple],
     u_print: tuple,
     db: bambu_db.BambuDB,
-    current_form_rows: dict[str, tuple],
+    current_rows: dict[str, tuple],
     printers: dict[str, bambu_printer.Printer],
 ):
     matched = False  # flag to check if the print was matched
-    for form_row in reversed(old_form_rows):
+    for form_row in reversed(old_rows):
         # iterate through all old forms
-        if old_form_rows[form_row][0] is None:
+        if old_rows[form_row][0] is None:
             # if the form has already been used, skip
             continue
 
-        name, cruzid, form_time = old_form_rows[form_row]
+        name, cruzid, form_time = old_rows[form_row]
         if abs(form_time - u_print[4]) <= constants.BAMBU_TIMEOUT:
             # if the form was submitted within 10 minutes of the print, match them
             logger.debug(
@@ -153,10 +153,10 @@ def eval_old_print(
             db.match(u_print[0], form_row)
             db.subtract_limit(cruzid, u_print[6])
             matched = True
-            old_form_rows[form_row] = (None,)  # mark the form as used
-            if name in current_form_rows and current_form_rows[name][0] == form_row:
-                # if there has been no newer form for the same printer, mark the form as matched in current_form_rows
-                del current_form_rows[name]
+            old_rows[form_row] = (None,)  # mark the form as used
+            if name in current_rows and current_rows[name][0] == form_row:
+                # if there has been no newer form for the same printer, mark the form as matched in current_rows
+                del current_rows[name]
 
             break
 
@@ -179,22 +179,22 @@ def eval_old_print(
                 f"manager: Not canceling printer {u_print[1]} - job started at {u_print[4]}, printer reports start time {printers[u_print[1]].start_time}"
             )
 
-    return current_form_rows, old_form_rows
+    return current_rows, old_rows
 
 
 def match_print(
-    current_form_rows: dict[str, tuple],
+    current_rows: dict[str, tuple],
     u_print: tuple,
     db: bambu_db.BambuDB,
     printers: dict[str, bambu_printer.Printer],
 ):
     # if the print was submitted within the last 10 minutes and there is a form for the same printer (and the print is still running)
     # get the form details
-    form_row, cruzid = current_form_rows[u_print[1]]
+    form_row, cruzid = current_rows[u_print[1]]
 
-    # match the print with the form and remove the form from current_form_rows
+    # match the print with the form and remove the form from current_rows
     db.match(u_print[0], form_row)
-    del current_form_rows[u_print[1]]
+    del current_rows[u_print[1]]
 
     logger.debug(
         f"manager: Matching print {u_print[0]} with form {form_row} - new form/print, still running"
@@ -218,14 +218,14 @@ def match_print(
             f"manager: User {cruzid} has sufficient weight for print {u_print[0]}"
         )
 
-    return current_form_rows
+    return current_rows
 
 
 def check_unmatched_prints(
     db: bambu_db.BambuDB,
     timestamp: float,
-    current_form_rows: dict[str, tuple],
-    old_form_rows: dict[int, tuple],
+    current_rows: dict[str, tuple],
+    old_rows: dict[int, tuple],
     printers: dict[str, bambu_printer.Printer],
 ):
     for u_print in db.get_unmatched_prints():
@@ -235,26 +235,26 @@ def check_unmatched_prints(
             logger.debug(
                 f"manager: Print {u_print[0]} is older than timeout, checking old forms"
             )
-            current_form_rows, old_form_rows = eval_old_print(
-                old_form_rows, u_print, db, current_form_rows, printers
+            current_rows, old_rows = eval_old_print(
+                old_rows, u_print, db, current_rows, printers
             )
 
         elif (
-            u_print[1] in current_form_rows
+            u_print[1] in current_rows
             and abs(u_print[4] - printers[u_print[1]].start_time) <= 90
         ):
-            current_form_rows = match_print(current_form_rows, u_print, db, printers)
+            current_rows = match_print(current_rows, u_print, db, printers)
 
 
 def expire_old_forms(
-    old_form_rows: dict[int, tuple], db: bambu_db.BambuDB, timestamp: float
+    old_rows: dict[int, tuple], db: bambu_db.BambuDB, timestamp: float
 ):
     # expire any forms that were not matched and are older than 10 minutes
-    for form_row in old_form_rows:
+    for form_row in old_rows:
         # check if the form was used
         if (
-            old_form_rows[form_row][0] is not None
-            and old_form_rows[form_row][2] + constants.BAMBU_TIMEOUT < timestamp
+            old_rows[form_row][0] is not None
+            and old_rows[form_row][2] + constants.BAMBU_TIMEOUT < timestamp
         ):
             db.expire_form(form_row)
             logger.debug(
