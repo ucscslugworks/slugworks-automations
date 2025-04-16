@@ -1,0 +1,5 @@
+[tool.black]
+exclude = "venv|.venv|__pycache__"
+
+[tool.isort]
+profile = "black"
