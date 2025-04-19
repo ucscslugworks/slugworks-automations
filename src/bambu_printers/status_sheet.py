@@ -91,63 +91,6 @@ COLORS = {
     "042F56": "Matte Dark Blue",
 }
 
-# Jade White	#FFFFFF
-# Beige	#F7E6DE
-# Gold	#E4BD68
-# Silver	#A6A9AA
-# Gray	#8E9089
-# Bronze	#847D48
-# Brown	#9D432C
-# Cocoa Brown	#6F5034
-# Maroon Red	#9D2235
-# Red	#C12E1F
-# Magenta	#EC008C
-# Pink	#F55A74
-# Hot Pink	#F5547C
-# Orange	#FF6A13
-# Pumpkin Orange	#FF9016
-# Sunflower Yellow	#FEC600
-# Yellow	#F4EE2A
-# Bright Green	#BECF00
-# Bambu Green	#00AE42
-# Mistletoe Green	#3F8E43
-# Turquoise	#00B1B7
-# Cyan	#0086D6
-# Blue	#0A2989
-# Cobalt Blue	#0056B8
-# Purple	#5E43B7
-# Indigo Purple	#482960
-# Blue Gray	#5B6579
-# Light Gray	#D1D3D5
-# Dark Gray	#545454
-# Black	#000000
-
-# Ivory White	#FFFFFF
-# "CBC6B8": "Matte Bone White",
-# "D3B7A7": "Matte Latte Brown",
-# "AE835B": "Matte Caramel",
-# "B15533": "Matte Terracotta",
-# "E8DBB7": "Matte Desert Tan",
-# "9B9EA0": "Matte Ash Gray",
-# "757575": "Matte Nardo Gray",
-# "AE96D4": "Matte Lilac Purple",
-# Sakura Pink	#E8AFCF
-# Plum	#950051
-# Mandarin Orange	#F99963
-# "F7D959": "Matte Lemon Yellow",
-# "DE4343": "Matte Scarlet Red",
-# "BB3D43": "Matte Dark Red",
-# "7D6556": "Matte Dark Brown",
-# "4D3324": "Matte Dark Chocolate",
-# Dark Green	#68724D
-# Apple Green	#C2E189
-# Grass Green	#61C680
-# Ice Blue	#A3D8E1
-# "56B7E6": "Matte Sky Blue",
-# "0078BF": "Matte Marine Blue",
-# "042F56": "Matte Dark Blue",
-# "000000": "Matte Charcoal",
-
 
 def get_status_sheet():
     global STATUS_SHEET_OBJECT, STATUS_SHEET_STARTED
