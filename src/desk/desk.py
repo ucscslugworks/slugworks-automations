@@ -1,9 +1,8 @@
-import os
 from time import sleep, time
 
 import nfc
 
-from src import api, constants, log
+from src import api, log
 
 # import nfc_fake as nfc
 

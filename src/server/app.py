@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask, jsonify, redirect, render_template, request, url_for
+from flask import Flask, jsonify, request
 
 from src import constants, log
 from src.server import server

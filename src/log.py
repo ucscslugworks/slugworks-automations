@@ -136,6 +136,7 @@ def setup_logs(
 
     return logger
 
+
 def get_log_path(name: str):
     # Change directory to repository root
     logs_path = os.path.abspath(
@@ -151,9 +152,9 @@ def get_log_path(name: str):
         os.makedirs(os.path.join(logs_path, name, folder))
 
     # check for and remove existing latest symlink
-    if os.path.islink(
+    if os.path.islink(os.path.join(logs_path, name, "latest.log")) or os.path.exists(
         os.path.join(logs_path, name, "latest.log")
-    ) or os.path.exists(os.path.join(logs_path, name, "latest.log")):
+    ):
         os.remove(os.path.join(logs_path, name, "latest.log"))
 
     # Create a new symlink to the latest log file
@@ -162,5 +163,6 @@ def get_log_path(name: str):
         os.path.join(logs_path, name, "latest.log"),
     )
     return os.path.join(logs_path, name, folder, filename + ".log")
+
 
 setup_logs("root", DEBUG)

@@ -14,7 +14,9 @@ chdir = "../.."
 now = datetime.now()
 
 # Set log path using timestamp
-log_path = f"logs/flask/{now.strftime("%Y-%m-%d")}/{now.strftime("%Y-%m-%d %H:%M:%S")}.log"
+log_path = (
+    f"logs/flask/{now.strftime("%Y-%m-%d")}/{now.strftime("%Y-%m-%d %H:%M:%S")}.log"
+)
 errorlog = log_path
 accesslog = log_path
 

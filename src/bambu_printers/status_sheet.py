@@ -322,6 +322,9 @@ class StatusSheet:
                 private_table.append(private_row)
                 public_table.append(public_row)
 
+            private_table.sort(key=lambda x: x[0])
+            public_table.sort(key=lambda x: x[0])
+
             # update private sheet
             self.g_sheets.values().update(
                 spreadsheetId=PRIVATE_SHEET_ID,

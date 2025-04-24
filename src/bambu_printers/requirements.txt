@@ -3,9 +3,5 @@ google-auth-httplib2
 google-auth-oauthlib
 requests
 PyJWT
-cryptography
-git+https://github.com/ucscslugworks/bambu-printer-manager.git
-flask
-gunicorn
-flask-login
 oauthlib
+git+https://github.com/ucscslugworks/bambu-printer-manager.git

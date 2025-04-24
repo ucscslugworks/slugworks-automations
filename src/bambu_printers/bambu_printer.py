@@ -120,7 +120,11 @@ class Printer:
             except ValueError:
                 self.spool_state = -1
 
-            self.colors = [s.color for s in printer.spools if s.name or s.type or s.color != "black"]
+            self.colors = [
+                s.color
+                for s in printer.spools
+                if s.name or s.type or s.color != "black"
+            ]
 
             self.logger.debug(f"on_update: {self.name}")
         except Exception:
@@ -186,21 +190,26 @@ class Printer:
         self.logger.debug(f"restart_bpm_object: {self.name}")
         if self.printer.client and not self.printer.client.is_connected():
             self.logger.warning(f"restart_bpm_object: {self.name} - not connected")
-            self.stop_thread()
+            try:
+                self.stop_thread()
 
-            account = get_account()
-            config = BambuConfig(
-                hostname=HOSTNAME,
-                access_code=account.get_token(),
-                serial_number=self.serial,
-                mqtt_username=account.get_username(),
-                mqtt_port=PORT,
-            )
-            self.printer = BambuPrinter(config=config)
+                account = get_account()
+                config = BambuConfig(
+                    hostname=HOSTNAME,
+                    access_code=account.get_token(),
+                    serial_number=self.serial,
+                    mqtt_username=account.get_username(),
+                    mqtt_port=PORT,
+                )
+                self.printer = BambuPrinter(config=config)
 
-            self.printer.on_update = self.on_update
-            self.printer.start_session()
-            self.logger.info(f"restart_bpm_object: restarted {self.name}")
+                self.printer.on_update = self.on_update
+                self.printer.start_session()
+                self.logger.info(f"restart_bpm_object: restarted {self.name}")
+            except:
+                self.logger.error(
+                    f"restart_bpm_object: {self.name} - {traceback.format_exc()}"
+                )
 
 
 if __name__ == "__main__":

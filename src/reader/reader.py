@@ -1,4 +1,3 @@
-import os
 from datetime import datetime, timedelta
 from threading import Thread
 from time import sleep, time
@@ -212,7 +211,6 @@ if __name__ == "__main__":
                                 "error - card not in database or something else"
                             )
                             # TODO: flash no access color or some other unique indication
-                            pass
                         else:  # a response was received
                             # unpack color and timeout from response
                             color = response["color"]

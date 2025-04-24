@@ -37,7 +37,9 @@ BAMBU_TIMEOUT = (
 BAMBU_DEFAULT_LIMIT = 1000  # quarterly weight limit for all users (in grams)
 BAMBU_EXEMPT_LIMIT = float("inf")  # per-print weight limit for exempted users
 BAMBU_DELAY = 10  # manager loop time (in seconds)
-BAMBU_OFFLINE_TIMEOUT = 15 * 60 # time before a printer is considered offline (in seconds)
+BAMBU_OFFLINE_TIMEOUT = (
+    15 * 60
+)  # time before a printer is considered offline (in seconds)
 
 GCODE_IDLE = 0
 GCODE_RUNNING = 1
