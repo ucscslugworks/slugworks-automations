@@ -1,0 +1,16 @@
+class Print:
+    id: int
+    printer: str
+    title: str
+    cover: str
+    start_time: int
+    end_time: int
+    weight: float
+    color1: str
+    color1_weight: float
+    color2: str
+    color2_weight: float
+    color3: str
+    color3_weight: float
+    color4: str
+    color4_weight: float

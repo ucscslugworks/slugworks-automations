@@ -86,6 +86,8 @@ def get_new_prints(account: bambu_account.BambuAccount, db: bambu_db.BambuDB):
         for i in range(4 - len(colors)):
             colors.append(["", 0])
 
+        logger.debug(f"manager: adding print {task['id']} to db: {task}")
+
         # add the print to the db
         db.add_print(
             task["id"],  # print id
@@ -413,8 +415,6 @@ def manager():
         # main loop
         while True:
             try:
-                # delay between loops - this is at the beginning in case of an exception - don't spam
-                time.sleep(constants.BAMBU_DELAY)
                 logger.info("manager: Running main loop")
 
                 # loop timestamp - ensure consistent time comparisons for all operations in this loop
@@ -465,6 +465,9 @@ def manager():
                     os.remove(stop_file_path)
                     raise KeyboardInterrupt
 
+                # delay between loops
+                time.sleep(constants.BAMBU_DELAY)
+
             except Exception as e:
                 # log the exception
                 logger.error(f"manager: {traceback.format_exc()}")
@@ -472,6 +475,9 @@ def manager():
                 # if the exception is a KeyboardInterrupt, raise it (to stop the program)
                 if type(e) == KeyboardInterrupt:
                     raise e
+
+                # in case an exception occurs, wait for a while before continuing
+                time.sleep(constants.BAMBU_DELAY)
 
     # if a KeyboardInterrupt is raised, stop the program
     except KeyboardInterrupt:

@@ -176,7 +176,7 @@ class StatusSheet:
                 "start_time": int (epoch time),
                 "time_remaining": int (seconds),
                 "end_time": int (epoch time),
-                "weight": int (grams),
+                "weight": float (grams),
                 "tool_temp": int (C),
                 "tool_temp_target": int (C),
                 "bed_temp": int (C),
@@ -191,6 +191,7 @@ class StatusSheet:
             public_table = []
 
             for printer, data in printer_data.items():
+                self.logger.debug(f"update: {printer}: {data}")
                 private_row = []
                 public_row = []
 
