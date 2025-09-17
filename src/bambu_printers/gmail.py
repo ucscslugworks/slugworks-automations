@@ -94,10 +94,10 @@ if __name__ == "__main__":
 This is a test email!
     
 Thank you,
-Ishan"""
+slugwork"""
     gmail_send_message(
-        "Ishan Madan <imadan1@ucsc.edu>",
-        "Ishan Madan <imadan1@ucsc.edu>",
+        "slugwork Baskin Engineering (BE) <slugwork@ucsc.edu>",
+        "slugwork Baskin Engineering (BE) <slugwork@ucsc.edu>",
         "Test Email",
         body,
         "",

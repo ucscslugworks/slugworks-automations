@@ -63,7 +63,14 @@ class StartForm:
                 flow = InstalledAppFlow.from_client_secrets_file(
                     os.path.join(common_path, "credentials.json"), SCOPES
                 )
-                creds = flow.run_local_server(port=44649)
+                creds = flow.run_local_server(
+                    host="localhost",
+                    port=44649,
+                    open_browser=False,  # <-- key change
+                    authorization_prompt_message="Please open this URL in a browser on your local machine (after SSH port-forward): {url}",
+                    success_message="Authentication complete. You may close this tab.",
+                )
+
             # Save the credentials for the next run
             with open(os.path.join(common_path, "start_form_token.json"), "w") as token:
                 token.write(creds.to_json())

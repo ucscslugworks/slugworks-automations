@@ -79,7 +79,7 @@ class BambuAccount:
         self.token = ""
         self.refresh_token = ""
         self.username = ""
-        self.expire_time = -1
+        self.expire_time = -1  # -1 means "unknown" (e.g., opaque token with no exp)
 
         self.refresh_thread = None
         self.stop_refresh_loop = False
@@ -87,13 +87,14 @@ class BambuAccount:
 
         self.login()
 
+    @staticmethod
+    def _is_jwt(token: str) -> bool:
+        # A minimal, safe check: JWTs have 3 segments (2 dots)
+        return isinstance(token, str) and token.count(".") == 2
+
     def login(self):
         try:
-            bambu_json = json.load(
-                open(
-                    BAMBU_JSON,
-                )
-            )
+            bambu_json = json.load(open(BAMBU_JSON))
 
             if "token" in bambu_json and "refreshToken" in bambu_json:
                 self.logger.info(
@@ -151,13 +152,7 @@ class BambuAccount:
 
                     code = bambu_json["code"]
                     del bambu_json["code"]
-                    json.dump(
-                        bambu_json,
-                        open(
-                            BAMBU_JSON,
-                            "w",
-                        ),
-                    )
+                    json.dump(bambu_json, open(BAMBU_JSON, "w"))
 
                     self.logger.info("login: Got code, deleted from bambu.json")
 
@@ -184,7 +179,7 @@ class BambuAccount:
                         "login: Login may have been successful, attempting to parse headers"
                     )
 
-                if "token" not in response.headers["Set-Cookie"]:
+                if "token" not in response.headers.get("Set-Cookie", ""):
                     self.logger.error("login: Failed to login - no token received")
                     exit(1)
 
@@ -199,29 +194,30 @@ class BambuAccount:
             self.logger.info(f'login: Token: "{self.token}"')
             self.logger.info(f'login: Refresh Token: "{self.refresh_token}"')
 
-            decoded_token = jwt.decode(
-                self.token, algorithms=["RS256"], options={"verify_signature": False}
-            )
-
-            self.logger.info("login: Headers and token successfully parsed")
-
-            self.expire_time = decoded_token["exp"]
-            self.username = decoded_token["username"]
-
-            self.logger.info(
-                f"login: Token expires at {time.strftime("%Y-%m-%d %H:%M:%S %z", time.gmtime(self.expire_time))}"
-            )
-            self.logger.info(f"login: Logged in as {self.username}")
+            # ===== JWT SAFEGUARD START =====
+            if self._is_jwt(self.token):
+                decoded_token = jwt.decode(
+                    self.token, algorithms=["RS256"], options={"verify_signature": False}
+                )
+                self.logger.info("login: Headers and token successfully parsed")
+                self.expire_time = decoded_token.get("exp", -1)
+                self.username = decoded_token.get("username", "")
+                self.logger.info(
+                    f"login: Token expires at {time.strftime('%Y-%m-%d %H:%M:%S %z', time.gmtime(self.expire_time))}"
+                )
+                self.logger.info(f"login: Logged in as {self.username}")
+            else:
+                # Opaque token: cannot decode, so skip JWT fields gracefully.
+                self.logger.info(
+                    "login: Opaque token detected (not a JWT) — skipping jwt.decode and expiry/username parsing."
+                )
+                self.expire_time = -1
+                self.username = ""
+            # ===== JWT SAFEGUARD END =====
 
             bambu_json["token"] = self.token
             bambu_json["refreshToken"] = self.refresh_token
-            json.dump(
-                bambu_json,
-                open(
-                    BAMBU_JSON,
-                    "w",
-                ),
-            )
+            json.dump(bambu_json, open(BAMBU_JSON, "w"))
 
             self.logger.info("login: Saved token to bambu.json")
 
@@ -250,26 +246,15 @@ class BambuAccount:
             self.logger.info(f'login: Token: "{self.token}"')
             self.logger.info(f'login: Refresh Token: "{self.refresh_token}"')
             self.logger.info(
-                f"login: Token expires at {time.strftime("%Y-%m-%d %H:%M:%S %z", time.gmtime(self.expire_time))}"
+                f"login: Token expires at {time.strftime('%Y-%m-%d %H:%M:%S %z', time.gmtime(self.expire_time))}"
             )
 
             self.headers["Authorization"] = f"Bearer {self.token}"
 
-            bambu_json = json.load(
-                open(
-                    BAMBU_JSON,
-                    "r",
-                ),
-            )
+            bambu_json = json.load(open(BAMBU_JSON, "r"))
             bambu_json["token"] = self.token
             bambu_json["refreshToken"] = self.refresh_token
-            json.dump(
-                bambu_json,
-                open(
-                    BAMBU_JSON,
-                    "w",
-                ),
-            )
+            json.dump(bambu_json, open(BAMBU_JSON, "w"))
 
             self.logger.info("refresh: Refreshed token and saved to bambu.json")
         except Exception:
@@ -281,7 +266,8 @@ class BambuAccount:
     def refresh_loop(self):
         while not self.stop_refresh_loop:
             try:
-                if self.expire_time - int(time.time()) < REFRESH_DELAY * 2:
+                # Only attempt time-based refresh if we actually know an expiry.
+                if self.expire_time >= 0 and (self.expire_time - int(time.time()) < REFRESH_DELAY * 2):
                     self.refresh()
 
                 time.sleep(REFRESH_DELAY)

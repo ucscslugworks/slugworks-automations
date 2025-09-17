@@ -139,7 +139,14 @@ class StatusSheet:
                 flow = InstalledAppFlow.from_client_secrets_file(
                     os.path.join(common_path, "credentials.json"), SCOPES
                 )
-                creds = flow.run_local_server(port=44649)
+                creds = flow.run_local_server(
+                    host="127.0.0.1",
+                    port=int(os.getenv("GOOGLE_OAUTH_PORT", "44650")),  # different from any other flow
+                    open_browser=False,
+                    authorization_prompt_message="Open this URL in your local browser (after SSH port-forward): {url}",
+                    success_message="Authentication complete. You may close this tab.",
+                )
+
             # Save the credentials for the next run
             with open(
                 os.path.join(common_path, "status_sheet_token.json"), "w"
