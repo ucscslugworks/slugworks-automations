@@ -597,6 +597,7 @@ class BambuDB:
                     -1,  # end_time
                     -1,  # active_spool
                     -1,  # spool_state
+                    "",  # colors
                 ),
             )
             self.logger.info(f"add_printer: Added printer {name}")
@@ -629,7 +630,7 @@ class BambuDB:
             ).fetchone()
 
             if not data:
-                self.logger.warning(f"get_printer_data: Printer {name} not found")
+                self.logger.warning(f"get_printer_data: Printer '{name}' not found")
                 return None
 
             return {label: data[i] for i, label in enumerate(DATA_TABLES["printers"])}

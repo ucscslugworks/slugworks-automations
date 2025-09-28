@@ -1,4 +1,5 @@
 import time
+
 import traceback
 
 from bpm.bambuconfig import BambuConfig
@@ -15,14 +16,15 @@ PRINTER_OBJECTS = dict()
 
 
 def get_printer(name: str, serial: str):
+    """Return a singleton Printer per name."""
     global PRINTER_OBJECTS
-
     if name in PRINTER_OBJECTS:
+        # wait if another thread is constructing it
         while PRINTER_OBJECTS[name] is None:
-            time.sleep(1)
+            time.sleep(0.2)
         p = PRINTER_OBJECTS[name]
-        p.logger.info(f"get_printer: returned duplicate printer: {name}")
-        return PRINTER_OBJECTS[name]
+        p.logger.info(f"get_printer: returned existing printer: {name}")
+        return p
     else:
         PRINTER_OBJECTS[name] = None
         printer = Printer(name, serial)
@@ -41,19 +43,33 @@ class Printer:
         self.serial = serial
 
         account = get_account()
+
+        # Prefer device access_code for MQTT auth; fall back to token if needed.
+        try:
+            dev_access = account.get_device_access_code(self.serial)
+        except Exception:
+            dev_access = None
+        password = dev_access or account.get_token()
+        if not dev_access:
+            self.logger.warning("init: device access_code unavailable; using token")
+
+        username = account.get_username() or account.email
+
         config = BambuConfig(
             hostname=HOSTNAME,
-            access_code=account.get_token(),
-            serial_number=self.serial,
-            mqtt_username=account.get_username(),
+            access_code=password,           # <- MQTT password
+            serial_number=self.serial,      # <- MQTT client_id must match dev_id
+            mqtt_username=username,         # <- MQTT username (email is fine)
             mqtt_port=PORT,
         )
         self.printer = BambuPrinter(config=config)
 
         self.db = get_db()
         if not self.db.get_printer_data(self.name):
+            # add a minimal row so updates don’t warn forever
             self.db.add_printer(self.name)
 
+        # cached fields for DB updates
         self.last_update = -1
         self.tool_temp = -1
         self.tool_temp_target = -1
@@ -75,13 +91,16 @@ class Printer:
         self.spool_state = ""
         self.colors = []
 
+        # hook the update callback and start the session
         self.printer.on_update = self.on_update
         self.printer.start_session()
-
         self.logger.info(f"init: Initialized printer {self.name}.")
+
+    # ---------------- MQTT event → cache fields ----------------
 
     def on_update(self, printer):
         try:
+            print("why dont i update")
             self.last_update = int(time.time())
             self.tool_temp = float(printer.tool_temp)
             self.tool_temp_target = float(printer.tool_temp_target)
@@ -130,18 +149,21 @@ class Printer:
         except Exception:
             self.logger.error(f"on_update: {self.name} - {traceback.format_exc()}")
 
+    # ---------------- Periodic DB sync ----------------
+
     def update_db(self):
         try:
             status = constants.PRINTER_IDLE
-            if self.last_update + 60 <= int(time.time()):
+            now = int(time.time())
+
+            if self.last_update < 0 or (self.last_update + 60 <= now):
                 status = constants.PRINTER_OFFLINE
             elif self.gcode_state in [constants.GCODE_RUNNING, constants.GCODE_PAUSE]:
                 data = self.db.get_printer_data(self.name)
                 if data:
-                    if data["cruzid"]:
-                        status = constants.PRINTER_MATCHED
-                    else:
-                        status = constants.PRINTER_UNMATCHED
+                    status = (
+                        constants.PRINTER_MATCHED if data.get("cruzid") else constants.PRINTER_UNMATCHED
+                    )
 
             self.db.update_printer(
                 self.name,
@@ -162,7 +184,7 @@ class Printer:
                 percent_complete=self.percent_complete,
                 time_remaining=self.time_remaining,
                 start_time=self.start_time,
-                end_time=self.start_time + self.time_remaining,
+                end_time=(self.start_time + self.time_remaining) if self.start_time >= 0 and self.time_remaining >= 0 else -1,
                 active_spool=self.active_spool,
                 spool_state=self.spool_state,
                 colors=",".join(self.colors),
@@ -170,6 +192,8 @@ class Printer:
             self.logger.info(f"update_db: {self.name}")
         except Exception:
             self.logger.error(f"update_db: {self.name} - {traceback.format_exc()}")
+
+    # ---------------- Controls / lifecycle ----------------
 
     def cancel(self):
         self.printer.stop_printing()
@@ -180,36 +204,44 @@ class Printer:
         return self.gcode_state
 
     def get_end_time(self):
-        return self.start_time + self.time_remaining
+        return (self.start_time + self.time_remaining) if self.start_time >= 0 and self.time_remaining >= 0 else -1
 
     def stop_thread(self):
-        self.printer.quit()
-        self.logger.info(f"stop_thread: {self.name}")
+        try:
+            self.printer.quit()
+        finally:
+            self.logger.info(f"stop_thread: {self.name}")
 
     def restart_bpm_object(self):
+        """Full teardown + fresh session. No reinitialise(), no monkey-patching."""
         self.logger.debug(f"restart_bpm_object: {self.name}")
-        if self.printer.client and not self.printer.client.is_connected():
-            self.logger.warning(f"restart_bpm_object: {self.name} - not connected")
+        try:
+            self.stop_thread()
+            account = get_account()
             try:
-                self.stop_thread()
+                dev_access = account.get_device_access_code(self.serial)
+            except Exception:
+                dev_access = None
+            password = dev_access or account.get_token()
+            if not dev_access:
+                self.logger.warning("restart: device access_code unavailable; using token")
 
-                account = get_account()
-                config = BambuConfig(
-                    hostname=HOSTNAME,
-                    access_code=account.get_token(),
-                    serial_number=self.serial,
-                    mqtt_username=account.get_username(),
-                    mqtt_port=PORT,
-                )
-                self.printer = BambuPrinter(config=config)
+            username = account.get_username() or account.email
 
-                self.printer.on_update = self.on_update
-                self.printer.start_session()
-                self.logger.info(f"restart_bpm_object: restarted {self.name}")
-            except:
-                self.logger.error(
-                    f"restart_bpm_object: {self.name} - {traceback.format_exc()}"
-                )
+            config = BambuConfig(
+                hostname=HOSTNAME,
+                access_code=password,
+                serial_number=self.serial,
+                mqtt_username=username,
+                mqtt_port=PORT,
+            )
+            self.printer = BambuPrinter(config=config)
+            self.printer.on_update = self.on_update
+            self.printer.start_session()
+            self.logger.info(f"restart_bpm_object: restarted {self.name}")
+        except Exception:
+            self.logger.error(f"restart_bpm_object: {self.name} - {traceback.format_exc()}")
+
 
 
 if __name__ == "__main__":
