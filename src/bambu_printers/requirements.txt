@@ -3,5 +3,6 @@ google-auth-httplib2
 google-auth-oauthlib
 requests
 PyJWT
+pytz
 oauthlib
 git+https://github.com/ucscslugworks/bambu-printer-manager.git

@@ -571,6 +571,7 @@ class BambuDB:
                 self.logger.warning(f"add_printer: Printer {name} already exists")
                 return False
 
+            # Added missing colors column (empty string) as the 24th value to match schema
             sql(
                 f"INSERT INTO printers ({', '.join(DATA_TABLES['printers'])}) VALUES ({', '.join(['?'] * len(DATA_TABLES['printers']))})",
                 (
@@ -597,6 +598,7 @@ class BambuDB:
                     -1,  # end_time
                     -1,  # active_spool
                     -1,  # spool_state
+                    "",  # colors (added)
                 ),
             )
             self.logger.info(f"add_printer: Added printer {name}")

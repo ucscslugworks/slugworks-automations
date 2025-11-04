@@ -2,7 +2,7 @@
 
 cd "$(dirname "$(readlink -f "$0")")"
 
-source venv/bin/activate
+source ../venv/bin/activate
 
 if python detect_bambu_restart.py; then
     echo "Bambu printer manager is still running"

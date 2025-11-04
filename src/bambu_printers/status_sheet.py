@@ -2,11 +2,14 @@ import datetime
 import os
 import time
 import traceback
+import pytz
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from googleapiclient import errors
+
 
 from src import constants, log
 
@@ -197,6 +200,8 @@ class StatusSheet:
             private_table = []
             public_table = []
 
+            TZ = pytz.timezone("America/Los_Angeles")
+
             for printer, data in printer_data.items():
                 self.logger.debug(f"update: {printer}: {data}")
                 private_row = []
@@ -211,7 +216,7 @@ class StatusSheet:
 
                 # last update (not public)
                 private_row.append(
-                    datetime.datetime.fromtimestamp(data["last_update"]).strftime(
+                    datetime.datetime.fromtimestamp(data["last_update"]).astimezone(TZ).strftime(
                         "%H:%M:%S (%Y-%m-%d)"
                     )
                 )
@@ -239,7 +244,7 @@ class StatusSheet:
 
                     # print start time (not public)
                     private_row.append(
-                        datetime.datetime.fromtimestamp(data["start_time"]).strftime(
+                        datetime.datetime.fromtimestamp(data["start_time"]).astimezone(TZ).strftime(
                             "%H:%M:%S (%Y-%m-%d)"
                         )
                     )
@@ -271,12 +276,12 @@ class StatusSheet:
                     private_row.append(
                         datetime.datetime.fromtimestamp(
                             time.time() + time_remaining
-                        ).strftime("%H:%M:%S (%Y-%m-%d)")
+                        ).astimezone(TZ).strftime("%H:%M:%S (%Y-%m-%d)")
                     )
                     public_row.append(
                         datetime.datetime.fromtimestamp(
                             time.time() + time_remaining
-                        ).strftime("%H:%M:%S (%Y-%m-%d)")
+                        ).astimezone(TZ).strftime("%H:%M:%S (%Y-%m-%d)")
                     )
 
                     # print weight (not public)

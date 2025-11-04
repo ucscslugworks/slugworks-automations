@@ -77,10 +77,8 @@ def setup_logs(
     if name in loggers:
         return loggers[name]
 
-    # Change directory to repository root
-    logs_path = os.path.abspath(
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logs")
-    )
+    # Use LOGS_DIR env var or default to /data/logs
+    logs_path = os.getenv("LOGS_DIR", "/data/logs")
 
     timestamp = datetime.datetime.now()
     folder = timestamp.strftime("%Y-%m-%d")
@@ -104,7 +102,7 @@ def setup_logs(
         else:
             # Create a new directory for file handler if it doesn't exist
             if not os.path.exists(os.path.join(logs_path, h_name, folder)):
-                os.makedirs(os.path.join(logs_path, h_name, folder))
+                os.makedirs(os.path.join(logs_path, h_name, folder), exist_ok=True)
 
             # create file handler which logs debug messages (and above - everything)
             fh = RollingFileHandler(
@@ -138,10 +136,8 @@ def setup_logs(
 
 
 def get_log_path(name: str):
-    # Change directory to repository root
-    logs_path = os.path.abspath(
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logs")
-    )
+    # Use LOGS_DIR env var or default to /data/logs
+    logs_path = os.getenv("LOGS_DIR", "/data/logs")
 
     timestamp = datetime.datetime.now()
     folder = timestamp.strftime("%Y-%m-%d")
@@ -149,7 +145,7 @@ def get_log_path(name: str):
 
     # Create a new directory for date if it doesn't exist
     if not os.path.exists(os.path.join(logs_path, name, folder)):
-        os.makedirs(os.path.join(logs_path, name, folder))
+        os.makedirs(os.path.join(logs_path, name, folder), exist_ok=True)
 
     # check for and remove existing latest symlink
     if os.path.islink(os.path.join(logs_path, name, "latest.log")) or os.path.exists(
