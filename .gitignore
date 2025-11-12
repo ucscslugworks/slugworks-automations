@@ -167,5 +167,6 @@ logs/
 *.db-shm
 *.db-wal
 /BambuPrinter.log.jsonl*
+/BambuPrinterManager.log.jsonl*
 /pid_*
 *.pem
