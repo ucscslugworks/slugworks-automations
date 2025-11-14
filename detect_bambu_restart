@@ -1,17 +1,6 @@
-#!/bin/bash
-
 cd "$(dirname "$(readlink -f "$0")")"
-
 source ../venv/bin/activate
 
-if python detect_bambu_restart.py; then
-    echo "Bambu printer manager is still running"
-else
-    echo "Bambu printer manager is not running"
 
-    echo "Canceling previously running instance"
-    pkill -f "python -m src.bambu_printer_manager"
-
-    echo "Starting Bambu printer manager"
-    ./start_bambu_unsafe
-fi
+# Hourly check: if manager appears down, notify and wait for approval to restart
+python ./monitor_bambu.py || true

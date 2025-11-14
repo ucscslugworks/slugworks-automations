@@ -15,8 +15,10 @@ from googleapiclient.discovery import build
 SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
 CLIENT_SECRETS_FILE = "./common/credentials.json"  # Downloaded from Google Cloud Console
 TOKEN_FILE = "./common/emailtoken.json"
-#LOG_FILE = "grade_copy_preview.log"
-LOG_FILE = "logs/bambu_manager/latest.log"  # Path to the file you want to attach
+#
+# pick up logs dir from env, defaulting to /data/logs
+LOGS_DIR = os.getenv("LOGS_DIR", "/data/logs")
+LOG_FILE = os.path.join(LOGS_DIR, "bambu_manager", "latest.log")  # Path to the file you want to attach
 
 TO = "chartier@ucsc.edu"
 SUBJECT = "print server error"
