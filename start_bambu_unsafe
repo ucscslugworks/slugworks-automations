@@ -1,15 +1,15 @@
 #!/bin/bash
-# this script is used to start the Bambu printers manager using cron - @reboot
+# Start Bambu printers manager at boot, using start_bambu and health semantics.
 set -e
 
 cd "$(dirname "$(readlink -f "$0")")"
+
 PID_FILE="pid_bambu_printers"
 STOP_FILE="common/SPECIAL_BAMBU_STOP"
-if [ -f $STOP_FILE ]; then
-    rm $STOP_FILE
-fi
-if [ -f $PID_FILE ]; then
-    rm $PID_FILE
-fi
 
+# Clean any previous state
+[ -f "$STOP_FILE" ] && rm -f "$STOP_FILE"
+[ -f "$PID_FILE" ] && rm -f "$PID_FILE"
+
+# Attempt start; exit non-zero if health check fails so cron/systemd can retry or alert
 ./start_bambu

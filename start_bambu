@@ -1,20 +1,40 @@
- source ../venv/bin/activate
- 
- python -m src.bambu_printers.manager &
- MANAGER_PID=$!
+#!/bin/bash
+set -e
 
+# Ensure we run from repo root
+cd "$(dirname "$(readlink -f "$0")")"
 
- echo $MANAGER_PID > $PID_FILE
+# Files
+PID_FILE="pid_bambu_printers"
+STOP_FILE="common/SPECIAL_BAMBU_STOP"
 
- # Give the process a moment to initialize, then verify it's still running
- sleep 10
- if ps -p "$MANAGER_PID" > /dev/null; then
-     echo "bambu_printers started (pid=$MANAGER_PID)"
- else
-     echo "bambu_printers failed to start"
-     # remove stale pid file if present
-     if [ -f $PID_FILE ]; then rm -f $PID_FILE; fi
-     # try to notify via email (will still send without attachment if log not found)
-    python ./helpme.py || true
+# Activate venv
+source ../venv/bin/activate
+
+# Clear stop flag if present
+if [ -f "$STOP_FILE" ]; then rm -f "$STOP_FILE"; fi
+
+# Start manager
+python -m src.bambu_printers.manager &
+MANAGER_PID=$!
+echo "$MANAGER_PID" > "$PID_FILE"
+
+# Give the process a moment to initialize, then verify it's still running
+sleep 10
+if ps -p "$MANAGER_PID" > /dev/null; then
+    echo "bambu_printers started (pid=$MANAGER_PID)"
+    # Optional health check like detect_bambu_restart (fresh log within 5 minutes)
+    if python ./detect_bambu_restart.py; then
+        echo "health: logs fresh"
+        exit 0
+    else
+        echo "health: logs stale; failing for supervisor to restart"
+        exit 1
+    fi
+else
+    echo "bambu_printers failed to start"
+    # remove stale pid file if present
+    if [ -f "$PID_FILE" ]; then rm -f "$PID_FILE"; fi
+    # no email here; rely on external supervisor/cron to retry
     exit 1
 fi

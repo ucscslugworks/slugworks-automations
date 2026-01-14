@@ -404,6 +404,56 @@ class BambuDB:
             self.logger.error(f"get_current_prints: {traceback.format_exc()}")
             return []
 
+    def get_limits_snapshot(self):
+        """Return list of (cruzid, remaining_limit) for the active limits column."""
+        try:
+            self.column = self.get_limits_column()
+            if self.column not in [
+                p[0]
+                for p in sql("SELECT name from pragma_table_info('limits')").fetchall()
+            ]:
+                sql(f"ALTER TABLE limits ADD COLUMN {self.column} REAL")
+
+            return sql(
+                f"SELECT cruzid, {self.column} FROM limits"
+            ).fetchall()
+        except Exception:
+            self.logger.error(f"get_limits_snapshot: {traceback.format_exc()}")
+            return []
+
+    def get_usage_totals(self):
+        """Return dict of cruzid -> total recorded weight from archive + current prints."""
+        try:
+            archive_rows = sql(
+                "SELECT cruzid, SUM(weight) FROM prints_archive WHERE status != ? GROUP BY cruzid",
+                (constants.PRINT_EXPIRED,),
+            ).fetchall()
+            current_rows = sql(
+                "SELECT cruzid, SUM(weight) FROM prints_current GROUP BY cruzid"
+            ).fetchall()
+
+            totals = {}
+            for cruzid, total in archive_rows:
+                totals[cruzid] = (totals.get(cruzid, 0) or 0) + (total or 0)
+            for cruzid, total in current_rows:
+                totals[cruzid] = (totals.get(cruzid, 0) or 0) + (total or 0)
+            return totals
+        except Exception:
+            self.logger.error(f"get_usage_totals: {traceback.format_exc()}")
+            return {}
+
+    def get_active_prints_by_cruzid(self, cruzid: str):
+        try:
+            return sql(
+                "SELECT * FROM prints_current WHERE cruzid = ?",
+                (cruzid,),
+            ).fetchall()
+        except Exception:
+            self.logger.error(
+                f"get_active_prints_by_cruzid: {traceback.format_exc()}"
+            )
+            return []
+
     def get_unmatched_forms(self):
         try:
             return sql("SELECT * FROM form_unmatched").fetchall()

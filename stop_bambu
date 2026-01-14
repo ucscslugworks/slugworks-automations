@@ -3,6 +3,33 @@ set -e
 
 cd "$(dirname "$(readlink -f "$0")")"
 
+PID_FILE="pid_bambu_printers"
 STOP_FILE="common/SPECIAL_BAMBU_STOP"
 
-touch $STOP_FILE
+# Signal manager to stop via STOP_FILE (some code paths may read this)
+touch "$STOP_FILE"
+
+# If a PID exists, try graceful stop
+if [ -f "$PID_FILE" ]; then
+	MANAGER_PID="$(cat "$PID_FILE" || true)"
+	if [ -n "$MANAGER_PID" ]; then
+		echo "Stopping bambu_printers (pid=$MANAGER_PID)"
+		# Send SIGTERM, wait up to 10s, then SIGKILL
+		if kill -TERM "$MANAGER_PID" 2>/dev/null; then
+			for i in {1..10}; do
+				if ps -p "$MANAGER_PID" > /dev/null; then
+					sleep 1
+				else
+					break
+				fi
+			done
+			if ps -p "$MANAGER_PID" > /dev/null; then
+				echo "Process still running; sending SIGKILL"
+				kill -KILL "$MANAGER_PID" 2>/dev/null || true
+			fi
+		fi
+	fi
+	rm -f "$PID_FILE"
+fi
+
+echo "bambu_printers stop requested"

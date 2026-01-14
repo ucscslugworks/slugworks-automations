@@ -13,8 +13,10 @@ from src.bambu_printers import (
     get_printer,
     get_start_form,
     get_status_sheet,
+    get_usage_sheet,
     start_form,
     status_sheet,
+    usage_sheet,
 )
 
 logger = log.setup_logs("bambu_manager", additional_handlers=[("bambu", log.INFO)])
@@ -33,6 +35,47 @@ pid_file_path = os.path.join(
     "..",
     "pid_bambu_printers",
 )
+
+
+def load_policy_lists():
+    try:
+        base_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "..", "common"
+        )
+        # Exemptions: support both bambu_limit_exempt.json and exemption.json
+        exemptions = []
+        for fname in ("bambu_limit_exempt.json", "exemption.json"):
+            fpath = os.path.join(base_dir, fname)
+            if os.path.exists(fpath):
+                try:
+                    import json
+
+                    with open(fpath, "r") as f:
+                        data = json.load(f)
+                        if isinstance(data, list):
+                            exemptions.extend([str(x) for x in data])
+                except Exception:
+                    logger.warning(f"manager: Failed to read {fname}")
+
+        # Ban list: ban.json if present
+        bans = []
+        ban_path = os.path.join(base_dir, "ban.json")
+        if os.path.exists(ban_path):
+            try:
+                import json
+
+                with open(ban_path, "r") as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        bans.extend([str(x) for x in data])
+            except Exception:
+                logger.warning("manager: Failed to read ban.json")
+
+        # Deduplicate
+        return set(exemptions), set(bans)
+    except Exception:
+        logger.error(f"manager: {traceback.format_exc()}")
+        return set(), set()
 
 
 def get_new_forms(db: bambu_db.BambuDB, sf: start_form.StartForm):
@@ -153,7 +196,30 @@ def eval_old_print(
                 f"manager: Matching print {u_print[0]} with form {form_row} - old form/print"
             )
             db.match(u_print[0], form_row)
-            db.subtract_limit(cruzid, u_print[6])
+            # Policy checks: ban and concurrency
+            exemptions, bans = load_policy_lists()
+            if cruzid in bans:
+                printers[u_print[1]].cancel()
+                db.archive_print(u_print[0], constants.PRINT_CANCELED)
+                logger.debug(
+                    f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - user {cruzid} is banned"
+                )
+            elif cruzid not in exemptions:
+                active = db.get_active_prints_by_cruzid(cruzid)
+                if any(p[0] != u_print[0] for p in active):
+                    printers[u_print[1]].cancel()
+                    db.archive_print(u_print[0], constants.PRINT_CANCELED)
+                    logger.debug(
+                        f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - user {cruzid} already has an active print"
+                    )
+                else:
+                    db.subtract_limit(cruzid, u_print[6])
+                    logger.debug(
+                        f"manager: User {cruzid} has sufficient weight for print {u_print[0]}"
+                    )
+            else:
+                # exempt user: ignore concurrency and limits
+                db.subtract_limit(cruzid, u_print[6])
             matched = True
             old_rows[form_row] = (None,)  # mark the form as used
             if name in current_rows and current_rows[name][0] == form_row:
@@ -201,6 +267,30 @@ def match_print(
     logger.debug(
         f"manager: Matching print {u_print[0]} with form {form_row} - new form/print, still running"
     )
+
+    # Load policy lists
+    exemptions, bans = load_policy_lists()
+
+    # Ban enforcement: cancel immediately
+    if cruzid in bans:
+        printers[u_print[1]].cancel()
+        db.archive_print(u_print[0], constants.PRINT_CANCELED)
+        logger.debug(
+            f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - user {cruzid} is banned"
+        )
+        return current_rows
+
+    # Concurrency enforcement: non-exempt users limited to one active print
+    if cruzid not in exemptions:
+        active = db.get_active_prints_by_cruzid(cruzid)
+        # If there is any other active print, cancel this one
+        if any(p[0] != u_print[0] for p in active):
+            printers[u_print[1]].cancel()
+            db.archive_print(u_print[0], constants.PRINT_CANCELED)
+            logger.debug(
+                f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - user {cruzid} already has an active print"
+            )
+            return current_rows
 
     # check if the user has enough weight left in their limit
     if db.get_limit(cruzid) < u_print[6]:
@@ -396,12 +486,74 @@ def update_status_sheet(
     ss.update(data)
 
 
+def build_usage_rows(db: bambu_db.BambuDB):
+    """Build rows for the usage sheet: [cruzid, used_g, remaining_g, status, last_updated]."""
+    exemptions, bans = load_policy_lists()
+    limits = db.get_limits_snapshot()
+    usage_totals = db.get_usage_totals()
+
+    rows = [["cruzid", "used_g", "remaining_g", "status", "last_updated"]]
+    now = datetime.utcnow().isoformat()
+    seen = set()
+
+    def remaining_display(cruzid, remaining):
+        if cruzid in bans:
+            return 0 if remaining is None else remaining
+        if cruzid in exemptions:
+            return "Exempt"
+        return "" if remaining is None else remaining
+
+    def status_label(cruzid):
+        if cruzid in bans:
+            return "Banned"
+        if cruzid in exemptions:
+            return "Exempt"
+        return "Active"
+
+    def used_display(cruzid, remaining):
+        if cruzid in exemptions:
+            return usage_totals.get(cruzid, 0)
+        if remaining is None:
+            return usage_totals.get(cruzid, 0)
+        return round(constants.BAMBU_DEFAULT_LIMIT - remaining, 2)
+
+    for cruzid, remaining in limits:
+        seen.add(cruzid)
+        rows.append(
+            [
+                cruzid,
+                used_display(cruzid, remaining),
+                remaining_display(cruzid, remaining),
+                status_label(cruzid),
+                now,
+            ]
+        )
+
+    for cruzid, total in usage_totals.items():
+        if cruzid in seen:
+            continue
+        remaining = db.get_limit(cruzid)
+        rows.append(
+            [
+                cruzid,
+                used_display(cruzid, remaining),
+                remaining_display(cruzid, remaining),
+                status_label(cruzid),
+                now,
+            ]
+        )
+
+    rows[1:] = sorted(rows[1:], key=lambda r: r[0])
+    return rows
+
+
 def manager():
     logger.info("manager: Starting setup")
     account = get_account()
     db = get_db()
     sf = get_start_form()
     ss = get_status_sheet()
+    us = get_usage_sheet()
 
     devices = account.get_devices()
     printers = dict()
@@ -453,6 +605,11 @@ def manager():
                 # update the status sheet with the latest data
                 logger.info("manager: Updating status sheet")
                 update_status_sheet(db, printers, ss)
+
+                # update the usage sheet with per-user totals
+                logger.info("manager: Updating usage sheet")
+                usage_rows = build_usage_rows(db)
+                us.update(usage_rows)
 
                 logger.info("manager: Finished main loop")
 
