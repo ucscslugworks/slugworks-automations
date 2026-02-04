@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Bambu Lab Dashboard</h1>
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Printers</h5>
+                <p class="card-text">Manage and control your printers.</p>
+                <a href="/dashboard/printers" class="btn btn-primary">View Printers</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Print History</h5>
+                <p class="card-text">View recent prints and thumbnails.</p>
+                <a href="/dashboard/prints" class="btn btn-primary">View Prints</a>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">User Management</h5>
+                <p class="card-text">Manage filament limits, exemptions, and bans.</p>
+                <a href="/dashboard/users" class="btn btn-primary">Manage Users</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Filament Inventory</h5>
+                <p class="card-text">Track stock and AMS usage.</p>
+                <a href="/dashboard/inventory" class="btn btn-primary">View Inventory</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

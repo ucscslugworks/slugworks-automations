@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>User Management</h1>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>CruzID</th>
+            <th>Remaining (g)</th>
+            <th>Status</th>
+            <th>Exempt</th>
+            <th>Banned</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for cruzid, remaining in limits %}
+        <tr>
+            <td>{{ cruzid }}</td>
+            <td>
+                {% if cruzid in exemptions %}
+                <span class="badge bg-info">Exempt</span>
+                {% else %}
+                <span>{{ remaining or 1000 }}</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if cruzid in bans %}
+                <span class="badge bg-danger">Banned</span>
+                {% else %}
+                <span class="badge bg-success">Active</span>
+                {% endif %}
+            </td>
+            <td>
+                <input type="checkbox" {% if cruzid in exemptions %}checked{% endif %} 
+                       onchange="updateUser('{{ cruzid }}', 'exempt', this.checked)">
+            </td>
+            <td>
+                <input type="checkbox" {% if cruzid in bans %}checked{% endif %} 
+                       onchange="updateUser('{{ cruzid }}', 'ban', this.checked)">
+            </td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="addLimitPrompt('{{ cruzid }}')">+1kg</button>
+                <button class="btn btn-sm btn-warning" onclick="subtractLimitPrompt('{{ cruzid }}')">-1kg</button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="mt-5">
+    <h3>Add New User</h3>
+    <form onsubmit="addNewUser(event)">
+        <div class="mb-3">
+            <label>CruzID:</label>
+            <input type="text" id="newCruzid" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-success">Add User</button>
+    </form>
+</div>
+
+<script>
+function updateUser(cruzid, action, value) {
+    fetch('/dashboard/users/update', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({cruzid, action, value})
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) alert('Updated');
+        else alert('Error: ' + d.error);
+        location.reload();
+    })
+    .catch(e => alert('Error: ' + e));
+}
+
+function addLimitPrompt(cruzid) {
+    updateUser(cruzid, 'limit', 1000);
+}
+
+function subtractLimitPrompt(cruzid) {
+    updateUser(cruzid, 'limit', -1000);
+}
+
+function addNewUser(e) {
+    e.preventDefault();
+    const cruzid = document.getElementById('newCruzid').value;
+    updateUser(cruzid, 'limit', 0);
+}
+</script>
+{% endblock %}

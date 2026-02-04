@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Printers</h1>
+<div class="row">
+    {% for name, pdata in printers.items() %}
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5>{{ name }}</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Status:</strong> 
+                    {% if pdata.status == 0 %}Offline
+                    {% elif pdata.status == 1 %}Idle
+                    {% elif pdata.status == 2 %}Unmatched
+                    {% elif pdata.status == 3 %}Printing
+                    {% endif %}
+                </p>
+                <p><strong>Gcode State:</strong> 
+                    {% if pdata.gcode_state == 0 %}Idle
+                    {% elif pdata.gcode_state == 1 %}Running
+                    {% elif pdata.gcode_state == 2 %}Finished
+                    {% elif pdata.gcode_state == 3 %}Paused
+                    {% elif pdata.gcode_state == 4 %}Failed
+                    {% else %}Unknown
+                    {% endif %}
+                </p>
+                <p><strong>Current User:</strong> {{ pdata.cruzid or 'None' }}</p>
+                <p><strong>Tool Temp:</strong> {{ pdata.tool_temp }}°C / {{ pdata.tool_temp_target }}°C</p>
+                <p><strong>Bed Temp:</strong> {{ pdata.bed_temp }}°C / {{ pdata.bed_temp_target }}°C</p>
+                <p><strong>Progress:</strong> {{ pdata.percent_complete }}%</p>
+                {% if pdata.status == 3 %}
+                <button class="btn btn-danger btn-sm" onclick="cancelPrint('{{ name }}')">Cancel Print</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+function cancelPrint(printerName) {
+    if (!confirm(`Cancel print on ${printerName}?`)) return;
+    
+    fetch(`/dashboard/printers/cancel/${printerName}`, {method: 'POST'})
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                alert('Print canceled');
+                location.reload();
+            } else {
+                alert('Error: ' + d.error);
+            }
+        })
+        .catch(e => alert('Error: ' + e));
+}
+</script>
+{% endblock %}

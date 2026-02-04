@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Print History</h1>
+<p class="text-muted">Auto-refreshing every 5 seconds...</p>
+<div id="prints-container" class="row">
+    {% for print_row in prints %}
+    <div class="col-md-3 mb-4">
+        <div class="card h-100">
+            <div style="height: 200px; overflow: hidden; background: #f0f0f0;">
+                <img src="/dashboard/prints/photo/{{ print_row[0] }}" 
+                     style="width: 100%; height: 100%; object-fit: cover;"
+                     onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22%3E%3Crect fill=%22%23ddd%22 width=%22100%25%22 height=%22100%25%22/%3E%3C/svg%3E'">
+            </div>
+            <div class="card-body">
+                <h6 class="card-title">Print #{{ print_row[0] }}</h6>
+                <p class="card-text small">
+                    <strong>Printer:</strong> {{ print_row[3] if print_row|length > 8 else print_row[3] }}<br>
+                    <strong>User:</strong> {{ print_row[2] if print_row|length > 8 else print_row[3] or 'Unknown' }}<br>
+                    <strong>Weight:</strong> {{ print_row[8] if print_row|length > 8 else print_row[9] }}g<br>
+                    <strong>Status:</strong>
+                    {% if print_row|length == 17 %}
+                        <span class="badge bg-info">Active</span>
+                    {% else %}
+                        {% if print_row[1] == 0 %}Expired
+                        {% elif print_row[1] == 1 %}Succeeded
+                        {% elif print_row[1] == 2 %}Failed
+                        {% elif print_row[1] == 3 %}Canceled
+                        {% endif %}
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+// Auto-refresh prints every 5 seconds
+setInterval(function() {
+    fetch('/dashboard/prints/list')
+        .then(r => r.json())
+        .then(data => {
+            let html = '';
+            data.prints.forEach(print_row => {
+                // Determine if current (17 cols) or archived (20 cols)
+                let statusText, printer, user, weight;
+                if (print_row.length === 17) {
+                    statusText = 'Active';
+                    printer = print_row[3];
+                    user = print_row[2];
+                    weight = print_row[8];
+                } else {
+                    const statuses = ['Expired', 'Succeeded', 'Failed', 'Canceled'];
+                    statusText = statuses[print_row[1]] || 'Unknown';
+                    printer = print_row[4];
+                    user = print_row[3] || 'Unknown';
+                    weight = print_row[9];
+                }
+                
+                html += `
+                    <div class="col-md-3 mb-4">
+                        <div class="card h-100">
+                            <div style="height: 200px; overflow: hidden; background: #f0f0f0;">
+                                <img src="/dashboard/prints/photo/${print_row[0]}" 
+                                     style="width: 100%; height: 100%; object-fit: cover;"
+                                     onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22%3E%3Crect fill=%22%23ddd%22 width=%22100%25%22 height=%22100%25%22/%3E%3C/svg%3E'">
+                            </div>
+                            <div class="card-body">
+                                <h6 class="card-title">Print #${print_row[0]}</h6>
+                                <p class="card-text small">
+                                    <strong>Printer:</strong> ${printer}<br>
+                                    <strong>User:</strong> ${user}<br>
+                                    <strong>Weight:</strong> ${weight}g<br>
+                                    <strong>Status:</strong> <span class="badge ${statusText === 'Active' ? 'bg-info' : 'bg-secondary'}">${statusText}</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            document.getElementById('prints-container').innerHTML = html;
+        })
+        .catch(e => console.error('Failed to refresh prints:', e));
+}, 5000);
+</script>
+{% endblock %}

@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Filament Inventory</h1>
+
+<div class="row">
+    <div class="col-md-6">
+        <h3>Add Stock</h3>
+        <form onsubmit="addStock(event)">
+            <div class="mb-3">
+                <label>Color:</label>
+                <select id="color" class="form-control" required>
+                    <option value="">Select color...</option>
+                    <option value="Black (Basic)">Black (Basic)</option>
+                    <option value="White (Matte)">White (Matte)</option>
+                    <option value="Red (Basic)">Red (Basic)</option>
+                    <option value="Green (Matte Grass)">Green (Matte Grass)</option>
+                    <option value="Blue (Basic)">Blue (Basic)</option>
+                    <option value="Gold (Basic)">Gold (Basic)</option>
+                    <option value="Ice Blue (Matte)">Ice Blue (Matte)</option>
+                    <option value="Orange (Matte Mandarin)">Orange (Matte Mandarin)</option>
+                    <option value="Bambu Green (Basic)">Bambu Green (Basic)</option>
+                    <option value="Pink (Matte Sakura)">Pink (Matte Sakura)</option>
+                    <option value="Yellow (Matte)">Yellow (Matte)</option>
+                    <option value="Red (Maroon)">Red (Maroon)</option>
+                    <option value="Cobalt Blue">Cobalt Blue</option>
+                    <option value="Cyan">Cyan</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label>Quantity (packages):</label>
+                <input type="number" id="quantity" class="form-control" min="0" step="1" required>
+            </div>
+            <button type="submit" class="btn btn-success">Add to Stock</button>
+        </form>
+    </div>
+
+    <div class="col-md-6">
+        <h3>Move to Printer</h3>
+        <form onsubmit="moveFilament(event)">
+            <div class="mb-3">
+                <label>Filament:</label>
+                <select id="filament_id" class="form-control" required>
+                    <option value="">Select filament...</option>
+                    {% for row in stock %}
+                    <option value="{{ row[0] }}">{{ row[2] }} ({{ row[3] }} packages)</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label>Printer:</label>
+                <select id="printer" class="form-control" required>
+                    <option value="">Select printer...</option>
+                    {% for p in printers %}
+                    <option value="{{ p }}">{{ p }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label>AMS Slot:</label>
+                <select id="ams_slot" class="form-control" required>
+                    <option value="0">Slot 0</option>
+                    <option value="1">Slot 1</option>
+                    <option value="2">Slot 2</option>
+                    <option value="3">Slot 3</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label>Quantity (packages):</label>
+                <input type="number" id="move_quantity" class="form-control" min="1" step="1" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Move to Printer</button>
+        </form>
+    </div>
+</div>
+
+<h3 class="mt-5">Current Stock</h3>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Color</th>
+            <th>Quantity (packages)</th>
+            <th>Status</th>
+            <th>Added</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in stock %}
+        <tr {% if row[3] < 5 %}class="table-warning"{% endif %}>
+            <td>{{ row[2] }}</td>
+            <td>
+                <strong>{{ row[3] }}</strong>
+                {% if row[3] < 5 %}<span class="badge bg-danger">LOW</span>{% endif %}
+            </td>
+            <td>
+                {% if row[3] < 5 %}<span class="badge bg-danger">Low Stock</span>
+                {% elif row[3] < 10 %}<span class="badge bg-warning">Medium</span>
+                {% else %}<span class="badge bg-success">Good</span>{% endif %}
+            </td>
+            <td>{{ row[5] }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h3>Recent Moves</h3>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Filament</th>
+            <th>Printer</th>
+            <th>AMS Slot</th>
+            <th>Quantity (packages)</th>
+            <th>Type</th>
+            <th>Timestamp</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for move in moves %}
+        <tr>
+            <td>#{{ move[1] }}</td>
+            <td>{{ move[2] }}</td>
+            <td>{{ move[3] }}</td>
+            <td>{{ move[4] }}</td>
+            <td>{{ move[5] }}</td>
+            <td>{{ move[6] }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h3 class="mt-5">Printer AMS Status</h3>
+<div class="row">
+    {% for pname, pdata in printer_data.items() %}
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">{{ pname }}</div>
+            <div class="card-body">
+                <p><strong>Status:</strong>
+                    {% if pdata.status == 0 %}Offline
+                    {% elif pdata.status == 1 %}Idle
+                    {% elif pdata.status == 2 %}Unmatched
+                    {% elif pdata.status == 3 %}Printing
+                    {% endif %}
+                </p>
+                <p><strong>Filament Colors:</strong> {{ pdata.colors or 'None' }}</p>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+function addStock(e) {
+    e.preventDefault();
+    const data = {
+        color: document.getElementById('color').value,
+        quantity: document.getElementById('quantity').value
+    };
+    fetch('/dashboard/inventory/add', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            alert('Added to stock');
+            location.reload();
+        } else alert('Error: ' + d.error);
+    })
+    .catch(e => alert('Error: ' + e));
+}
+
+function moveFilament(e) {
+    e.preventDefault();
+    const data = {
+        filament_id: document.getElementById('filament_id').value,
+        printer: document.getElementById('printer').value,
+        ams_slot: document.getElementById('ams_slot').value,
+        quantity: document.getElementById('move_quantity').value
+    };
+    fetch('/dashboard/inventory/move', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            alert('Moved to printer and stock updated');
+            location.reload();
+        } else alert('Error: ' + d.error);
+    })
+    .catch(e => alert('Error: ' + e));
+}
+</script>
+{% endblock %}
