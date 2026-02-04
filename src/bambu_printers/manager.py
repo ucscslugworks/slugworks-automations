@@ -3,6 +3,8 @@ import time
 import traceback
 from datetime import datetime
 
+import pytz
+
 from src import constants, log
 from src.bambu_printers import (
     bambu_account,
@@ -195,30 +197,42 @@ def eval_old_print(
             logger.debug(
                 f"manager: Matching print {u_print[0]} with form {form_row} - old form/print"
             )
-            db.match(u_print[0], form_row)
-            # Policy checks: ban and concurrency
+            # Policy checks: ban, concurrency, and weight BEFORE matching
             exemptions, bans = load_policy_lists()
             if cruzid in bans:
+                db.match(u_print[0], form_row)
                 printers[u_print[1]].cancel()
                 db.archive_print(u_print[0], constants.PRINT_CANCELED)
                 logger.debug(
                     f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - user {cruzid} is banned"
                 )
             elif cruzid not in exemptions:
-                active = db.get_active_prints_by_cruzid(cruzid)
-                if any(p[0] != u_print[0] for p in active):
+                remaining = db.get_limit(cruzid)
+                if remaining < u_print[6]:
+                    db.match(u_print[0], form_row)
                     printers[u_print[1]].cancel()
                     db.archive_print(u_print[0], constants.PRINT_CANCELED)
                     logger.debug(
-                        f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - user {cruzid} already has an active print"
+                        f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - user {cruzid} has insufficient weight (needs {u_print[6]}g, has {remaining}g)"
                     )
                 else:
-                    db.subtract_limit(cruzid, u_print[6])
-                    logger.debug(
-                        f"manager: User {cruzid} has sufficient weight for print {u_print[0]}"
-                    )
+                    active = db.get_active_prints_by_cruzid(cruzid)
+                    if any(p[0] != u_print[0] for p in active):
+                        db.match(u_print[0], form_row)
+                        printers[u_print[1]].cancel()
+                        db.archive_print(u_print[0], constants.PRINT_CANCELED)
+                        logger.debug(
+                            f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - user {cruzid} already has an active print"
+                        )
+                    else:
+                        db.match(u_print[0], form_row)
+                        db.subtract_limit(cruzid, u_print[6])
+                        logger.debug(
+                            f"manager: User {cruzid} has sufficient weight for print {u_print[0]}"
+                        )
             else:
                 # exempt user: ignore concurrency and limits
+                db.match(u_print[0], form_row)
                 db.subtract_limit(cruzid, u_print[6])
             matched = True
             old_rows[form_row] = (None,)  # mark the form as used
@@ -232,19 +246,14 @@ def eval_old_print(
         # if the print was not matched, expire it
         logger.debug(f"manager: Expiring print {u_print[0]} - old print, no form found")
         db.expire_print(u_print[0])
-        logger.debug(
-            f"manager: print started at {u_print[4]}, printer started at {printers[u_print[1]].start_time}"
-        )
-        if abs(u_print[4] - printers[u_print[1]].start_time) <= 90:
-            # if the start time in the print task is within 90 seconds of the printer's current print's start time, they must be the same print
-            # cancel the print (no form was submitted/matched)
+        try:
             printers[u_print[1]].cancel()
             logger.debug(
-                f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - old print, no form found, still running"
+                f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - no form found"
             )
-        else:
-            logger.debug(
-                f"manager: Not canceling printer {u_print[1]} - job started at {u_print[4]}, printer reports start time {printers[u_print[1]].start_time}"
+        except Exception:
+            logger.warning(
+                f"manager: Failed to cancel printer {u_print[1]} for unmatched print {u_print[0]}"
             )
 
     return current_rows, old_rows
@@ -292,8 +301,9 @@ def match_print(
             )
             return current_rows
 
-    # check if the user has enough weight left in their limit
-    if db.get_limit(cruzid) < u_print[6]:
+    # Weight check: ensure user has enough remaining limit before matching
+    remaining = db.get_limit(cruzid)
+    if remaining < u_print[6]:
         # if the user does not have enough weight left, cancel the print
         printers[u_print[1]].cancel()
         # archive the print as canceled
@@ -486,6 +496,19 @@ def update_status_sheet(
     ss.update(data)
 
 
+def _day_suffix(day: int) -> str:
+    if 11 <= day <= 13:
+        return "th"
+    return {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+
+
+def _human_pst_now() -> str:
+    tz = pytz.timezone("America/Los_Angeles")
+    dt = datetime.now(tz)
+    suffix = _day_suffix(dt.day)
+    return f"{dt.strftime('%A %b')} {dt.day}{suffix} at {dt.strftime('%H:%M')}"
+
+
 def build_usage_rows(db: bambu_db.BambuDB):
     """Build rows for the usage sheet: [cruzid, used_g, remaining_g, status, last_updated]."""
     exemptions, bans = load_policy_lists()
@@ -493,7 +516,7 @@ def build_usage_rows(db: bambu_db.BambuDB):
     usage_totals = db.get_usage_totals()
 
     rows = [["cruzid", "used_g", "remaining_g", "status", "last_updated"]]
-    now = datetime.utcnow().isoformat()
+    now_text = _human_pst_now()
     seen = set()
 
     def remaining_display(cruzid, remaining):
@@ -525,7 +548,7 @@ def build_usage_rows(db: bambu_db.BambuDB):
                 used_display(cruzid, remaining),
                 remaining_display(cruzid, remaining),
                 status_label(cruzid),
-                now,
+                now_text,
             ]
         )
 
@@ -539,7 +562,7 @@ def build_usage_rows(db: bambu_db.BambuDB):
                 used_display(cruzid, remaining),
                 remaining_display(cruzid, remaining),
                 status_label(cruzid),
-                now,
+                now_text,
             ]
         )
 
