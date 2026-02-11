@@ -63,6 +63,13 @@
                     <a href="/dashboard/prints" class="{% if 'prints' in request.path %}active{% endif %}">Prints</a>
                     <a href="/dashboard/users" class="{% if 'users' in request.path %}active{% endif %}">Users</a>
                     <a href="/dashboard/inventory" class="{% if 'inventory' in request.path %}active{% endif %}">Inventory</a>
+                    {% if session.get('user_email') %}
+                    <div class="mt-3 small text-muted">
+                        Logged in as<br>
+                        <strong>{{ session.get('user_name') }}</strong>
+                    </div>
+                    <a href="/dashboard/logout" class="text-danger">Logout</a>
+                    {% endif %}
                 </div>
             </div>
             <div class="col-md-10">

@@ -2,44 +2,57 @@
 
 {% block content %}
 <h1>Printers</h1>
-<div class="row">
-    {% for name, pdata in printers.items() %}
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h5>{{ name }}</h5>
-            </div>
-            <div class="card-body">
-                <p><strong>Status:</strong> 
-                    {% if pdata.status == 0 %}Offline
-                    {% elif pdata.status == 1 %}Idle
-                    {% elif pdata.status == 2 %}Unmatched
-                    {% elif pdata.status == 3 %}Printing
-                    {% endif %}
-                </p>
-                <p><strong>Gcode State:</strong> 
-                    {% if pdata.gcode_state == 0 %}Idle
-                    {% elif pdata.gcode_state == 1 %}Running
-                    {% elif pdata.gcode_state == 2 %}Finished
-                    {% elif pdata.gcode_state == 3 %}Paused
-                    {% elif pdata.gcode_state == 4 %}Failed
-                    {% else %}Unknown
-                    {% endif %}
-                </p>
-                <p><strong>Current User:</strong> {{ pdata.cruzid or 'None' }}</p>
-                <p><strong>Tool Temp:</strong> {{ pdata.tool_temp }}°C / {{ pdata.tool_temp_target }}°C</p>
-                <p><strong>Bed Temp:</strong> {{ pdata.bed_temp }}°C / {{ pdata.bed_temp_target }}°C</p>
-                <p><strong>Progress:</strong> {{ pdata.percent_complete }}%</p>
-                {% if pdata.status == 3 %}
-                <button class="btn btn-danger btn-sm" onclick="cancelPrint('{{ name }}')">Cancel Print</button>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    {% endfor %}
-</div>
+<div id="printers-grid" class="row"></div>
 
 <script>
+const REFRESH_INTERVAL = 5000; // 5 seconds
+
+function renderPrinters(printers) {
+    const grid = document.getElementById('printers-grid');
+    grid.innerHTML = '';
+    
+    for (const [name, pdata] of Object.entries(printers)) {
+        const statusClass = pdata.status === 0 ? 'danger' : pdata.status === 3 ? 'warning' : 'success';
+        const progress = pdata.percent_complete ? `${pdata.percent_complete}%` : 'N/A';
+        const layer = pdata.current_layer && pdata.layer_count ? `${pdata.current_layer}/${pdata.layer_count}` : 'N/A';
+        const timeLeft = pdata.time_remaining ? `${Math.floor(pdata.time_remaining / 60)}m` : 'N/A';
+        const toolTemp = pdata.tool_temp ? `${Math.round(pdata.tool_temp)}°C / ${pdata.tool_temp_target}°C` : 'N/A';
+        const bedTemp = pdata.bed_temp ? `${Math.round(pdata.bed_temp)}°C / ${pdata.bed_temp_target}°C` : 'N/A';
+        const matchedTo = pdata.cruzid ? `Matched to: ${pdata.cruzid}` : 'No match';
+        
+        const html = `
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-${statusClass} text-white">
+                        <h5>${name}</h5>
+                        <small>${matchedTo}</small>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Status:</strong> ${pdata.status_text}</p>
+                        ${pdata.gcode_file ? `<p><strong>File:</strong> ${pdata.gcode_file}</p>` : ''}
+                        ${pdata.status === 3 ? `
+                            <p><strong>Progress:</strong> ${progress}</p>
+                            <p><strong>Layer:</strong> ${layer}</p>
+                            <p><strong>Time Remaining:</strong> ${timeLeft}</p>
+                            <p><strong>Nozzle:</strong> ${toolTemp}</p>
+                            <p><strong>Bed:</strong> ${bedTemp}</p>
+                        ` : ''}
+                        ${pdata.status === 3 ? `<button class="btn btn-danger btn-sm" onclick="cancelPrint('${name}')">Cancel Print</button>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+        grid.innerHTML += html;
+    }
+}
+
+function refreshPrinters() {
+    fetch('/dashboard/api/printers')
+        .then(r => r.json())
+        .then(data => renderPrinters(data))
+        .catch(e => console.error('Failed to refresh printers:', e));
+}
+
 function cancelPrint(printerName) {
     if (!confirm(`Cancel print on ${printerName}?`)) return;
     
@@ -48,12 +61,20 @@ function cancelPrint(printerName) {
         .then(d => {
             if (d.success) {
                 alert('Print canceled');
-                location.reload();
+                refreshPrinters();
             } else {
-                alert('Error: ' + d.error);
+                alert('Error: ' + (d.error || 'Unknown error'));
+                console.error('Cancel failed:', d);
             }
         })
-        .catch(e => alert('Error: ' + e));
+        .catch(e => {
+            alert('Error: ' + e.message);
+            console.error('Cancel error:', e);
+        });
 }
+
+// Initial load and auto-refresh
+refreshPrinters();
+setInterval(refreshPrinters, REFRESH_INTERVAL);
 </script>
 {% endblock %}

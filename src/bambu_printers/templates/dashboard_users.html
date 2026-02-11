@@ -3,51 +3,27 @@
 {% block content %}
 <h1>User Management</h1>
 
-<table class="table table-striped">
+<div class="mb-3">
+    <input type="text" id="searchBar" class="form-control" placeholder="Search by CruzID...">
+</div>
+
+<table class="table table-striped" id="users-table">
     <thead>
         <tr>
             <th>CruzID</th>
             <th>Remaining (g)</th>
-            <th>Status</th>
+            <th>Usage (g)</th>
             <th>Exempt</th>
             <th>Banned</th>
             <th>Actions</th>
         </tr>
     </thead>
-    <tbody>
-        {% for cruzid, remaining in limits %}
-        <tr>
-            <td>{{ cruzid }}</td>
-            <td>
-                {% if cruzid in exemptions %}
-                <span class="badge bg-info">Exempt</span>
-                {% else %}
-                <span>{{ remaining or 1000 }}</span>
-                {% endif %}
-            </td>
-            <td>
-                {% if cruzid in bans %}
-                <span class="badge bg-danger">Banned</span>
-                {% else %}
-                <span class="badge bg-success">Active</span>
-                {% endif %}
-            </td>
-            <td>
-                <input type="checkbox" {% if cruzid in exemptions %}checked{% endif %} 
-                       onchange="updateUser('{{ cruzid }}', 'exempt', this.checked)">
-            </td>
-            <td>
-                <input type="checkbox" {% if cruzid in bans %}checked{% endif %} 
-                       onchange="updateUser('{{ cruzid }}', 'ban', this.checked)">
-            </td>
-            <td>
-                <button class="btn btn-sm btn-primary" onclick="addLimitPrompt('{{ cruzid }}')">+1kg</button>
-                <button class="btn btn-sm btn-warning" onclick="subtractLimitPrompt('{{ cruzid }}')">-1kg</button>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
+    <tbody id="users-tbody"></tbody>
 </table>
+
+<nav aria-label="Page navigation" class="mt-4">
+    <ul class="pagination justify-content-center" id="pagination"></ul>
+</nav>
 
 <div class="mt-5">
     <h3>Add New User</h3>
@@ -61,6 +37,136 @@
 </div>
 
 <script>
+const REFRESH_INTERVAL = 5000; // 5 seconds
+const ITEMS_PER_PAGE = 20;
+let allUsers = [];
+let filteredUsers = [];
+let currentPage = 1;
+
+function sortUsers(users) {
+    // Sort: exempt first, then alphabetically by cruzid
+    return users.sort((a, b) => {
+        if (a.exempt && !b.exempt) return -1;
+        if (!a.exempt && b.exempt) return 1;
+        return a.cruzid.localeCompare(b.cruzid);
+    });
+}
+
+function filterUsers(searchTerm) {
+    if (!searchTerm.trim()) {
+        filteredUsers = [...allUsers];
+    } else {
+        filteredUsers = allUsers.filter(u => 
+            u.cruzid.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }
+    currentPage = 1;
+    renderPagination();
+    renderUsersPage();
+}
+
+function renderPagination() {
+    const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
+    const pagination = document.getElementById('pagination');
+    pagination.innerHTML = '';
+    
+    // Previous button
+    const prevLi = document.createElement('li');
+    prevLi.className = 'page-item' + (currentPage === 1 ? ' disabled' : '');
+    prevLi.innerHTML = '<a class="page-link" href="#" onclick="goToPage(' + (currentPage - 1) + '); return false;">Previous</a>';
+    pagination.appendChild(prevLi);
+    
+    // Page numbers
+    for (let i = 1; i <= totalPages; i++) {
+        const li = document.createElement('li');
+        li.className = 'page-item' + (i === currentPage ? ' active' : '');
+        li.innerHTML = '<a class="page-link" href="#" onclick="goToPage(' + i + '); return false;">' + i + '</a>';
+        pagination.appendChild(li);
+    }
+    
+    // Next button
+    const nextLi = document.createElement('li');
+    nextLi.className = 'page-item' + (currentPage === totalPages ? ' disabled' : '');
+    nextLi.innerHTML = '<a class="page-link" href="#" onclick="goToPage(' + (currentPage + 1) + '); return false;">Next</a>';
+    pagination.appendChild(nextLi);
+}
+
+function goToPage(page) {
+    const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
+    if (page >= 1 && page <= totalPages) {
+        currentPage = page;
+        renderPagination();
+        renderUsersPage();
+    }
+}
+
+function renderUsersPage() {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    const end = start + ITEMS_PER_PAGE;
+    const pageUsers = filteredUsers.slice(start, end);
+    renderUsers(pageUsers);
+}
+
+function renderUsers(users) {
+    const tbody = document.getElementById('users-tbody');
+    tbody.innerHTML = '';
+    
+    for (const user of users) {
+        const exemptChecked = user.exempt ? 'checked' : '';
+        const bannedChecked = user.banned ? 'checked' : '';
+        
+        let remainingCell = user.current_limit;
+        if (user.exempt) {
+            remainingCell = '<span class="badge bg-success">EXEMPT</span>';
+        } else if (user.banned) {
+            remainingCell = '<span class="badge bg-danger">BANNED</span>';
+        }
+        
+        const html = `
+            <tr>
+                <td>${user.cruzid}</td>
+                <td>${remainingCell}</td>
+                <td>${user.usage}</td>
+                <td><input type="checkbox" ${exemptChecked} onchange="updateUser('${user.cruzid}', 'exempt', this.checked)"></td>
+                <td><input type="checkbox" ${bannedChecked} onchange="updateUser('${user.cruzid}', 'ban', this.checked)"></td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="updateUser('${user.cruzid}', 'limit', 1000)">+1kg</button>
+                    <button class="btn btn-sm btn-warning" onclick="updateUser('${user.cruzid}', 'limit', -1000)">-1kg</button>
+                </td>
+            </tr>
+        `;
+        tbody.innerHTML += html;
+    }
+}
+
+function refreshUsers() {
+    const searchTerm = document.getElementById('searchBar').value;
+    const savedPage = currentPage;
+    
+    fetch('/dashboard/api/users')
+        .then(r => r.json())
+        .then(data => {
+            allUsers = sortUsers(data);
+            
+            // Reapply search without changing page
+            if (!searchTerm.trim()) {
+                filteredUsers = [...allUsers];
+            } else {
+                filteredUsers = allUsers.filter(u => 
+                    u.cruzid.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+            }
+            
+            // Restore page number (but cap it if fewer pages now)
+            const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
+            currentPage = Math.min(savedPage, Math.max(1, totalPages));
+            
+            renderPagination();
+            renderUsersPage();
+        })
+        .catch(e => console.error('Failed to refresh users:', e));
+}
+
 function updateUser(cruzid, action, value) {
     fetch('/dashboard/users/update', {
         method: 'POST',
@@ -69,25 +175,29 @@ function updateUser(cruzid, action, value) {
     })
     .then(r => r.json())
     .then(d => {
-        if (d.success) alert('Updated');
-        else alert('Error: ' + d.error);
-        location.reload();
+        if (d.success) {
+            refreshUsers();
+        } else {
+            alert('Error: ' + d.error);
+        }
     })
     .catch(e => alert('Error: ' + e));
-}
-
-function addLimitPrompt(cruzid) {
-    updateUser(cruzid, 'limit', 1000);
-}
-
-function subtractLimitPrompt(cruzid) {
-    updateUser(cruzid, 'limit', -1000);
 }
 
 function addNewUser(e) {
     e.preventDefault();
     const cruzid = document.getElementById('newCruzid').value;
     updateUser(cruzid, 'limit', 0);
+    document.getElementById('newCruzid').value = '';
 }
+
+// Search bar event listener
+document.getElementById('searchBar').addEventListener('input', (e) => {
+    filterUsers(e.target.value);
+});
+
+// Initial load and auto-refresh
+refreshUsers();
+setInterval(refreshUsers, REFRESH_INTERVAL);
 </script>
 {% endblock %}

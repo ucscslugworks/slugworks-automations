@@ -3,4 +3,5 @@ isort
 autoflake
 flask
 requests
+authlib
 

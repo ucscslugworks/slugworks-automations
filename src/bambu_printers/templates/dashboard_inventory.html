@@ -42,18 +42,12 @@
                 <label>Filament:</label>
                 <select id="filament_id" class="form-control" required>
                     <option value="">Select filament...</option>
-                    {% for row in stock %}
-                    <option value="{{ row[0] }}">{{ row[2] }} ({{ row[3] }} packages)</option>
-                    {% endfor %}
                 </select>
             </div>
             <div class="mb-3">
                 <label>Printer:</label>
                 <select id="printer" class="form-control" required>
                     <option value="">Select printer...</option>
-                    {% for p in printers %}
-                    <option value="{{ p }}">{{ p }}</option>
-                    {% endfor %}
                 </select>
             </div>
             <div class="mb-3">
@@ -75,7 +69,7 @@
 </div>
 
 <h3 class="mt-5">Current Stock</h3>
-<table class="table">
+<table class="table" id="stock-table">
     <thead>
         <tr>
             <th>Color</th>
@@ -84,23 +78,7 @@
             <th>Added</th>
         </tr>
     </thead>
-    <tbody>
-        {% for row in stock %}
-        <tr {% if row[3] < 5 %}class="table-warning"{% endif %}>
-            <td>{{ row[2] }}</td>
-            <td>
-                <strong>{{ row[3] }}</strong>
-                {% if row[3] < 5 %}<span class="badge bg-danger">LOW</span>{% endif %}
-            </td>
-            <td>
-                {% if row[3] < 5 %}<span class="badge bg-danger">Low Stock</span>
-                {% elif row[3] < 10 %}<span class="badge bg-warning">Medium</span>
-                {% else %}<span class="badge bg-success">Good</span>{% endif %}
-            </td>
-            <td>{{ row[5] }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
+    <tbody id="stock-tbody"></tbody>
 </table>
 
 <h3>Recent Moves</h3>
@@ -115,42 +93,67 @@
             <th>Timestamp</th>
         </tr>
     </thead>
-    <tbody>
-        {% for move in moves %}
-        <tr>
-            <td>#{{ move[1] }}</td>
-            <td>{{ move[2] }}</td>
-            <td>{{ move[3] }}</td>
-            <td>{{ move[4] }}</td>
-            <td>{{ move[5] }}</td>
-            <td>{{ move[6] }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
+    <tbody id="moves-tbody"></tbody>
 </table>
 
-<h3 class="mt-5">Printer AMS Status</h3>
-<div class="row">
-    {% for pname, pdata in printer_data.items() %}
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">{{ pname }}</div>
-            <div class="card-body">
-                <p><strong>Status:</strong>
-                    {% if pdata.status == 0 %}Offline
-                    {% elif pdata.status == 1 %}Idle
-                    {% elif pdata.status == 2 %}Unmatched
-                    {% elif pdata.status == 3 %}Printing
-                    {% endif %}
-                </p>
-                <p><strong>Filament Colors:</strong> {{ pdata.colors or 'None' }}</p>
-            </div>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-
 <script>
+const REFRESH_INTERVAL = 5000; // 5 seconds
+let printers = [];
+
+function renderInventory(data) {
+    // Render stock
+    const stockBody = document.getElementById('stock-tbody');
+    stockBody.innerHTML = '';
+    for (const item of data.stock) {
+        const statusBadge = item.quantity_packages < 5 ? '<span class="badge bg-danger">LOW</span>' :
+                            item.quantity_packages < 10 ? '<span class="badge bg-warning">Medium</span>' :
+                            '<span class="badge bg-success">Good</span>';
+        const rowClass = item.quantity_packages < 5 ? 'table-warning' : '';
+        const html = `
+            <tr class="${rowClass}">
+                <td>${item.color}</td>
+                <td><strong>${item.quantity_packages}</strong> ${item.quantity_packages < 5 ? '<span class="badge bg-danger">LOW</span>' : ''}</td>
+                <td>${statusBadge}</td>
+                <td>${item.added_date}</td>
+            </tr>
+        `;
+        stockBody.innerHTML += html;
+    }
+
+    // Render moves
+    const movesBody = document.getElementById('moves-tbody');
+    movesBody.innerHTML = '';
+    for (const move of data.moves) {
+        const html = `
+            <tr>
+                <td>#${move.filament_id}</td>
+                <td>${move.printer}</td>
+                <td>${move.ams_slot}</td>
+                <td>${move.quantity_packages}</td>
+                <td>${move.move_type}</td>
+                <td>${move.timestamp}</td>
+            </tr>
+        `;
+        movesBody.innerHTML += html;
+    }
+
+    // Update filament dropdown
+    const filamentSelect = document.getElementById('filament_id');
+    const oldValue = filamentSelect.value;
+    filamentSelect.innerHTML = '<option value="">Select filament...</option>';
+    for (const item of data.stock) {
+        filamentSelect.innerHTML += `<option value="${item.id}">${item.color} (${item.quantity_packages} packages)</option>`;
+    }
+    filamentSelect.value = oldValue;
+}
+
+function refreshInventory() {
+    fetch('/dashboard/api/inventory')
+        .then(r => r.json())
+        .then(data => renderInventory(data))
+        .catch(e => console.error('Failed to refresh inventory:', e));
+}
+
 function addStock(e) {
     e.preventDefault();
     const data = {
@@ -166,7 +169,9 @@ function addStock(e) {
     .then(d => {
         if (d.success) {
             alert('Added to stock');
-            location.reload();
+            document.getElementById('color').value = '';
+            document.getElementById('quantity').value = '';
+            refreshInventory();
         } else alert('Error: ' + d.error);
     })
     .catch(e => alert('Error: ' + e));
@@ -189,10 +194,26 @@ function moveFilament(e) {
     .then(d => {
         if (d.success) {
             alert('Moved to printer and stock updated');
-            location.reload();
+            document.getElementById('move_quantity').value = '';
+            refreshInventory();
         } else alert('Error: ' + d.error);
     })
     .catch(e => alert('Error: ' + e));
 }
+
+// Load printers and initial data
+fetch('/dashboard/api/printers')
+    .then(r => r.json())
+    .then(data => {
+        printers = Object.keys(data);
+        const printerSelect = document.getElementById('printer');
+        printerSelect.innerHTML = '<option value="">Select printer...</option>';
+        for (const p of printers) {
+            printerSelect.innerHTML += `<option value="${p}">${p}</option>`;
+        }
+    });
+
+refreshInventory();
+setInterval(refreshInventory, REFRESH_INTERVAL);
 </script>
 {% endblock %}
