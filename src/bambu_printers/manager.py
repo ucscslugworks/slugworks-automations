@@ -380,7 +380,7 @@ def match_print(
 
     # Weight check: ensure user has enough remaining limit before matching
     remaining = db.get_limit(cruzid)
-    if remaining < u_print[6]:
+    if remaining is None or remaining < u_print[6]:
         # if the user does not have enough weight left, cancel the print
         printers[u_print[1]].cancel()
         # archive the print as canceled

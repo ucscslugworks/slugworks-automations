@@ -573,6 +573,7 @@ class BambuDB:
             return result[0]
         except Exception:
             self.logger.error(f"get_limit: {traceback.format_exc()}")
+            return constants.BAMBU_DEFAULT_LIMIT
             return None
 
     def subtract_limit(self, cruzid: str, amount: float):
