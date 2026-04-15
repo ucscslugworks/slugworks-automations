@@ -182,6 +182,7 @@ class EmailCodeRetriever:
         Extract verification code from a Gmail message.
         
         Searches message body for numeric codes (usually 6 digits).
+        Handles both plain text and HTML emails.
         
         Args:
             message_id: Gmail message ID
@@ -196,36 +197,68 @@ class EmailCodeRetriever:
                 format='full'
             ).execute()
             
+            body = ''
+            is_html = False
+            
             # Get message body
             if 'parts' in message['payload']:
-                parts = message['payload']['parts']
-                body = ''
-                for part in parts:
-                    if part['mimeType'] == 'text/plain':
-                        if 'data' in part['body']:
-                            body = base64.urlsafe_b64decode(part['body']['data']).decode()
-                        elif 'attachmentId' in part['body']:
-                            # Handle attachments if needed
-                            pass
+                # Multi-part message - try to get plain text first
+                for part in message['payload']['parts']:
+                    if part['mimeType'] == 'text/plain' and 'data' in part['body']:
+                        body = base64.urlsafe_b64decode(part['body']['data']).decode()
+                        break
+                    elif part['mimeType'] == 'text/html' and 'data' in part['body']:
+                        body = base64.urlsafe_b64decode(part['body']['data']).decode()
+                        is_html = True
             else:
-                # Simple message without parts
+                # Simple message (usually HTML for Bambu Lab)
                 if 'data' in message['payload']['body']:
                     body = base64.urlsafe_b64decode(message['payload']['body']['data']).decode()
-                else:
-                    body = ''
+                    is_html = True
             
-            # Extract numeric codes (usually 6 digits)
-            # Look for patterns like "123456" or "code: 123456"
-            codes = re.findall(r'\b(\d{6})\b', body)
+            if not body:
+                return None
             
-            if codes:
-                # Return first (most likely) code
-                return codes[0]
+            # For HTML emails, look for code in styled elements first (Bambu Lab pattern)
+            if is_html:
+                # Look for code in style/tag context (appears to be styled differently)
+                styled_match = re.search(
+                    r'(?:style|class).*?>\s*(\d{6})\s*<',
+                    body,
+                    re.DOTALL
+                )
+                if styled_match:
+                    return styled_match.group(1)
             
-            # Try extracting any numeric sequence from body
+            # For plain text or fallback: look for codes near "verification code" text
+            bambu_code_match = re.search(
+                r'(?:verification\s+code|enter.*?code|code\s*:)\s*\n?\s*(\d{6})',
+                body,
+                re.IGNORECASE | re.DOTALL
+            )
+            if bambu_code_match:
+                return bambu_code_match.group(1)
+            
+            # Try extracting codes with context keywords
             codes = re.findall(r'(?:code|verification|verify).*?(\d{4,8})', body, re.IGNORECASE)
             if codes:
+                # Prefer 6-digit codes
+                for code in codes:
+                    if len(str(code)) == 6:
+                        return str(code)
                 return str(codes[0])[-6:]  # Take last 6 digits
+            
+            # Last resort: find all 6-digit codes (skip single repeated digits like 000000, 111111)
+            codes = re.findall(r'\b(\d{6})\b', body)
+            if codes:
+                # Filter out repeated digit patterns (000000, 111111, etc)
+                for code in reversed(codes):
+                    if len(set(code)) > 1:  # Has more than 1 unique digit
+                        return code
+                # If all are repeated digits, return the second one (usually the real code)
+                if len(codes) > 1:
+                    return codes[1]
+                return codes[-1]
             
         except Exception as e:
             print(f"Error extracting code from message: {e}")
