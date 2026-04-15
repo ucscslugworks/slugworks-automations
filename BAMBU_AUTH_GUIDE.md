@@ -620,6 +620,85 @@ EOF
 
 ---
 
+## Troubleshooting & Token Rotation Reality
+
+### Current Token Status (April 15, 2026)
+- ✅ Token is **VALID** and working
+- ✅ Token age: **0 days** (fresh, created today)
+- ✅ Next rotation needed: **May 15, 2026** (30 days from now)
+- ✅ API access: **Verified working perfectly**
+
+### Important: How Token Rotation Works
+
+**📌 Key Finding:** Bambu Lab's API **does not support token refresh endpoints**. 
+
+The ONLY way to get a new token every 30 days is via:
+1. **Email verification code** sent to your Bambu Lab account email
+2. **Login with that code** to receive new token
+
+**What This Means:**
+- ✅ Your **current token will work indefinitely** (no absolute expiration)
+- ✅ But **best practice** is to rotate every 30 days for security
+- ✅ When rotation is needed, you'll need to **receive a code via email**
+
+### When You Need to Rotate (in 30 days)
+
+**Scenario 1: With Gmail Setup (Recommended)**
+```bash
+# One-time setup
+pip install google-auth-oauthlib google-auth-httplib2 google-api-python-client
+python3 src/bambulab/token_rotator_cli.py test-email
+
+# Then automatically rotate
+python3 src/bambulab/token_rotator_cli.py rotate --auto
+```
+
+**Scenario 2: Manual (No Gmail Setup)**
+```bash
+# Run this command
+python3 src/bambulab/token_rotator_cli.py rotate
+
+# When prompted, enter the 6-digit code from your email
+# The system will complete the rotation automatically
+```
+
+**Scenario 3: Verify Before Rotating**
+```bash
+# Check if rotation is needed
+python3 src/bambulab/token_rotator_cli.py status
+
+# Output shows how many days until rotation needed
+```
+
+### Token Not Rotating
+```bash
+# Check status
+python3 src/bambulab/token_rotator_cli.py status
+
+# Manually rotate (you enter the code from email when prompted)
+python3 src/bambulab/token_rotator_cli.py rotate
+
+# Check logs
+tail -f /tmp/bambu.log
+```
+
+### "Gmail libraries not installed"
+Email verification is optional. To use automatic code retrieval:
+```bash
+pip install google-auth-oauthlib google-auth-httplib2 google-api-python-client
+python3 src/bambulab/token_rotator_cli.py test-email
+```
+
+Without them, system works in manual mode (you enter code when prompted).
+
+### "Token verification failed"
+- Check that email/password in `common/bambu.json` are correct  
+- Verify internet connection
+- Confirm Bambu Lab account is active
+- Try manual login first: `python3 src/bambu_printers/login.py`
+
+---
+
 ## FAQ
 
 **Q: Can I use this without Gmail?**
