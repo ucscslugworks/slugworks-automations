@@ -178,7 +178,8 @@ class TokenRotationService:
         code_callback: Optional[Callable[[], str]] = None
     ) -> bool:
         """
-        Rotate token by logging in again.
+        Rotate token by logging in again. Retries up to 3 times with 5-minute waits.
+        On final failure, sends error email.
         
         Args:
             code_callback: Optional callback to get verification code
@@ -189,29 +190,107 @@ class TokenRotationService:
         """
         self.log(f"Starting token rotation for: {self.username}")
         
-        try:
-            # Perform login to get new token
-            token = self.authenticator.login(
-                username=self.username,
-                password=self.password,
-                code_callback=code_callback
-            )
-            
-            self.log("✓ Token rotation successful!")
-            self.log(f"  New token: {token[:20]}...{token[-20:]}")
-            
-            # Log token age info
-            info = self.get_token_age_info()
-            self.log(f"  Token status: {info}")
-            
-            return True
+        max_retries = 3
+        retry_delay = 300  # 5 minutes in seconds
         
-        except BambuAuthError as e:
-            self.log(f"✗ Token rotation failed: {e}")
-            return False
+        for attempt in range(1, max_retries + 1):
+            try:
+                # Reset email code retriever for each attempt
+                if self.code_retriever:
+                    self.code_retriever.request_timestamp = None
+                
+                # Perform login to get new token
+                token = self.authenticator.login(
+                    username=self.username,
+                    password=self.password,
+                    code_callback=code_callback
+                )
+                
+                self.log("✓ Token rotation successful!")
+                self.log(f"  New token: {token[:20]}...{token[-20:]}")
+                
+                # Log token age info
+                info = self.get_token_age_info()
+                self.log(f"  Token status: {info}")
+                
+                return True
+            
+            except BambuAuthError as e:
+                error_msg = f"Token rotation failed: {e}"
+                self.log(f"✗ {error_msg} (Attempt {attempt}/{max_retries})")
+                
+                # If this was the last attempt, send error email
+                if attempt == max_retries:
+                    self._send_error_email(error_msg, attempt)
+                    return False
+                
+                # Wait before retrying
+                if attempt < max_retries:
+                    self.log(f"Waiting 5 minutes before retry...")
+                    time.sleep(retry_delay)
+                    
+            except Exception as e:
+                error_msg = f"Unexpected error during rotation: {e}"
+                self.log(f"✗ {error_msg} (Attempt {attempt}/{max_retries})")
+                
+                # If this was the last attempt, send error email
+                if attempt == max_retries:
+                    self._send_error_email(error_msg, attempt)
+                    return False
+                
+                # Wait before retrying
+                if attempt < max_retries:
+                    self.log(f"Waiting 5 minutes before retry...")
+                    time.sleep(retry_delay)
+        
+        return False
+    
+    def _send_error_email(self, error_msg: str, attempt: int) -> None:
+        """
+        Send error notification email using Gmail.
+        
+        Args:
+            error_msg: Error message to include in email
+            attempt: The attempt number that failed
+        """
+        try:
+            # Import here to avoid circular imports
+            from src.bambu_printers.gmail import gmail_send_message
+            from src.config_manager import ConfigManager
+            
+            email_address = self.username  # Use the configured email
+            
+            subject = f"Bambu Lab Token Rotation Failed - {self.username}"
+            body = f"""
+Token rotation for {self.username} failed after {attempt} attempts.
+
+Error Details:
+{error_msg}
+
+Please check the system and manually rotate the token if necessary.
+You can run: python3 token_rotator_cli.py rotate --auto
+
+Technical Details:
+- Username: {self.username}
+- Timestamp: {datetime.now().isoformat()}
+- Attempts made: {attempt}
+
+Token rotation is critical for maintaining API access. 
+Please address this issue promptly.
+"""
+            
+            gmail_send_message(
+                recipient=email_address,
+                sender=email_address,
+                subject=subject,
+                body=body,
+                cc=None,
+                reply_to=None
+            )
+            self.log(f"Error notification email sent to {email_address}")
+            
         except Exception as e:
-            self.log(f"✗ Unexpected error during rotation: {e}")
-            return False
+            self.log(f"Failed to send error email: {e}")
     
     def check_and_rotate_if_needed(self) -> bool:
         """

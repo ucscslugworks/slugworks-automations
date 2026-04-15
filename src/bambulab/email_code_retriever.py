@@ -68,6 +68,7 @@ class EmailCodeRetriever:
         self.token_file = token_file
         self.service = None
         self.creds = None
+        self.request_timestamp = None  # Track when code was requested
         self._authenticate()
     
     def _authenticate(self):
@@ -110,7 +111,8 @@ class EmailCodeRetriever:
         Get latest verification code from Gmail.
         
         Searches for recent emails from Bambu Lab and extracts the verification code.
-        Waits for email to arrive if not found immediately.
+        Waits 30 seconds initially for email to arrive.
+        Tracks tried codes to avoid retry attempts.
         
         Args:
             max_age_seconds: Maximum age of email in seconds (default: 300s = 5min)
@@ -125,6 +127,13 @@ class EmailCodeRetriever:
             >>> code = retriever.get_latest_verification_code()
             >>> print(f"Got code: {code}")
         """
+        # Set request timestamp on first call
+        if self.request_timestamp is None:
+            self.request_timestamp = int(time.time())
+            print(f"Verification code requested at {time.ctime(self.request_timestamp)}")
+            print("Waiting 30 seconds for email to arrive...")
+            time.sleep(30)
+        
         current_time = int(time.time())
         min_timestamp = current_time - max_age_seconds
         
@@ -163,6 +172,7 @@ class EmailCodeRetriever:
                 for msg in messages:
                     code = self._extract_code_from_message(msg['id'])
                     if code:
+                        print(f"Found verification code: {code}")
                         return code
                 
                 # If code not found and we have more attempts, wait and try again
@@ -219,7 +229,7 @@ class EmailCodeRetriever:
             if not body:
                 return None
             
-            # For HTML emails, look for code in styled elements first (Bambu Lab pattern)
+            # Extract HTML body
             if is_html:
                 # Look for code in style/tag context (appears to be styled differently)
                 styled_match = re.search(
@@ -228,7 +238,8 @@ class EmailCodeRetriever:
                     re.DOTALL
                 )
                 if styled_match:
-                    return styled_match.group(1)
+                    code = styled_match.group(1)
+                    return code
             
             # For plain text or fallback: look for codes near "verification code" text
             bambu_code_match = re.search(
@@ -237,7 +248,8 @@ class EmailCodeRetriever:
                 re.IGNORECASE | re.DOTALL
             )
             if bambu_code_match:
-                return bambu_code_match.group(1)
+                code = bambu_code_match.group(1)
+                return code
             
             # Try extracting codes with context keywords
             codes = re.findall(r'(?:code|verification|verify).*?(\d{4,8})', body, re.IGNORECASE)
@@ -246,7 +258,8 @@ class EmailCodeRetriever:
                 for code in codes:
                     if len(str(code)) == 6:
                         return str(code)
-                return str(codes[0])[-6:]  # Take last 6 digits
+                code = str(codes[0])[-6:]  # Take last 6 digits
+                return code
             
             # Last resort: find all 6-digit codes (skip single repeated digits like 000000, 111111)
             codes = re.findall(r'\b(\d{6})\b', body)
@@ -257,8 +270,10 @@ class EmailCodeRetriever:
                         return code
                 # If all are repeated digits, return the second one (usually the real code)
                 if len(codes) > 1:
-                    return codes[1]
-                return codes[-1]
+                    code = codes[1]
+                    return code
+                code = codes[-1]
+                return code
             
         except Exception as e:
             print(f"Error extracting code from message: {e}")
