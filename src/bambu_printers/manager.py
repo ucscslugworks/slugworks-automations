@@ -1,4 +1,5 @@
 import os.path
+import subprocess
 import time
 import traceback
 from datetime import datetime
@@ -35,6 +36,82 @@ pid_file_path = os.path.join(
     "..",
     "pid_bambu_printers",
 )
+
+dashboard_pid_file_path = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "..",
+    "..",
+    "pid_dashboard",
+)
+
+
+def start_dashboard():
+    """Start the dashboard process and save its PID."""
+    try:
+        logger.info("manager: Starting dashboard")
+        
+        repo_root = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", ".."
+        )
+        
+        # Open log files for stdout/stderr
+        log_file = open(os.path.join(repo_root, "dashboard.log"), "a")
+        
+        # Set environment to include the repo root in PYTHONPATH
+        import sys
+        env = os.environ.copy()
+        env['PYTHONPATH'] = repo_root + ':' + env.get('PYTHONPATH', '')
+        
+        dashboard_process = subprocess.Popen(
+            [
+                sys.executable,  # Use the same Python interpreter as the manager
+                "-m",
+                "src.bambu_printers.dashboard",
+            ],
+            cwd=repo_root,
+            stdout=log_file,
+            stderr=log_file,
+            env=env,
+        )
+        
+        # Save dashboard PID
+        with open(dashboard_pid_file_path, "w") as f:
+            f.write(str(dashboard_process.pid))
+        
+        logger.info(f"manager: Dashboard started (pid={dashboard_process.pid})")
+        return dashboard_process
+    except Exception:
+        logger.error(f"manager: Failed to start dashboard: {traceback.format_exc()}")
+        return None
+
+
+def stop_dashboard(dashboard_process):
+    """Stop the dashboard process gracefully."""
+    if dashboard_process is None:
+        return
+    
+    try:
+        logger.info(f"manager: Stopping dashboard (pid={dashboard_process.pid})")
+        dashboard_process.terminate()
+        
+        # Wait up to 10 seconds for graceful shutdown
+        try:
+            dashboard_process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            logger.warning("manager: Dashboard did not stop gracefully, killing it")
+            dashboard_process.kill()
+            dashboard_process.wait()
+        
+        logger.info("manager: Dashboard stopped")
+    except Exception:
+        logger.error(f"manager: Error stopping dashboard: {traceback.format_exc()}")
+    finally:
+        # Clean up PID file
+        if os.path.exists(dashboard_pid_file_path):
+            try:
+                os.remove(dashboard_pid_file_path)
+            except Exception:
+                pass
 
 
 def load_policy_lists():
@@ -548,7 +625,12 @@ def build_usage_rows(db: bambu_db.BambuDB):
 
 
 def manager():
+    dashboard_process = None
     logger.info("manager: Starting setup")
+    
+    # Start dashboard
+    dashboard_process = start_dashboard()
+    
     account = get_account()
     db = get_db()
     sf = get_start_form()
@@ -649,10 +731,15 @@ def manager():
         # stop the account refresh thread
         logger.info("manager: Stopping account refresh thread")
         account.stop_refresh_thread()
+        
+        # stop the dashboard
+        stop_dashboard(dashboard_process)
 
     # if any other exception is raised, log it and stop the program
     except Exception:
         logger.error(f"manager: {traceback.format_exc()}")
+        # stop the dashboard
+        stop_dashboard(dashboard_process)
 
     # remove the pid file if it exists
     if os.path.exists(pid_file_path):
