@@ -170,3 +170,8 @@ logs/
 /BambuPrinterManager.log.jsonl*
 /pid_*
 *.pem
+
+# Sensitive credentials - never commit
+common/
+common.tar
+*.tar
