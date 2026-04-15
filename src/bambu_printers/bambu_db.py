@@ -476,18 +476,18 @@ class BambuDB:
         try:
             totals = {}
             
-            # Get cumulative totals from archive with date filter
+            # Get cumulative totals from archive with date filter (using start_time column)
             archive_results = sql(
-                "SELECT cruzid, SUM(weight) FROM prints_archive WHERE status != ? AND timestamp BETWEEN ? AND ? GROUP BY cruzid",
+                "SELECT cruzid, SUM(weight) FROM prints_archive WHERE status != ? AND start_time BETWEEN ? AND ? GROUP BY cruzid",
                 ("EXPIRED", start_time, end_time),
             ).fetchall()
             
             for cruzid, weight in archive_results:
                 totals[cruzid] = round(weight, 2)
             
-            # Add current prints with date filter
+            # Add current prints with date filter (using start_time column)
             current_results = sql(
-                "SELECT cruzid, SUM(weight) FROM prints_current WHERE timestamp BETWEEN ? AND ? GROUP BY cruzid",
+                "SELECT cruzid, SUM(weight) FROM prints_current WHERE start_time BETWEEN ? AND ? GROUP BY cruzid",
                 (start_time, end_time),
             ).fetchall()
             
