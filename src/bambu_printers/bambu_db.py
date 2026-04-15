@@ -442,6 +442,66 @@ class BambuDB:
             self.logger.error(f"get_usage_totals: {traceback.format_exc()}")
             return {}
 
+    def get_quarterly_usage_totals(self, start_time: int = None, end_time: int = None):
+        """Get usage totals for a specific quarter.
+        
+        Args:
+            start_time: Unix timestamp for quarter start. If None, uses current quarter start.
+            end_time: Unix timestamp for quarter end. If None, uses current quarter end.
+            
+        Returns:
+            Dict with cruzid as key and total weight in grams as value.
+        """
+        if start_time is None or end_time is None:
+            from datetime import datetime
+            now = datetime.now()
+            quarter = (now.month - 1) // 3 + 1
+            
+            if quarter == 1:
+                start = datetime(now.year, 1, 1)
+                end = datetime(now.year, 3, 31, 23, 59, 59)
+            elif quarter == 2:
+                start = datetime(now.year, 4, 1)
+                end = datetime(now.year, 6, 30, 23, 59, 59)
+            elif quarter == 3:
+                start = datetime(now.year, 7, 1)
+                end = datetime(now.year, 9, 30, 23, 59, 59)
+            else:  # Q4
+                start = datetime(now.year, 10, 1)
+                end = datetime(now.year, 12, 31, 23, 59, 59)
+            
+            start_time = int(start.timestamp())
+            end_time = int(end.timestamp())
+        
+        try:
+            totals = {}
+            
+            # Get cumulative totals from archive with date filter
+            archive_results = sql(
+                "SELECT cruzid, SUM(weight) FROM prints_archive WHERE status != ? AND timestamp BETWEEN ? AND ? GROUP BY cruzid",
+                ("EXPIRED", start_time, end_time),
+            ).fetchall()
+            
+            for cruzid, weight in archive_results:
+                totals[cruzid] = round(weight, 2)
+            
+            # Add current prints with date filter
+            current_results = sql(
+                "SELECT cruzid, SUM(weight) FROM prints_current WHERE timestamp BETWEEN ? AND ? GROUP BY cruzid",
+                (start_time, end_time),
+            ).fetchall()
+            
+            for cruzid, weight in current_results:
+                if cruzid in totals:
+                    totals[cruzid] = round(totals[cruzid] + weight, 2)
+                else:
+                    totals[cruzid] = round(weight, 2)
+            
+            return totals
+        except Exception:
+            self.logger.error(f"get_quarterly_usage_totals: {traceback.format_exc()}")
+            return {}
+
     def get_active_prints_by_cruzid(self, cruzid: str):
         try:
             return sql(

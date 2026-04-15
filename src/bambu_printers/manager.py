@@ -590,7 +590,7 @@ def build_usage_rows(db: bambu_db.BambuDB):
     """Build rows for the usage sheet: [cruzid, used_g, remaining_g, status, last_updated]."""
     exemptions, bans = load_policy_lists()
     limits = db.get_limits_snapshot()
-    usage_totals = db.get_usage_totals()
+    usage_totals = db.get_quarterly_usage_totals()
 
     rows = [["cruzid", "used_g", "remaining_g", "status", "last_updated"]]
     now_text = _human_pst_now()

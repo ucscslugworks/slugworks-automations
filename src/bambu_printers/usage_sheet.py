@@ -81,19 +81,38 @@ class UsageSheet:
             exit(1)
 
     def update(self, rows):
-        """Update the usage sheet with provided rows (including header)."""
-        if not rows:
+        """Update the usage sheet with provided rows (including header).
+        
+        Filters out users with no filament usage this quarter.
+        Only includes rows where used_g > 0.
+        """
+        if not rows or len(rows) < 1:
             self.logger.info("update: No usage rows to write")
             return
+        
+        # Keep header row
+        header = rows[0]
+        data_rows = rows[1:]
+        
+        # Filter out rows with 0 usage (index 1 is "used_g" column)
+        filtered_rows = [row for row in data_rows if len(row) > 1 and float(row[1]) > 0]
+        
+        if not filtered_rows:
+            self.logger.info("update: No users with usage this quarter")
+            return
+        
+        # Combine header with filtered data
+        rows_to_write = [header] + filtered_rows
+        
         try:
-            end_col = chr(ord("A") + len(rows[0]) - 1)
+            end_col = chr(ord("A") + len(rows_to_write[0]) - 1)
             self.g_sheets.values().update(
                 spreadsheetId=USAGE_SHEET_ID,
-                range=f"{USAGE_SHEET_NAME}!A1:{end_col}{len(rows)}",
+                range=f"{USAGE_SHEET_NAME}!A1:{end_col}{len(rows_to_write)}",
                 valueInputOption="USER_ENTERED",
-                body={"values": rows},
+                body={"values": rows_to_write},
             ).execute()
-            self.logger.info(f"update: Wrote {len(rows)-1} user rows to usage sheet")
+            self.logger.info(f"update: Wrote {len(filtered_rows)} user rows to usage sheet (quarterly usage only)")
         except Exception:
             self.logger.error(f"update: {traceback.format_exc()}")
 
