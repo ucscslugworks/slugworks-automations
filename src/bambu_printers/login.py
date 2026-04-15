@@ -131,7 +131,6 @@ Examples:
         
         print("Login successful!")
         print(f"Token saved to: {auth.token_file}")
-        print(f"Token: {token[:20]}...{token[-20:]}")
         
         # Test token if requested
         if args.test:
