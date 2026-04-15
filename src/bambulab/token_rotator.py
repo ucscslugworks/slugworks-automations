@@ -244,6 +244,43 @@ class TokenRotationService:
             self.log(f"Token is {info['age_days']} days old ({days_left} days remaining)")
             return True
     
+    def rotate_token_with_refresh(self, refresh_token: str) -> bool:
+        """
+        Rotate token using refresh token (no email verification needed).
+        
+        This is the most reliable method as it doesn't require
+        receiving a new verification code via email.
+        
+        Args:
+            refresh_token: Valid refresh token from config
+            
+        Returns:
+            True if successful, False otherwise
+            
+        Example:
+            >>> from src.bambulab import ConfigManager
+            >>> config = ConfigManager.get_all_bambu_config()
+            >>> service.rotate_token_with_refresh(config['refreshToken'])
+        """
+        try:
+            self.log("Rotating token using refresh token...")
+            new_token = self.authenticator.refresh_token(refresh_token)
+            
+            if new_token:
+                self.log("✓ Token rotated successfully via refresh!")
+                self.log(f"  New token: {new_token[:20]}...{new_token[-20:]}")
+                return True
+            else:
+                self.log("✗ Refresh returned empty token")
+                return False
+                
+        except BambuAuthError as e:
+            self.log(f"✗ Token refresh failed: {e}")
+            return False
+        except Exception as e:
+            self.log(f"✗ Unexpected error during refresh: {e}")
+            return False
+    
     def force_rotate(self) -> bool:
         """
         Force token rotation regardless of age.

@@ -114,6 +114,38 @@ def cmd_rotate(args):
         sys.exit(1)
 
 
+def cmd_rotate_refresh(args):
+    """Rotate token using refresh token (no email verification needed)"""
+    config = load_config()
+    refresh_token = config.get("refreshToken")
+    
+    if not refresh_token:
+        print("\n✗ Error: No refresh token found in common/bambu.json")
+        sys.exit(1)
+    
+    username, password = get_credentials()
+    
+    service = TokenRotationService(
+        username=username,
+        password=password
+    )
+    
+    print("\n" + "=" * 60)
+    print("BAMBU LAB TOKEN ROTATION (Refresh Method)")
+    print("=" * 60)
+    print(f"Using refresh token to get new access token...")
+    
+    success = service.rotate_token_with_refresh(refresh_token)
+    
+    print("=" * 60)
+    if success:
+        print("✓ Token rotation successful!")
+        sys.exit(0)
+    else:
+        print("✗ Token rotation failed!")
+        sys.exit(1)
+
+
 def cmd_check(args):
     """Check and rotate if needed"""
     username, password = get_credentials()
@@ -260,6 +292,12 @@ Examples:
         help='Use automatic email code retrieval'
     )
     
+    # Rotate with refresh command (new - preferred method)
+    subparsers.add_parser(
+        'rotate-refresh',
+        help='Rotate token using refresh token (no email needed)'
+    )
+    
     # Check command
     subparsers.add_parser('check', help='Check and rotate if needed')
     
@@ -294,6 +332,8 @@ Examples:
         cmd_status(args)
     elif args.command == 'rotate':
         cmd_rotate(args)
+    elif args.command == 'rotate-refresh':
+        cmd_rotate_refresh(args)
     elif args.command == 'check':
         cmd_check(args)
     elif args.command == 'scheduler':

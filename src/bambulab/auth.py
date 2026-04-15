@@ -423,6 +423,53 @@ class BambuAuthenticator:
         except:
             return False
     
+    def refresh_token(self, refresh_token: str) -> Optional[str]:
+        """
+        Refresh an access token using a refresh token.
+        
+        This is more reliable than re-authenticating with email verification,
+        as it doesn't require receiving a new verification code.
+        
+        Args:
+            refresh_token: Valid refresh token from previous login
+        
+        Returns:
+            New access token if successful, None if refresh fails
+            
+        Raises:
+            BambuAuthError: If refresh request fails
+        
+        Example:
+            >>> auth = BambuAuthenticator()
+            >>> new_token = auth.refresh_token(old_refresh_token)
+        """
+        refresh_payload = {
+            "refreshToken": refresh_token
+        }
+        
+        try:
+            response = self.session.post(
+                f"{self.base_url}/v1/user-service/user/refresh",
+                json=refresh_payload,
+                timeout=30
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            new_token = data.get("accessToken")
+            
+            if new_token:
+                self.save_token(new_token)
+                return new_token
+            else:
+                error_msg = data.get("message", data.get("error", "Token refresh failed"))
+                raise BambuAuthError(f"Token refresh failed: {error_msg}")
+                
+        except requests.exceptions.RequestException as e:
+            raise BambuAuthError(f"Network error during token refresh: {e}")
+        except json.JSONDecodeError as e:
+            raise BambuAuthError(f"Invalid response during token refresh: {e}")
+    
     def get_or_create_token(
         self,
         username: Optional[str] = None,
