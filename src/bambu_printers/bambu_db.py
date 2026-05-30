@@ -502,6 +502,30 @@ class BambuDB:
             self.logger.error(f"get_quarterly_usage_totals: {traceback.format_exc()}")
             return {}
 
+    def has_tracked_print(self, printer_name: str, printer_start_time: int):
+        """Whether any tracked print (current or unmatched cloud task) exists for
+        this printer near the given start time. Used to detect prints started
+        directly on the printer that bypassed the cloud-upload pipeline."""
+        try:
+            window = constants.BAMBU_TIMEOUT
+            lo = printer_start_time - window
+            hi = printer_start_time + window
+            if sql(
+                "SELECT 1 FROM prints_current WHERE printer = ? AND start_time BETWEEN ? AND ? LIMIT 1",
+                (printer_name, lo, hi),
+            ).fetchone():
+                return True
+            if sql(
+                "SELECT 1 FROM prints_unmatched WHERE printer = ? AND start_time BETWEEN ? AND ? LIMIT 1",
+                (printer_name, lo, hi),
+            ).fetchone():
+                return True
+            return False
+        except Exception:
+            self.logger.error(f"has_tracked_print: {traceback.format_exc()}")
+            # Fail safe: assume tracked so we don't cancel a legit print on a query error
+            return True
+
     def get_active_prints_by_cruzid(self, cruzid: str):
         try:
             return sql(

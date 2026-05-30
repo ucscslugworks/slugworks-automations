@@ -176,7 +176,12 @@ def get_new_prints(account: bambu_account.BambuAccount, db: bambu_db.BambuDB):
     # Get the latest cloud tasks from the account
     tasks = account.get_tasks()
 
-    # if nothing was returned (possibly because an error occurred) set to empty list
+    # Distinguish API failure (None) from a legitimately empty task list ([]):
+    # if the cloud fetch failed we must not later treat running printers as
+    # "unauthorized" — we just don't have the data to make that call.
+    if tasks is None:
+        logger.warning("manager: get_tasks returned None - cloud API likely failed")
+        return False
     if not tasks:
         tasks = []
 
@@ -228,6 +233,54 @@ def get_new_prints(account: bambu_account.BambuAccount, db: bambu_db.BambuDB):
             colors[3][0],  # color 3 hex code
             colors[3][1],  # color 3 weight
         )
+
+    return True
+
+
+# Grace period from MQTT-reported print start before we'll consider a running
+# printer "unauthorized". Covers cloud-task API lag and a few manager loops.
+UNAUTHORIZED_GRACE_SECONDS = 3 * 60
+
+
+def check_unauthorized_prints(
+    printers: dict[str, bambu_printer.Printer],
+    db: bambu_db.BambuDB,
+    timestamp: float,
+):
+    """Cancel prints that bypassed the cloud-upload pipeline.
+
+    Loophole: user sends a print from Bambu Studio (creates a tracked cloud
+    task), cancels it (refunding their weight), then starts a print directly
+    from the printer's screen. The second print creates no cloud task, so it
+    runs untracked against their filament limit. Detection: printer reports
+    RUNNING/PAUSE but no cloud task exists for it near the printer-reported
+    start time.
+    """
+    for name, printer in printers.items():
+        if printer.get_status() not in (
+            constants.GCODE_RUNNING,
+            constants.GCODE_PAUSE,
+        ):
+            continue
+        if printer.start_time <= 0:
+            continue
+        if timestamp - printer.start_time < UNAUTHORIZED_GRACE_SECONDS:
+            continue
+        if db.has_tracked_print(name, printer.start_time):
+            continue
+
+        logger.warning(
+            f"manager: Unauthorized print on {name} "
+            f"(start_time={printer.start_time}, file={printer.gcode_file!r}) "
+            "- no cloud task found, canceling"
+        )
+        try:
+            printer.cancel()
+        except Exception:
+            logger.error(
+                f"manager: Failed to cancel unauthorized print on {name}: "
+                f"{traceback.format_exc()}"
+            )
 
 
 def categorize_forms(db: bambu_db.BambuDB, timestamp: float):
@@ -683,7 +736,7 @@ def manager():
 
                 # get the latest prints from the account
                 logger.info("manager: Checking for new prints")
-                get_new_prints(account, db)
+                cloud_ok = get_new_prints(account, db)
 
                 # check unmatched form responses - either mark them as old or current
                 logger.info("manager: Checking unmatched form responses")
@@ -706,6 +759,16 @@ def manager():
                 # check the printers - update the db based on the status of each print that's actually running
                 logger.info("manager: Updating printers and print statuses")
                 update_printers(printers, current_prints, timestamp, db)
+
+                # catch the start-from-printer loophole: running with no cloud
+                # task. Skip if the cloud fetch failed - we can't tell yet.
+                if cloud_ok:
+                    logger.info("manager: Checking for unauthorized prints")
+                    check_unauthorized_prints(printers, db, timestamp)
+                else:
+                    logger.warning(
+                        "manager: Skipping unauthorized print check (cloud fetch failed)"
+                    )
 
                 # update the status sheet with the latest data
                 logger.info("manager: Updating status sheet")
