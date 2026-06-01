@@ -17,6 +17,7 @@ from src.bambu_printers import (
     get_start_form,
     get_status_sheet,
     get_usage_sheet,
+    notifications,
     start_form,
     status_sheet,
     usage_sheet,
@@ -45,6 +46,12 @@ dashboard_pid_file_path = os.path.join(
     "..",
     "pid_dashboard",
 )
+
+# Grace period after the manager (re)starts before we'll cancel or expire
+# anything. A restart loses all in-memory printer state, so we give MQTT, the
+# cloud task list, and the db time to repopulate before acting on them -
+# otherwise a restart while prints are running could cancel legitimate prints.
+STARTUP_GRACE_SECONDS = 5 * 60
 
 
 def start_dashboard():
@@ -333,6 +340,9 @@ def eval_old_print(
                 db.match(u_print[0], form_row)
                 printers[u_print[1]].cancel()
                 db.archive_print(u_print[0], constants.PRINT_CANCELED)
+                notifications.notify_canceled(
+                    db, cruzid, u_print[2], notifications.REASON_BANNED
+                )
                 logger.debug(
                     f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - user {cruzid} is banned"
                 )
@@ -342,6 +352,9 @@ def eval_old_print(
                     db.match(u_print[0], form_row)
                     printers[u_print[1]].cancel()
                     db.archive_print(u_print[0], constants.PRINT_CANCELED)
+                    notifications.notify_canceled(
+                        db, cruzid, u_print[2], notifications.REASON_INSUFFICIENT_WEIGHT
+                    )
                     logger.debug(
                         f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - user {cruzid} has insufficient weight (needs {u_print[6]}g, has {remaining}g)"
                     )
@@ -351,6 +364,9 @@ def eval_old_print(
                         db.match(u_print[0], form_row)
                         printers[u_print[1]].cancel()
                         db.archive_print(u_print[0], constants.PRINT_CANCELED)
+                        notifications.notify_canceled(
+                            db, cruzid, u_print[2], notifications.REASON_CONCURRENCY
+                        )
                         logger.debug(
                             f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - user {cruzid} already has an active print"
                         )
@@ -414,6 +430,9 @@ def match_print(
     if cruzid in bans:
         printers[u_print[1]].cancel()
         db.archive_print(u_print[0], constants.PRINT_CANCELED)
+        notifications.notify_canceled(
+            db, cruzid, u_print[2], notifications.REASON_BANNED
+        )
         logger.debug(
             f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - user {cruzid} is banned"
         )
@@ -426,6 +445,9 @@ def match_print(
         if any(p[0] != u_print[0] for p in active):
             printers[u_print[1]].cancel()
             db.archive_print(u_print[0], constants.PRINT_CANCELED)
+            notifications.notify_canceled(
+                db, cruzid, u_print[2], notifications.REASON_CONCURRENCY
+            )
             logger.debug(
                 f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - user {cruzid} already has an active print"
             )
@@ -438,6 +460,9 @@ def match_print(
         printers[u_print[1]].cancel()
         # archive the print as canceled
         db.archive_print(u_print[0], constants.PRINT_CANCELED)
+        notifications.notify_canceled(
+            db, cruzid, u_print[2], notifications.REASON_INSUFFICIENT_WEIGHT
+        )
 
         logger.debug(
             f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - new form/print, still running, user {cruzid} has insufficient weight"
@@ -518,10 +543,13 @@ def check_current_prints(db: bambu_db.BambuDB, timestamp: float):
                         current_prints[c_print[3]][0],
                         constants.PRINT_CANCELED,
                     )
-                    # add the print weight back to the user's limit
-                    db.subtract_limit(
+                    # the weight stays debited - canceled prints count against
+                    # the user's filament usage (machine-error refunds are a
+                    # manual staff appeal)
+                    notifications.notify_failed(
+                        db,
                         current_prints[c_print[3]][2],
-                        -1 * current_prints[c_print[3]][8],
+                        current_prints[c_print[3]][4],
                     )
                 else:
                     # if the print's end time is in the past, the print probably succeeded
@@ -532,6 +560,11 @@ def check_current_prints(db: bambu_db.BambuDB, timestamp: float):
                     db.archive_print(
                         current_prints[c_print[3]][0],
                         constants.PRINT_SUCCEEDED,
+                    )
+                    notifications.notify_succeeded(
+                        db,
+                        current_prints[c_print[3]][2],
+                        current_prints[c_print[3]][4],
                     )
 
                 logger.debug(
@@ -562,18 +595,25 @@ def update_printers(
                     # if the printer status is finish, the print succeeded
                     logger.debug(f"manager: Print {print_details[0]} succeeded")
                     db.archive_print(print_details[0], constants.PRINT_SUCCEEDED)
+                    notifications.notify_succeeded(
+                        db, print_details[2], print_details[4]
+                    )
                 elif printer.get_status() == constants.GCODE_FAILED:
                     # if the printer status is failed, the print failed
                     logger.debug(f"manager: Print {print_details[0]} failed")
                     db.archive_print(print_details[0], constants.PRINT_FAILED)
-                    # add the print weight back to the user's limit
-                    db.subtract_limit(print_details[2], -1 * print_details[8])
+                    # the weight stays debited - failed prints count against the
+                    # user's filament usage (machine-error refunds are a manual
+                    # staff appeal)
+                    notifications.notify_failed(db, print_details[2], print_details[4])
                 elif printer.get_status() == constants.GCODE_IDLE:
                     # if the printer status is idle, the print was canceled
                     logger.debug(f"manager: Print {print_details[0]} canceled")
                     db.archive_print(print_details[0], constants.PRINT_CANCELED)
-                    # add the print weight back to the user's limit
-                    db.subtract_limit(print_details[2], -1 * print_details[8])
+                    # the weight stays debited - canceled prints count against the
+                    # user's filament usage (machine-error refunds are a manual
+                    # staff appeal)
+                    notifications.notify_failed(db, print_details[2], print_details[4])
                 else:
                     # if the printer status is not finish, failed, or idle, the print is still in progress
                     running = True
@@ -703,7 +743,10 @@ def build_usage_rows(db: bambu_db.BambuDB):
 def manager():
     dashboard_process = None
     logger.info("manager: Starting setup")
-    
+
+    # time the manager (re)started - used for the startup grace period below
+    manager_start_time = int(time.time())
+
     # Start dashboard
     dashboard_process = start_dashboard()
     
@@ -738,19 +781,32 @@ def manager():
                 logger.info("manager: Checking for new prints")
                 cloud_ok = get_new_prints(account, db)
 
-                # check unmatched form responses - either mark them as old or current
-                logger.info("manager: Checking unmatched form responses")
-                current_form_rows, old_form_rows = categorize_forms(db, timestamp)
-
-                # check unmatched prints - either match them with forms or expire them
-                logger.info("manager: Checking unmatched prints for expiry/matching")
-                check_unmatched_prints(
-                    db, timestamp, current_form_rows, old_form_rows, printers
+                # within the startup grace period, skip everything that can cancel
+                # or expire a print (form matching/expiry and the unauthorized
+                # check) - a restart loses the in-memory printer state, so we wait
+                # for it to repopulate before acting on it
+                in_startup_grace = (
+                    timestamp - manager_start_time < STARTUP_GRACE_SECONDS
                 )
+                if in_startup_grace:
+                    logger.warning(
+                        "manager: In startup grace period, skipping form matching and unauthorized print checks"
+                    )
 
-                # expire any forms that were not matched and are older than 10 minutes
-                logger.info("manager: Expiring old forms")
-                expire_old_forms(old_form_rows, db, timestamp)
+                if not in_startup_grace:
+                    # check unmatched form responses - either mark them as old or current
+                    logger.info("manager: Checking unmatched form responses")
+                    current_form_rows, old_form_rows = categorize_forms(db, timestamp)
+
+                    # check unmatched prints - either match them with forms or expire them
+                    logger.info("manager: Checking unmatched prints for expiry/matching")
+                    check_unmatched_prints(
+                        db, timestamp, current_form_rows, old_form_rows, printers
+                    )
+
+                    # expire any forms that were not matched and are older than 10 minutes
+                    logger.info("manager: Expiring old forms")
+                    expire_old_forms(old_form_rows, db, timestamp)
 
                 # create a list of "current prints" - prints that should be running based on db
                 logger.info("manager: Checking current prints for status changes")
@@ -761,11 +817,12 @@ def manager():
                 update_printers(printers, current_prints, timestamp, db)
 
                 # catch the start-from-printer loophole: running with no cloud
-                # task. Skip if the cloud fetch failed - we can't tell yet.
-                if cloud_ok:
+                # task. Skip if the cloud fetch failed - we can't tell yet - or
+                # during the startup grace period.
+                if cloud_ok and not in_startup_grace:
                     logger.info("manager: Checking for unauthorized prints")
                     check_unauthorized_prints(printers, db, timestamp)
-                else:
+                elif not cloud_ok:
                     logger.warning(
                         "manager: Skipping unauthorized print check (cloud fetch failed)"
                     )
