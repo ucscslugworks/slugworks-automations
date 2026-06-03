@@ -314,6 +314,23 @@ def categorize_forms(db: bambu_db.BambuDB, timestamp: float):
     return current_rows, old_rows
 
 
+def _print_is_live(printer: bambu_printer.Printer, u_print: tuple) -> bool:
+    """True if u_print is the print physically running on its printer right now.
+
+    Old/expired prints still get reconciled in the db on restart, but we must
+    never call printer.cancel() for them: cancel() stops whatever is currently
+    on that physical printer, so acting on a stale historical print (e.g. the
+    backlog pulled in after the manager was down for a while) would kill a
+    legitimate running print. Only cancel when the print we're acting on is the
+    one actually on the machine, matched by live start time.
+    """
+    return (
+        printer.get_status() in (constants.GCODE_RUNNING, constants.GCODE_PAUSE)
+        and printer.start_time > 0
+        and abs(printer.start_time - u_print[4]) <= 90
+    )
+
+
 def eval_old_print(
     old_rows: dict[int, tuple],
     u_print: tuple,
@@ -338,7 +355,8 @@ def eval_old_print(
             exemptions, bans = load_policy_lists()
             if cruzid in bans:
                 db.match(u_print[0], form_row)
-                printers[u_print[1]].cancel()
+                if _print_is_live(printers[u_print[1]], u_print):
+                    printers[u_print[1]].cancel()
                 db.archive_print(u_print[0], constants.PRINT_CANCELED)
                 notifications.notify_canceled(
                     db, cruzid, u_print[2], notifications.REASON_BANNED
@@ -350,7 +368,8 @@ def eval_old_print(
                 remaining = db.get_limit(cruzid)
                 if remaining < u_print[6]:
                     db.match(u_print[0], form_row)
-                    printers[u_print[1]].cancel()
+                    if _print_is_live(printers[u_print[1]], u_print):
+                        printers[u_print[1]].cancel()
                     db.archive_print(u_print[0], constants.PRINT_CANCELED)
                     notifications.notify_canceled(
                         db, cruzid, u_print[2], notifications.REASON_INSUFFICIENT_WEIGHT
@@ -362,7 +381,8 @@ def eval_old_print(
                     active = db.get_active_prints_by_cruzid(cruzid)
                     if any(p[0] != u_print[0] for p in active):
                         db.match(u_print[0], form_row)
-                        printers[u_print[1]].cancel()
+                        if _print_is_live(printers[u_print[1]], u_print):
+                            printers[u_print[1]].cancel()
                         db.archive_print(u_print[0], constants.PRINT_CANCELED)
                         notifications.notify_canceled(
                             db, cruzid, u_print[2], notifications.REASON_CONCURRENCY
@@ -392,15 +412,19 @@ def eval_old_print(
         # if the print was not matched, expire it
         logger.debug(f"manager: Expiring print {u_print[0]} - old print, no form found")
         db.expire_print(u_print[0])
-        try:
-            printers[u_print[1]].cancel()
-            logger.debug(
-                f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - no form found"
-            )
-        except Exception:
-            logger.warning(
-                f"manager: Failed to cancel printer {u_print[1]} for unmatched print {u_print[0]}"
-            )
+        # Only stop the machine if this expired print is the one actually
+        # running now - otherwise we'd cancel an unrelated live print (e.g. the
+        # historical backlog reconciled after a long downtime).
+        if _print_is_live(printers[u_print[1]], u_print):
+            try:
+                printers[u_print[1]].cancel()
+                logger.debug(
+                    f"manager: Canceling printer {u_print[1]}, id {u_print[0]} - no form found"
+                )
+            except Exception:
+                logger.warning(
+                    f"manager: Failed to cancel printer {u_print[1]} for unmatched print {u_print[0]}"
+                )
 
     return current_rows, old_rows
 
