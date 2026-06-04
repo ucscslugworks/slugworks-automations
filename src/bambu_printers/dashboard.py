@@ -1,12 +1,10 @@
-"""
-Flask dashboard for Bambu Lab printer management.
-Routes:
-  /dashboard - Home page
-  /dashboard/printers - Control printers (stop prints)
-  /dashboard/prints - View prints with cloud photos
-  /dashboard/users - Manage user limits, exemptions, bans
-  /dashboard/inventory - View & manage filament inventory
-"""
+# flask dashboard for bambu printer management
+# routes:
+#   /dashboard - home page
+#   /dashboard/printers - control printers (stop prints)
+#   /dashboard/prints - view prints with cloud photos
+#   /dashboard/users - manage user limits, exemptions, bans
+#   /dashboard/inventory - view & manage filament inventory
 
 import json
 import os
@@ -71,7 +69,7 @@ class Dashboard:
         )
         os.makedirs(template_dir, exist_ok=True)
         os.makedirs(static_dir, exist_ok=True)
-        
+
         self.app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
         self.auth_config = self.load_auth_config()
         self.app.secret_key = self.auth_config.get("secret_key") or os.urandom(32)
@@ -174,7 +172,7 @@ class Dashboard:
         return wrapper
 
     def init_inventory_db(self):
-        """Initialize filament inventory database."""
+        # initialize the filament inventory database
         conn = sqlite3.connect(INVENTORY_DB)
         cursor = conn.cursor()
         cursor.execute(
@@ -312,11 +310,11 @@ class Dashboard:
                 device_info = devices[printer_name]
                 logger.info(f"cancel_print: Getting printer object for {printer_name}")
                 printer = get_printer(printer_name, device_info)
-                
+
                 if not printer:
                     logger.error(f"cancel_print: Failed to instantiate printer {printer_name}")
                     return jsonify({"error": "Failed to connect to printer"}), 500
-                
+
                 logger.info(f"cancel_print: Calling cancel() on {printer_name}")
                 result = printer.cancel()
                 logger.info(f"cancel_print: Cancel result for {printer_name}: {result}")
@@ -332,12 +330,12 @@ class Dashboard:
                 # Get both current and archived prints
                 current = self.db.get_current_prints()
                 archive = self.db.get_print_archive()
-                
+
                 # Combine and sort by print ID (descending for newest first)
                 all_prints = list(current) + list(archive)
                 all_prints.sort(key=lambda x: x[0], reverse=True)
                 all_prints = all_prints[:100]
-                
+
                 # Eagerly download photos from active prints (cloud links expire fast)
                 for print_row in all_prints:
                     print_id = print_row[0]
@@ -359,7 +357,7 @@ class Dashboard:
                             ).fetchone()
                             if result:
                                 cover_url = result[0]
-                            
+
                             # Fall back to archive
                             if not cover_url:
                                 result = cursor.execute(
@@ -368,9 +366,9 @@ class Dashboard:
                                 ).fetchone()
                                 if result:
                                     cover_url = result[0]
-                            
+
                             conn.close()
-                            
+
                             if cover_url:
                                 self.download_photo(cover_url, print_id)
                                 logger.debug(
@@ -378,7 +376,7 @@ class Dashboard:
                                 )
                         except Exception as e:
                             logger.debug(f"prints_view: Failed to fetch photo for {print_id}: {e}")
-                
+
                 logger.info(f"prints_view: Retrieved {len(all_prints)} prints (current + archive)")
                 return render_template("dashboard_prints.html", prints=all_prints)
             except Exception:
@@ -458,28 +456,28 @@ class Dashboard:
         def api_users():
             try:
                 exemptions, bans = self.load_policy_lists()
-                
+
                 # Get current limits column name
                 from datetime import datetime
                 column = f"weight_{datetime.now().year}_{(datetime.now().month - 1) // 3}"
-                
+
                 # Query directly from DB to avoid recursive cursor issues
                 conn = sqlite3.connect(os.path.join(
                     os.path.dirname(os.path.abspath(__file__)), "bambu.db"
                 ))
                 cursor = conn.cursor()
-                
+
                 # Get limits
                 cursor.execute(f"SELECT cruzid, {column} FROM limits")
                 limits = cursor.fetchall()
-                
+
                 # Get usage (sum of weights from prints_archive)
                 cursor.execute("SELECT cruzid, SUM(weight) FROM prints_archive GROUP BY cruzid")
                 usage_rows = cursor.fetchall()
                 usage_map = {row[0]: row[1] if row[1] is not None else 0 for row in usage_rows}
-                
+
                 conn.close()
-                
+
                 users = []
                 for row in limits:
                     cruzid = row[0]
@@ -662,17 +660,17 @@ class Dashboard:
                 logger.info(
                     f"move_filament: Moved {quantity} packages to {printer} AMS slot {ams_slot}"
                 )
-                
+
                 # Check stock levels and send alert if low
                 self.check_and_alert_stock()
-                
+
                 return jsonify({"success": True})
             except Exception as e:
                 logger.error(f"move_filament: {traceback.format_exc()}")
                 return jsonify({"error": str(e)}), 500
 
     def download_photo(self, url, print_id):
-        """Download print photo from URL and save locally."""
+        # download a print photo from the url and save it locally
         try:
             resp = requests.get(url, timeout=10)
             if resp.status_code == 200:
@@ -684,7 +682,7 @@ class Dashboard:
             logger.warning(f"download_photo: Failed to download for {print_id}")
 
     def load_policy_lists(self):
-        """Load ban and exemption lists from common/."""
+        # load the ban and exemption lists from common/
         exemptions = set()
         bans = set()
         base_dir = os.path.join(
@@ -715,7 +713,7 @@ class Dashboard:
         return exemptions, bans
 
     def toggle_exemption(self, cruzid, enable):
-        """Add or remove cruzid from exemption list."""
+        # add or remove a cruzid from the exemption list
         base_dir = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "..", "..", "common"
         )
@@ -744,7 +742,7 @@ class Dashboard:
             if os.path.exists(bambu_exempt_path):
                 with open(bambu_exempt_path, "r") as f:
                     bambu_exemptions = json.load(f)
-                
+
                 if enable:
                     if cruzid not in bambu_exemptions:
                         bambu_exemptions.append(cruzid)
@@ -758,7 +756,7 @@ class Dashboard:
             logger.error(f"toggle_exemption: {traceback.format_exc()}")
 
     def toggle_ban(self, cruzid, enable):
-        """Add or remove cruzid from ban list."""
+        # add or remove a cruzid from the ban list
         base_dir = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "..", "..", "common"
         )
@@ -784,23 +782,23 @@ class Dashboard:
             logger.error(f"toggle_ban: {traceback.format_exc()}")
 
     def check_and_alert_stock(self):
-        """Check stock levels and email staff if < 5 packages remaining."""
+        # check stock levels and email staff if < 5 packages remaining
         try:
             conn = sqlite3.connect(INVENTORY_DB)
             cursor = conn.cursor()
-            
+
             # Get total stock by type
             stock_by_type = cursor.execute(
                 "SELECT filament_type, SUM(quantity_packages) FROM inventory GROUP BY filament_type"
             ).fetchall()
-            
+
             conn.close()
-            
+
             # Check for low stock
             low_stock_items = [
                 (ftype, qty) for ftype, qty in stock_by_type if qty is not None and qty < 5
             ]
-            
+
             if low_stock_items:
                 self.send_low_stock_alert(low_stock_items)
                 logger.warning(f"Low filament stock alert sent: {low_stock_items}")
@@ -808,16 +806,16 @@ class Dashboard:
             logger.error(f"check_and_alert_stock: {traceback.format_exc()}")
 
     def send_low_stock_alert(self, low_stock_items):
-        """Send email alert when stock is low."""
+        # send an email alert when stock is low
         try:
             # Read email config from common/bambu.json or use defaults
             config_path = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)), "..", "..", "common", "bambu.json"
             )
-            
+
             email_from = "slugworks@ucsc.edu"
             email_to = "slugworks-staff@ucsc.edu"
-            
+
             try:
                 with open(config_path, "r") as f:
                     config = json.load(f)
@@ -825,30 +823,30 @@ class Dashboard:
                         email_to = config["alert_email"]
             except Exception:
                 pass
-            
+
             # Build email message
             subject = "⚠️ Low Filament Stock Alert"
             body = "The following filament types have less than 5 packages remaining:\n\n"
-            
+
             for ftype, qty in low_stock_items:
                 body += f"- {ftype}: {qty} packages\n"
-            
+
             body += "\nPlease order more filament soon."
-            
+
             # Send via Gmail (if configured) or local mail
             try:
                 import smtplib
                 from email.mime.text import MIMEText
-                
+
                 msg = MIMEText(body)
                 msg["Subject"] = subject
                 msg["From"] = email_from
                 msg["To"] = email_to
-                
+
                 # Try Gmail SMTP
                 server = smtplib.SMTP("smtp.gmail.com", 587)
                 server.starttls()
-                
+
                 with open(config_path, "r") as f:
                     config = json.load(f)
                     if "email_password" in config:
@@ -859,7 +857,7 @@ class Dashboard:
                         return
             except Exception:
                 pass
-            
+
             # Fallback: try local mail
             try:
                 server = smtplib.SMTP("localhost")

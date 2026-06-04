@@ -11,7 +11,7 @@ from googleapiclient.discovery import build
 from src import log
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-# Defaults to the provided Usage sheet
+# defaults to the provided usage sheet
 DEFAULT_SHEET_ID = "1XppmTZ--5IxVcsRWJ2nd_ioEjMHJUihbYUDHjAOh9j0"
 USAGE_SHEET_ID = os.getenv("USAGE_SHEET_ID", DEFAULT_SHEET_ID)
 USAGE_SHEET_NAME = os.getenv("USAGE_SHEET_NAME", "Sheet1")
@@ -81,29 +81,29 @@ class UsageSheet:
             exit(1)
 
     def update(self, rows):
-        """Update the usage sheet with provided rows (including header).
-        
-        Filters out users with no filament usage this quarter.
-        Only includes rows where used_g > 0.
+        """
+        Updates the usage sheet with the provided rows (including header).
+
+        Only users with usage this quarter (used_g > 0) are written.
         """
         if not rows or len(rows) < 1:
             self.logger.info("update: No usage rows to write")
             return
-        
-        # Keep header row
+
+        # keep the header row
         header = rows[0]
         data_rows = rows[1:]
-        
-        # Filter out rows with 0 usage (index 1 is "used_g" column)
+
+        # filter out rows with 0 usage (index 1 is the "used_g" column)
         filtered_rows = [row for row in data_rows if len(row) > 1 and float(row[1]) > 0]
-        
+
         if not filtered_rows:
             self.logger.info("update: No users with usage this quarter")
             return
-        
-        # Combine header with filtered data
+
+        # combine the header with the filtered data
         rows_to_write = [header] + filtered_rows
-        
+
         try:
             end_col = chr(ord("A") + len(rows_to_write[0]) - 1)
             self.g_sheets.values().update(
@@ -118,7 +118,7 @@ class UsageSheet:
 
 
 if __name__ == "__main__":
-    # Simple manual run example
+    # simple manual run example
     from src.bambu_printers import get_db
 
     db = get_db()

@@ -217,7 +217,7 @@ class BambuAccount:
             )
 
     def stop_refresh_thread(self):
-        # No background refresh thread currently; provided for compatibility
+        # no background refresh thread currently; provided for compatibility
         try:
             self.logger.info("stop_refresh_thread: No-op (no refresh thread)")
         except Exception:

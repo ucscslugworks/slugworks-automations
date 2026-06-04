@@ -1,5 +1,7 @@
+import json
 import os.path
 import subprocess
+import sys
 import time
 import traceback
 from datetime import datetime
@@ -47,33 +49,30 @@ dashboard_pid_file_path = os.path.join(
     "pid_dashboard",
 )
 
-# Grace period after the manager (re)starts before we'll cancel or expire
-# anything. A restart loses all in-memory printer state, so we give MQTT, the
-# cloud task list, and the db time to repopulate before acting on them -
-# otherwise a restart while prints are running could cancel legitimate prints.
+# grace period after a (re)start before we cancel or expire anything - lets
+# MQTT, the cloud task list, and the db repopulate first
 STARTUP_GRACE_SECONDS = 5 * 60
 
 
 def start_dashboard():
-    """Start the dashboard process and save its PID."""
+    # start the dashboard process and save its pid
     try:
         logger.info("manager: Starting dashboard")
-        
+
         repo_root = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "..", ".."
         )
-        
-        # Open log files for stdout/stderr
+
+        # open a log file for the dashboard's stdout/stderr
         log_file = open(os.path.join(repo_root, "dashboard.log"), "a")
-        
-        # Set environment to include the repo root in PYTHONPATH
-        import sys
+
+        # add the repo root to PYTHONPATH so the subprocess can import src
         env = os.environ.copy()
-        env['PYTHONPATH'] = repo_root + ':' + env.get('PYTHONPATH', '')
-        
+        env["PYTHONPATH"] = repo_root + ":" + env.get("PYTHONPATH", "")
+
         dashboard_process = subprocess.Popen(
             [
-                sys.executable,  # Use the same Python interpreter as the manager
+                sys.executable,  # use the same python interpreter as the manager
                 "-m",
                 "src.bambu_printers.dashboard",
             ],
@@ -82,11 +81,11 @@ def start_dashboard():
             stderr=log_file,
             env=env,
         )
-        
-        # Save dashboard PID
+
+        # save the dashboard pid
         with open(dashboard_pid_file_path, "w") as f:
             f.write(str(dashboard_process.pid))
-        
+
         logger.info(f"manager: Dashboard started (pid={dashboard_process.pid})")
         return dashboard_process
     except Exception:
@@ -95,27 +94,27 @@ def start_dashboard():
 
 
 def stop_dashboard(dashboard_process):
-    """Stop the dashboard process gracefully."""
+    # stop the dashboard process gracefully
     if dashboard_process is None:
         return
-    
+
     try:
         logger.info(f"manager: Stopping dashboard (pid={dashboard_process.pid})")
         dashboard_process.terminate()
-        
-        # Wait up to 10 seconds for graceful shutdown
+
+        # wait up to 10 seconds for it to stop, then kill it
         try:
             dashboard_process.wait(timeout=10)
         except subprocess.TimeoutExpired:
             logger.warning("manager: Dashboard did not stop gracefully, killing it")
             dashboard_process.kill()
             dashboard_process.wait()
-        
+
         logger.info("manager: Dashboard stopped")
     except Exception:
         logger.error(f"manager: Error stopping dashboard: {traceback.format_exc()}")
     finally:
-        # Clean up PID file
+        # remove the pid file
         if os.path.exists(dashboard_pid_file_path):
             try:
                 os.remove(dashboard_pid_file_path)
@@ -128,14 +127,12 @@ def load_policy_lists():
         base_dir = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "..", "..", "common"
         )
-        # Exemptions: support both bambu_limit_exempt.json and exemption.json
+        # exemptions - support both bambu_limit_exempt.json and exemption.json
         exemptions = []
         for fname in ("bambu_limit_exempt.json", "exemption.json"):
             fpath = os.path.join(base_dir, fname)
             if os.path.exists(fpath):
                 try:
-                    import json
-
                     with open(fpath, "r") as f:
                         data = json.load(f)
                         if isinstance(data, list):
@@ -143,13 +140,11 @@ def load_policy_lists():
                 except Exception:
                     logger.warning(f"manager: Failed to read {fname}")
 
-        # Ban list: ban.json if present
+        # bans - ban.json if present
         bans = []
         ban_path = os.path.join(base_dir, "ban.json")
         if os.path.exists(ban_path):
             try:
-                import json
-
                 with open(ban_path, "r") as f:
                     data = json.load(f)
                     if isinstance(data, list):
@@ -157,7 +152,7 @@ def load_policy_lists():
             except Exception:
                 logger.warning("manager: Failed to read ban.json")
 
-        # Deduplicate
+        # deduplicate
         return set(exemptions), set(bans)
     except Exception:
         logger.error(f"manager: {traceback.format_exc()}")
@@ -183,9 +178,8 @@ def get_new_prints(account: bambu_account.BambuAccount, db: bambu_db.BambuDB):
     # Get the latest cloud tasks from the account
     tasks = account.get_tasks()
 
-    # Distinguish API failure (None) from a legitimately empty task list ([]):
-    # if the cloud fetch failed we must not later treat running printers as
-    # "unauthorized" — we just don't have the data to make that call.
+    # None means the cloud fetch failed (vs. [] for no tasks) - don't treat
+    # running printers as unauthorized when we have no data to judge them
     if tasks is None:
         logger.warning("manager: get_tasks returned None - cloud API likely failed")
         return False
@@ -244,8 +238,8 @@ def get_new_prints(account: bambu_account.BambuAccount, db: bambu_db.BambuDB):
     return True
 
 
-# Grace period from MQTT-reported print start before we'll consider a running
-# printer "unauthorized". Covers cloud-task API lag and a few manager loops.
+# grace from the printer-reported start before a running printer counts as
+# unauthorized - covers cloud-task api lag and a few manager loops
 UNAUTHORIZED_GRACE_SECONDS = 3 * 60
 
 
@@ -254,15 +248,8 @@ def check_unauthorized_prints(
     db: bambu_db.BambuDB,
     timestamp: float,
 ):
-    """Cancel prints that bypassed the cloud-upload pipeline.
-
-    Loophole: user sends a print from Bambu Studio (creates a tracked cloud
-    task), cancels it (refunding their weight), then starts a print directly
-    from the printer's screen. The second print creates no cloud task, so it
-    runs untracked against their filament limit. Detection: printer reports
-    RUNNING/PAUSE but no cloud task exists for it near the printer-reported
-    start time.
-    """
+    # cancel prints started directly from the printer screen to dodge the cloud
+    # pipeline - printer is running but no cloud task exists near its start time
     for name, printer in printers.items():
         if printer.get_status() not in (
             constants.GCODE_RUNNING,
@@ -315,15 +302,8 @@ def categorize_forms(db: bambu_db.BambuDB, timestamp: float):
 
 
 def _print_is_live(printer: bambu_printer.Printer, u_print: tuple) -> bool:
-    """True if u_print is the print physically running on its printer right now.
-
-    Old/expired prints still get reconciled in the db on restart, but we must
-    never call printer.cancel() for them: cancel() stops whatever is currently
-    on that physical printer, so acting on a stale historical print (e.g. the
-    backlog pulled in after the manager was down for a while) would kill a
-    legitimate running print. Only cancel when the print we're acting on is the
-    one actually on the machine, matched by live start time.
-    """
+    # whether u_print is the print actually running on the printer right now -
+    # only cancel the live print, never a stale one from the backlog
     return (
         printer.get_status() in (constants.GCODE_RUNNING, constants.GCODE_PAUSE)
         and printer.start_time > 0
@@ -412,9 +392,7 @@ def eval_old_print(
         # if the print was not matched, expire it
         logger.debug(f"manager: Expiring print {u_print[0]} - old print, no form found")
         db.expire_print(u_print[0])
-        # Only stop the machine if this expired print is the one actually
-        # running now - otherwise we'd cancel an unrelated live print (e.g. the
-        # historical backlog reconciled after a long downtime).
+        # only cancel the printer if this expired print is the one running now
         if _print_is_live(printers[u_print[1]], u_print):
             try:
                 printers[u_print[1]].cancel()
@@ -567,9 +545,7 @@ def check_current_prints(db: bambu_db.BambuDB, timestamp: float):
                         current_prints[c_print[3]][0],
                         constants.PRINT_CANCELED,
                     )
-                    # the weight stays debited - canceled prints count against
-                    # the user's filament usage (machine-error refunds are a
-                    # manual staff appeal)
+                    # weight stays debited - canceled prints still count against usage
                     notifications.notify_failed(
                         db,
                         current_prints[c_print[3]][2],
@@ -626,17 +602,13 @@ def update_printers(
                     # if the printer status is failed, the print failed
                     logger.debug(f"manager: Print {print_details[0]} failed")
                     db.archive_print(print_details[0], constants.PRINT_FAILED)
-                    # the weight stays debited - failed prints count against the
-                    # user's filament usage (machine-error refunds are a manual
-                    # staff appeal)
+                    # weight stays debited - failed prints still count against usage
                     notifications.notify_failed(db, print_details[2], print_details[4])
                 elif printer.get_status() == constants.GCODE_IDLE:
                     # if the printer status is idle, the print was canceled
                     logger.debug(f"manager: Print {print_details[0]} canceled")
                     db.archive_print(print_details[0], constants.PRINT_CANCELED)
-                    # the weight stays debited - canceled prints count against the
-                    # user's filament usage (machine-error refunds are a manual
-                    # staff appeal)
+                    # weight stays debited - canceled prints still count against usage
                     notifications.notify_failed(db, print_details[2], print_details[4])
                 else:
                     # if the printer status is not finish, failed, or idle, the print is still in progress
@@ -663,6 +635,36 @@ def update_printers(
 
         printer.update_db()
         printer.restart_bpm_object()
+
+
+# time past a print's end time before a still-current print is treated as stuck
+STUCK_PRINT_GRACE_SECONDS = 15 * 60
+
+
+def reap_stuck_prints(
+    printers: dict[str, bambu_printer.Printer],
+    db: bambu_db.BambuDB,
+    timestamp: float,
+):
+    # archive prints stuck in prints_current long after they should have ended
+    # (printer went offline, or the print finished while the manager was down) -
+    # otherwise the row lingers and the user always looks like they have an
+    # active print, canceling their new prints for concurrency
+    for c_print in db.get_current_prints():
+        printer = printers.get(c_print[3])
+        if printer is None:
+            continue
+        # leave it alone if it's the print currently running on the printer
+        if (
+            printer.get_status() in (constants.GCODE_RUNNING, constants.GCODE_PAUSE)
+            and printer.start_time > 0
+            and abs(printer.start_time - c_print[6]) <= 90
+        ):
+            continue
+        # not running and well past its end time - archive as succeeded (weight stays debited)
+        if c_print[7] < timestamp - STUCK_PRINT_GRACE_SECONDS:
+            logger.warning(f"manager: Reaping stuck print {c_print[0]} on {c_print[3]}")
+            db.archive_print(c_print[0], constants.PRINT_SUCCEEDED)
 
 
 def update_status_sheet(
@@ -704,7 +706,7 @@ def _human_pst_now() -> str:
 
 
 def build_usage_rows(db: bambu_db.BambuDB):
-    """Build rows for the usage sheet: [cruzid, used_g, remaining_g, status, last_updated]."""
+    # build rows for the usage sheet: [cruzid, used_g, remaining_g, status, last_updated]
     exemptions, bans = load_policy_lists()
     limits = db.get_limits_snapshot()
     usage_totals = db.get_quarterly_usage_totals()
@@ -773,7 +775,7 @@ def manager():
 
     # Start dashboard
     dashboard_process = start_dashboard()
-    
+
     account = get_account()
     db = get_db()
     sf = get_start_form()
@@ -805,10 +807,8 @@ def manager():
                 logger.info("manager: Checking for new prints")
                 cloud_ok = get_new_prints(account, db)
 
-                # within the startup grace period, skip everything that can cancel
-                # or expire a print (form matching/expiry and the unauthorized
-                # check) - a restart loses the in-memory printer state, so we wait
-                # for it to repopulate before acting on it
+                # during the startup grace period skip anything that can cancel or
+                # expire a print, until the in-memory printer state repopulates
                 in_startup_grace = (
                     timestamp - manager_start_time < STARTUP_GRACE_SECONDS
                 )
@@ -818,6 +818,10 @@ def manager():
                     )
 
                 if not in_startup_grace:
+                    # clear out any prints stuck as current so they don't block new prints
+                    logger.info("manager: Reaping stuck prints")
+                    reap_stuck_prints(printers, db, timestamp)
+
                     # check unmatched form responses - either mark them as old or current
                     logger.info("manager: Checking unmatched form responses")
                     current_form_rows, old_form_rows = categorize_forms(db, timestamp)
@@ -840,9 +844,8 @@ def manager():
                 logger.info("manager: Updating printers and print statuses")
                 update_printers(printers, current_prints, timestamp, db)
 
-                # catch the start-from-printer loophole: running with no cloud
-                # task. Skip if the cloud fetch failed - we can't tell yet - or
-                # during the startup grace period.
+                # catch the start-from-printer loophole - skip if the cloud fetch
+                # failed or during the startup grace period
                 if cloud_ok and not in_startup_grace:
                     logger.info("manager: Checking for unauthorized prints")
                     check_unauthorized_prints(printers, db, timestamp)
@@ -898,7 +901,7 @@ def manager():
         # stop the account refresh thread
         logger.info("manager: Stopping account refresh thread")
         account.stop_refresh_thread()
-        
+
         # stop the dashboard
         stop_dashboard(dashboard_process)
 

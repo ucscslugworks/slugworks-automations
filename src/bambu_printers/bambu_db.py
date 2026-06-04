@@ -405,7 +405,7 @@ class BambuDB:
             return []
 
     def get_limits_snapshot(self):
-        """Return list of (cruzid, remaining_limit) for the active limits column."""
+        # return list of (cruzid, remaining_limit) for the active limits column
         try:
             self.column = self.get_limits_column()
             if self.column not in [
@@ -422,7 +422,7 @@ class BambuDB:
             return []
 
     def get_usage_totals(self):
-        """Return dict of cruzid -> total recorded weight from archive + current prints."""
+        # return dict of cruzid -> total recorded weight from archive + current prints
         try:
             archive_rows = sql(
                 "SELECT cruzid, SUM(weight) FROM prints_archive WHERE status != ? GROUP BY cruzid",
@@ -443,20 +443,12 @@ class BambuDB:
             return {}
 
     def get_quarterly_usage_totals(self, start_time: int = None, end_time: int = None):
-        """Get usage totals for a specific quarter.
-        
-        Args:
-            start_time: Unix timestamp for quarter start. If None, uses current quarter start.
-            end_time: Unix timestamp for quarter end. If None, uses current quarter end.
-            
-        Returns:
-            Dict with cruzid as key and total weight in grams as value.
-        """
+        # get usage totals for a quarter (defaults to the current quarter), as a
+        # dict of cruzid -> total weight in grams
         if start_time is None or end_time is None:
-            from datetime import datetime
             now = datetime.now()
             quarter = (now.month - 1) // 3 + 1
-            
+
             if quarter == 1:
                 start = datetime(now.year, 1, 1)
                 end = datetime(now.year, 3, 31, 23, 59, 59)
@@ -466,46 +458,46 @@ class BambuDB:
             elif quarter == 3:
                 start = datetime(now.year, 7, 1)
                 end = datetime(now.year, 9, 30, 23, 59, 59)
-            else:  # Q4
+            else:
                 start = datetime(now.year, 10, 1)
                 end = datetime(now.year, 12, 31, 23, 59, 59)
-            
+
             start_time = int(start.timestamp())
             end_time = int(end.timestamp())
-        
+
         try:
             totals = {}
-            
-            # Get cumulative totals from archive with date filter (using start_time column)
+
+            # cumulative totals from the archive within the quarter
             archive_results = sql(
                 "SELECT cruzid, SUM(weight) FROM prints_archive WHERE status != ? AND start_time BETWEEN ? AND ? GROUP BY cruzid",
                 ("EXPIRED", start_time, end_time),
             ).fetchall()
-            
+
             for cruzid, weight in archive_results:
                 totals[cruzid] = round(weight, 2)
-            
-            # Add current prints with date filter (using start_time column)
+
+            # add current prints within the quarter
             current_results = sql(
                 "SELECT cruzid, SUM(weight) FROM prints_current WHERE start_time BETWEEN ? AND ? GROUP BY cruzid",
                 (start_time, end_time),
             ).fetchall()
-            
+
             for cruzid, weight in current_results:
                 if cruzid in totals:
                     totals[cruzid] = round(totals[cruzid] + weight, 2)
                 else:
                     totals[cruzid] = round(weight, 2)
-            
+
             return totals
         except Exception:
             self.logger.error(f"get_quarterly_usage_totals: {traceback.format_exc()}")
             return {}
 
     def has_tracked_print(self, printer_name: str, printer_start_time: int):
-        """Whether any tracked print (current or unmatched cloud task) exists for
-        this printer near the given start time. Used to detect prints started
-        directly on the printer that bypassed the cloud-upload pipeline."""
+        # whether any tracked print (current or unmatched cloud task) exists for
+        # this printer near the given start time - used to detect prints started
+        # directly on the printer that bypassed the cloud-upload pipeline
         try:
             window = constants.BAMBU_TIMEOUT
             lo = printer_start_time - window
