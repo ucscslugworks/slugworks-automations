@@ -93,8 +93,8 @@ def run(cfg: Config, dry_run: bool = False, staff_source: str = "auto") -> dict:
     assignment = canvas_util.resolve_assignment(course, assignment_id)
 
     staff = staff_module.load(cfg, prefer=staff_source)
-    logger.info("Staff list from %s", staff.source)
-    print(f"Staff list: {staff.source}")
+    logger.info("Staff list from %s", staff.describe())
+    print(f"Staff list: {staff.describe()}")
 
     service = sheets.get_service(cfg)
     values = sheets.read_range(service, spreadsheet_id, cell_range, SHEET_WIDTH)
@@ -111,7 +111,11 @@ def run(cfg: Config, dry_run: bool = False, staff_source: str = "auto") -> dict:
         submitter = canvas_util.norm(row[1]).split("@")[0]
         if submitter not in staff:
             row[3] = NOT_STAFF
-            logger.warning("Rejected check-off from non-staff submitter %s", submitter)
+            logger.warning(
+                "Rejected check-off from %s: not in %s",
+                submitter,
+                staff.describe(),
+            )
             changed += 1
             continue
 

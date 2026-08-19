@@ -72,10 +72,15 @@ class RollingFileHandler(RotatingFileHandler):
 def setup_logs(
     name: str,
     level: int = INFO,
-    additional_handlers: list[tuple[str, int]] = [],
+    additional_handlers: list[tuple[str, int]] | None = None,
 ):
     if name in loggers:
         return loggers[name]
+
+    # A default of [] would be shared between calls and accumulate every
+    # logger set up so far, so each new logger inherited all the earlier
+    # ones' files.
+    additional_handlers = list(additional_handlers or [])
 
     # Use LOGS_DIR env var or default to /data/logs
     logs_path = os.getenv("LOGS_DIR", "/data/logs")
@@ -129,6 +134,12 @@ def setup_logs(
     for handler in handlers:
         # add the handlers to the logger
         logger.addHandler(handler)
+
+    # logging.getLogger("root") is the real root logger, so setup_logs("root")
+    # put a console handler there. Without this every named logger's records
+    # propagate up to it and get printed a second time.
+    if logger is not logging.getLogger():
+        logger.propagate = False
 
     loggers[name] = logger
 

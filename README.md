@@ -989,10 +989,24 @@ processed and the result written back, so the next run skips them. The CruzID
 cell is free text and may hold several IDs separated by commas, spaces,
 semicolons, or newlines.
 
-Only staff may submit. The allow-list comes from the access-control database
-(`server.is_staff`) when it is reachable, since `src/server/canvas.py` already
-keeps it current; otherwise it falls back to a Canvas query cached in
-`common/staff.txt`. Force a source with `--staff-source db|canvas|file`.
+Only staff may submit. The allow-list is the staff of the Canvas course being
+graded (`course_id`), cached in `common/staff.txt` and refreshed when it is
+older than a day — `checkoff.staff_max_age` tunes that.
+
+`--staff-source` overrides where it comes from:
+
+| | |
+| --- | --- |
+| `auto` (default) | the cache, refreshed from Canvas when missing or stale |
+| `canvas` | force a refresh from the course roster |
+| `file` | the cache only, never contacting Canvas |
+| `db` | the access-control database's staff table |
+
+`db` is deliberately not the default. That table is synced by
+`src/server/canvas.py` from whatever course it is pointed at, which is not
+necessarily the course these check-offs belong to — if the two differ, real
+staff get rejected. It refuses to run against an empty staff table rather than
+silently rejecting everyone.
 
 ```bash
 ./checkoff grade --dry-run    # report only, sheet untouched
