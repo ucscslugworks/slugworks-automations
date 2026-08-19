@@ -1050,3 +1050,71 @@ otherwise every assignment in a module whose name matches `report.module_terms`.
 A submission counts as complete if it has a score above zero or is graded, and
 its `graded_at` (falling back to `submitted_at`, then `updated_at`) must land in
 the window.
+
+# Makerspace Checkout
+
+A Home Depot-styled web app for checking makerspace inventory in and out. Instead
+of buying, people **check out** tools and **room keys** to their name (with a due
+date and a responsibility agreement) and **take** single-use supplies. Inventory
+and the checkout log live in a Google Sheet.
+
+It reuses the repo's shared modules: `src/log.py` for logging and
+`src/checkoff/sheets.py` for the Google OAuth client and Sheets service (the same
+`common/credentials.json` every Google module here shares). Config lives in
+`common/checkout.json` (template: `common.example/checkout.json`).
+
+## Commands
+
+```bash
+./checkout run                 # start the web app (default 127.0.0.1:5002)
+./checkout run --host 0.0.0.0 --port 5002 --debug
+./checkout bootstrap           # create tabs + seed dummy inventory in the sheet
+./checkout bootstrap --force   # overwrite existing sheet data with fresh dummies
+./checkout auth                # (re)authorize Google Sheets (copy-paste flow)
+```
+
+## Configuration (`common/checkout.json`)
+
+```jsonc
+{
+  "spreadsheet_id": "1bba7Outuw…",        // backing inventory spreadsheet
+  "makerspace_name": "Slugworks Makerspace",
+  "default_checkout_days": 7,
+  "tabs": { "items": "Items", "keys": "Keys",
+            "consumables": "Consumables", "checkouts": "Checkouts" },
+  "sheet": {                               // read by src/checkoff/sheets.py
+    "credentials_file": "credentials.json",
+    "token_file": "status_sheet_token.json"
+  }
+}
+```
+
+`sheet.token_file` points at `status_sheet_token.json` (full spreadsheets scope),
+which shares the repo's OAuth client. If it is ever revoked, `./checkout auth`
+re-authorizes it with the browserless copy-paste flow.
+
+## Sheet tabs
+
+- **Items** — `item_id, name, category, description, icon, location, total_qty,
+  available_qty, checkout_days` (checked out & returned)
+- **Keys** — `key_id, room, description, icon, total_qty, available_qty,
+  checkout_days` (room keys, checked out & returned)
+- **Consumables** — `consumable_id, name, category, description, icon, location,
+  unit, stock_qty, low_threshold` (single-use; taken, never returned)
+- **Checkouts** — `checkout_id, kind, ref_id, ref_name, person_name, cruzid,
+  qty, checkout_time, due_time, return_time, status`
+
+`available_qty` decrements on checkout and is restored on return; `stock_qty`
+decrements on take and is not restored. The `/admin` page adds/edits inventory
+and shows/returns everything currently out, with overdue and low-stock flags.
+
+## Notes
+
+- The Sheets layer (`src/checkout/store.py`) serializes API calls (httplib2 is
+  not thread-safe), retries transient network + 429 errors with backoff, and
+  caches tab reads ~6s to stay under the 60-reads/min/user quota. Writes bust the
+  cache, so app changes show immediately; direct edits to the sheet appear within
+  a few seconds. Hand-editable cells with non-numeric junk are parsed tolerantly
+  rather than crashing.
+- Logs go to `$LOGS_DIR/checkout` (default `/data/logs` on the Pi; falls back to
+  a repo-local `logs/` dir on a dev machine).

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Checkout — {{ makerspace_name }}{% endblock %}
+
+{% block search %}
+<div class="searchwrap">
+  <input id="search" type="search" placeholder="Search tools, equipment, room keys…" autocomplete="off" />
+  <button id="searchBtn" aria-label="search">🔍</button>
+</div>
+{% endblock %}
+
+{% block subbar %}
+<div class="subbar">
+  <div class="subbar-inner">
+    <div class="tabs">
+      <button class="tab active" data-view="catalog">🧰 Tools &amp; Equipment</button>
+      <button class="tab" data-view="consumables">🧤 Supplies</button>
+      <button class="tab" data-view="keys">🗝️ Room Keys</button>
+      <button class="tab" data-view="checkouts">📋 My Checkouts</button>
+    </div>
+    <button class="cartbtn" id="openCart">🛒 Cart <span class="cart-count" id="cartCount">0</span></button>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <h3>Categories</h3>
+    <ul class="catlist" id="catList"><li class="active" data-cat="">All</li></ul>
+  </aside>
+
+  <section class="content">
+    <!-- catalog + keys grids -->
+    <div id="view-catalog" class="view">
+      <div class="grid" id="itemGrid"></div>
+    </div>
+    <div id="view-consumables" class="view hidden">
+      <div class="notice">🧤 <strong>Supplies</strong> are single-use — take what you need. These are not returned; taking them reduces stock. Please don't over-grab.</div>
+      <div class="grid" id="consumableGrid"></div>
+    </div>
+
+    <div id="view-keys" class="view hidden">
+      <div class="notice">🔑 <strong>Room keys</strong> are checked out per-day. You are responsible for returning them and for who you let into the space.</div>
+      <div class="grid" id="keyGrid"></div>
+    </div>
+
+    <!-- my checkouts -->
+    <div id="view-checkouts" class="view hidden">
+      <div class="lookup">
+        <label>Show checkouts for CruzID
+          <input id="lookupCruzid" type="text" placeholder="e.g. sslug" />
+        </label>
+        <button id="lookupBtn">Look up</button>
+        <label class="chk"><input type="checkbox" id="activeOnly" checked /> active only</label>
+      </div>
+      <div id="checkoutList" class="checkout-list"></div>
+    </div>
+  </section>
+</div>
+
+<!-- Cart drawer -->
+<div class="drawer-scrim hidden" id="cartScrim"></div>
+<aside class="drawer hidden" id="cartDrawer" aria-label="cart">
+  <div class="drawer-head">
+    <h2>🛒 Checkout Cart</h2>
+    <button class="x" id="closeCart">✕</button>
+  </div>
+  <div class="drawer-body" id="cartBody"></div>
+  <div class="drawer-foot">
+    <div class="swipe hidden" id="swipeBox">
+      <label>💳 Swipe your ID card
+        <input id="swipe" type="text" autocomplete="off" placeholder="Swipe card or scan, or type CruzID + Enter" />
+      </label>
+      <p class="swipe-msg" id="swipeMsg"></p>
+    </div>
+    <div class="who">
+      <label>Your name<input id="personName" type="text" placeholder="Sammy Slug" /></label>
+      <label>CruzID<input id="cruzid" type="text" placeholder="sslug" /></label>
+    </div>
+
+    <label class="ack">
+      <input type="checkbox" id="ack" />
+      <span><strong>You are responsible for this item whether you have it at time of checkout or not.</strong>
+      By checking out, you accept responsibility for every item and key in this cart until it is returned.</span>
+    </label>
+
+    <button class="checkout-go" id="doCheckout" disabled>Complete Checkout</button>
+    <p class="cart-msg" id="cartMsg"></p>
+  </div>
+</aside>
+
+<!-- Toast -->
+<div class="toast hidden" id="toast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Inventory Admin — {{ makerspace_name }}{% endblock %}
+
+{% block content %}
+<div class="admin">
+  <h1>Inventory Admin</h1>
+  <p class="muted">Add or edit tools and room keys. Changes write straight to the Google Sheet.
+    Availability and overdue tracking update automatically as things are checked out and returned.</p>
+
+  <div class="admin-grid">
+    <section class="card-panel">
+      <h2>➕ Add / edit a tool</h2>
+      <form id="itemForm" class="adminform">
+        <input type="hidden" name="item_id" />
+        <label>Name<input name="name" required placeholder="Cordless Drill" /></label>
+        <label>Category<input name="category" list="catOptions" placeholder="Power Tools" /></label>
+        <datalist id="catOptions"></datalist>
+        <label>Description<input name="description" placeholder="18V brushless drill" /></label>
+        <div class="row3">
+          <label>Icon<input name="icon" maxlength="2" placeholder="🔩" /></label>
+          <label>Location<input name="location" placeholder="Tool Wall A" /></label>
+          <label>Checkout days<input name="checkout_days" type="number" min="1" value="7" /></label>
+        </div>
+        <div class="row3">
+          <label>Total qty<input name="total_qty" type="number" min="0" value="1" /></label>
+          <label>Available qty<input name="available_qty" type="number" min="0" placeholder="(defaults to total)" /></label>
+          <span></span>
+        </div>
+        <button type="submit">Save tool</button>
+        <button type="button" class="ghost" id="itemReset">Clear form</button>
+      </form>
+    </section>
+
+    <section class="card-panel">
+      <h2>🗝️ Add / edit a room key</h2>
+      <form id="keyForm" class="adminform">
+        <input type="hidden" name="key_id" />
+        <label>Room<input name="room" required placeholder="Laser Cutter Room" /></label>
+        <label>Description<input name="description" placeholder="Access key for the laser room" /></label>
+        <div class="row3">
+          <label>Icon<input name="icon" maxlength="2" placeholder="🗝️" /></label>
+          <label>Total qty<input name="total_qty" type="number" min="0" value="1" /></label>
+          <label>Checkout days<input name="checkout_days" type="number" min="1" value="1" /></label>
+        </div>
+        <button type="submit">Save key</button>
+        <button type="button" class="ghost" id="keyReset">Clear form</button>
+      </form>
+    </section>
+
+    <section class="card-panel">
+      <h2>🧤 Add / edit a single-use supply</h2>
+      <form id="consumableForm" class="adminform">
+        <input type="hidden" name="consumable_id" />
+        <label>Name<input name="name" required placeholder="Nitrile Gloves (M)" /></label>
+        <label>Category<input name="category" list="catOptions" placeholder="PPE & Supplies" /></label>
+        <label>Description<input name="description" placeholder="Disposable nitrile gloves" /></label>
+        <div class="row3">
+          <label>Icon<input name="icon" maxlength="2" placeholder="🧤" /></label>
+          <label>Location<input name="location" placeholder="PPE Cabinet" /></label>
+          <label>Unit<input name="unit" placeholder="pair / roll / each" /></label>
+        </div>
+        <div class="row3">
+          <label>Stock qty<input name="stock_qty" type="number" min="0" value="0" /></label>
+          <label>Low-stock at<input name="low_threshold" type="number" min="0" value="0" /></label>
+          <span></span>
+        </div>
+        <button type="submit">Save supply</button>
+        <button type="button" class="ghost" id="consumableReset">Clear form</button>
+      </form>
+    </section>
+  </div>
+
+  <section class="tablewrap">
+    <h2>Tools <span class="muted" id="itemCount"></span></h2>
+    <div class="scrollx"><table id="itemTable"><thead><tr>
+      <th></th><th>Name</th><th>Category</th><th>Location</th><th>Avail / Total</th><th>Days</th><th></th>
+    </tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="tablewrap">
+    <h2>Room keys <span class="muted" id="keyCount"></span></h2>
+    <div class="scrollx"><table id="keyTable"><thead><tr>
+      <th></th><th>Room</th><th>Description</th><th>Avail / Total</th><th>Days</th><th></th>
+    </tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="tablewrap">
+    <h2>Single-use supplies <span class="muted" id="consumableCount"></span></h2>
+    <div class="scrollx"><table id="consumableTable"><thead><tr>
+      <th></th><th>Name</th><th>Category</th><th>Location</th><th>Stock</th><th>Unit</th><th>Low at</th><th></th>
+    </tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="tablewrap">
+    <h2>Active checkouts <span class="muted" id="coCount"></span></h2>
+    <div class="scrollx"><table id="coTable"><thead><tr>
+      <th>What</th><th>Who</th><th>CruzID</th><th>Qty</th><th>Out</th><th>Due</th><th>Status</th><th></th>
+    </tr></thead><tbody></tbody></table></div>
+  </section>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='admin.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,15 @@
+{
+  "spreadsheet_id": "",
+  "makerspace_name": "Your Makerspace",
+  "default_checkout_days": 7,
+  "tabs": {
+    "items": "Items",
+    "keys": "Keys",
+    "consumables": "Consumables",
+    "checkouts": "Checkouts"
+  },
+  "sheet": {
+    "credentials_file": "credentials.json",
+    "token_file": "status_sheet_token.json"
+  }
+}
