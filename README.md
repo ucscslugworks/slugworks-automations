@@ -881,11 +881,30 @@ That token is already at the scope this needs, so normally nothing extra has to
 be authorized. Override with `sheet.credentials_file` / `sheet.token_file` if
 this ever needs its own.
 
-If the token is missing or can no longer be refreshed, `grade` run from a
-terminal prints a `http://localhost:8080` URL to authorize — open it on your own
-machine, forwarding the port if you are over SSH. Run non-interactively (from
-the scheduler) it raises instead, rather than blocking forever on a browser
-round trip nobody is there to complete.
+### Authorizing
+
+When the token is missing or can no longer be refreshed:
+
+```bash
+./checkoff auth
+```
+
+The print server has no browser, and Google removed the out-of-band flow in
+2022, so this is a copy-paste round trip. It prints a URL; open that on any
+machine that does have a browser, approve it, and the browser will fail to load
+a `localhost` page — that is expected, nothing is listening there. Copy the
+address it tried to load and paste it back. Just the `code=` value works too.
+
+Nothing has to reach the server's own localhost, so no SSH tunnel is needed.
+`./checkoff auth --local-server` uses the old callback-server flow instead, for
+a machine where the browser and the tool are on the same host.
+
+The flow asks for `prompt=consent`, so Google always returns a refresh token —
+without that, a re-authorization can come back access-token-only and stop
+working within the hour.
+
+Run non-interactively (from the scheduler), anything needing authorization
+raises rather than blocking forever on a prompt nobody is there to answer.
 
 ## Identity matching
 

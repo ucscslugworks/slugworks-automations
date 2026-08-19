@@ -26,6 +26,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="where the staff allow-list comes from (default: auto)",
     )
 
+    p = sub.add_parser(
+        "auth", help="authorize Google access (copy-paste, no browser needed)"
+    )
+    p.add_argument(
+        "--local-server",
+        action="store_true",
+        help="use a local callback server instead of pasting the code back",
+    )
+
     p = sub.add_parser("staff", help="refresh the cached staff list from Canvas")
     p.add_argument(
         "--roles", nargs="+", help="enrollment types (default: teacher ta designer)"
@@ -158,7 +167,11 @@ def main(argv=None) -> int:
     try:
         cfg = config_module.load(args.config)
 
-        if args.command == "grade":
+        if args.command == "auth":
+            from src.checkoff import sheets
+
+            sheets.authorize(cfg, use_local_server=args.local_server)
+        elif args.command == "grade":
             from src.checkoff import grade
 
             grade.run(cfg, dry_run=args.dry_run, staff_source=args.staff_source)
@@ -180,6 +193,9 @@ def main(argv=None) -> int:
 
             listing.list_modules(cfg, args.course)
     except config_module.ConfigError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 2
+    except (FileNotFoundError, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 2
     except KeyboardInterrupt:
