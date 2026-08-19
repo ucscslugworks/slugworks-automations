@@ -871,13 +871,21 @@ The check-off settings sit in their own `checkoff`, `sheet`, `transfer`, and
 `CANVAS_TOKEN`, `CANVAS_URL`, and `CHECKOFF_CONFIG` override the token, API URL,
 and config path.
 
-Google Sheets credentials go in `common/` alongside the rest:
+Google access uses the credentials already in `common/`, shared with every other
+Google module here:
 
-- `common/checkoff_credentials.json` — OAuth client from the Google Cloud console
-- `common/checkoff_token.json` — cached user token, written on first run
+- `common/credentials.json` — the OAuth client (also used by gmail, start_form, sheet)
+- `common/token.json` — cached token for the spreadsheets scope, shared with `src/sheet.py`
 
-The first `grade` run prints a `http://localhost:8080` URL to authorize; open it
-on your own machine, forwarding the port if you are over SSH.
+That token is already at the scope this needs, so normally nothing extra has to
+be authorized. Override with `sheet.credentials_file` / `sheet.token_file` if
+this ever needs its own.
+
+If the token is missing or can no longer be refreshed, `grade` run from a
+terminal prints a `http://localhost:8080` URL to authorize — open it on your own
+machine, forwarding the port if you are over SSH. Run non-interactively (from
+the scheduler) it raises instead, rather than blocking forever on a browser
+round trip nobody is there to complete.
 
 ## Identity matching
 
