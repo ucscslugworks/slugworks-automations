@@ -1,0 +1,88 @@
+{
+  "_comment": "Copy to common/canvas.json and fill in auth_token. The access-control sync (src/server/canvas.py) reads auth_token; the check-off tools read the rest.",
+  "api_url": "https://canvas.ucsc.edu",
+  "auth_token": "PUT_YOUR_CANVAS_TOKEN_HERE (or set CANVAS_TOKEN in the environment)",
+  "course_id": 87464,
+  "enrollment_types": [
+    "student"
+  ],
+  "enrollment_states": [
+    "active",
+    "invited",
+    "completed",
+    "inactive"
+  ],
+  "checkoff": {
+    "assignment_id": 747453,
+    "staff_roles": [
+      "teacher",
+      "ta",
+      "designer"
+    ]
+  },
+  "sheet": {
+    "spreadsheet_id": "PUT_THE_FORM_RESPONSE_SHEET_ID_HERE",
+    "range": "Form Responses 1!A2:D"
+  },
+  "transfer": {
+    "source_course_id": 77701,
+    "target_course_id": 87464,
+    "copy_comments": false,
+    "write_zeros_for_incomplete": false,
+    "pairs": [
+      [
+        606459,
+        747475
+      ],
+      [
+        606455,
+        747459
+      ]
+    ]
+  },
+  "report": {
+    "module_terms": [
+      "safety walkthrough",
+      "club hub",
+      "creatorspace",
+      "shop",
+      "laser cutting",
+      "soldering",
+      "sewing",
+      "3d printer",
+      "printer cutter"
+    ],
+    "courses": [
+      {
+        "id": 87464,
+        "start": "2025-09-19",
+        "end": "2025-11-03",
+        "assignments": [
+          747453,
+          747445,
+          731633,
+          747473,
+          747482,
+          731629,
+          747475,
+          747459,
+          748944
+        ]
+      },
+      {
+        "id": 77701,
+        "start": "2024-09-19",
+        "end": "2024-11-03",
+        "assignments": [
+          606470,
+          606511,
+          606480,
+          606512,
+          606496,
+          606455,
+          639056
+        ]
+      }
+    ]
+  }
+}

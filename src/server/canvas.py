@@ -5,7 +5,7 @@ from datetime import datetime
 
 from canvasapi import Canvas
 
-from src import constants, log
+from src import canvas_util, constants, log
 from src.server import server
 
 # TODO: remove (when the canvas course id is set in the UI)
@@ -38,43 +38,74 @@ canvas = Canvas(
 course = canvas.get_course(server.get_canvas_course_id())
 
 
+def split_name(profile: dict, cruzid: str):
+    """Split a Canvas sortable_name ("Last, First") into first and last names."""
+    sortable = (profile.get("sortable_name") or "").strip()
+    if ", " in sortable:
+        lastname, firstname = sortable.split(", ", 1)
+        return firstname, lastname
+    if sortable:
+        # No comma to split on; keep the whole thing as the first name.
+        return sortable, ""
+    logger.warning(f"{cruzid} has no sortable_name in Canvas")
+    return cruzid, ""
+
+
+def resolve(s):
+    """Resolve one Canvas user to an identity and their profile.
+
+    Identity falls back through a ucsc.edu login_id, then the email, then
+    sis_user_id - canvas_util lowercases the result and refuses a numeric SIS
+    id, which is a student number rather than a CruzID.
+
+    Returns (identity, profile), or (None, None) when Canvas gives us nothing
+    usable to key on.
+    """
+    profile = s.get_profile()
+    who = canvas_util.identity_of(profile, canvas)
+
+    if not who.cruzid:
+        logger.warning(
+            f"skipping Canvas user {getattr(s, 'id', '?')}: no usable CruzID "
+            f"(login_id={who.login_id!r}, sis_user_id={who.sis_user_id!r})"
+        )
+        return None, None
+
+    if not who.login_id and who.sis_user_id:
+        logger.info(f"{who.cruzid} identified by sis_user_id (no usable login_id)")
+
+    return who, profile
+
+
 def update():
     # Set Canvas status to "updating"
     server.set_canvas_status(constants.CANVAS_UPDATING)
 
-    # Get all staff members in the course (paginated list)
-    staff = course.get_users(
-        enrollment_type=["teacher", "ta", "designer"], enrollment_state=["active"]
+    # Get all staff members in the course (as a list, so the paginated result
+    # is fetched once rather than a second time just for the length)
+    staff = list(
+        course.get_users(
+            enrollment_type=["teacher", "ta", "designer"], enrollment_state=["active"]
+        )
     )
 
     # Empty list for all staff cruzids
     staff_done = []
 
-    # length of staff list
-    staff_len = 0
-    for _ in staff:
-        staff_len += 1
-
     # Iterate through all staff members (as User objects)
     for i, s in enumerate(staff):
-        logger.debug(f"Starting staff {str(s)} ({i}/{staff_len})")
+        logger.debug(f"Starting staff {str(s)} ({i}/{len(staff)})")
 
-        # Get the user's profile
-        profile = s.get_profile()
-
-        # If the user does not have a login_id or is not a ucsc.edu email, skip
-        if "login_id" not in profile or "ucsc.edu" not in profile["login_id"]:
+        # Resolve the user's identity, skipping anyone Canvas cannot key
+        who, profile = resolve(s)
+        if who is None:
             continue
 
-        # Get the user's cruzid
-        cruzid = profile["login_id"].split("@")[0]
+        cruzid = who.cruzid
 
         # If the user has already been processed, skip
         if cruzid in staff_done:
             continue
-
-        # Get the user's first and last name
-        lastname, firstname = tuple(profile["sortable_name"].split(", ", 1))
 
         # If the user is not already a staff member in the db, add them
         if not server.is_staff(cruzid):
@@ -85,6 +116,9 @@ def update():
                 # Get the student's UID
                 uid = server.get_uid(cruzid)
 
+            # Get the user's first and last name
+            firstname, lastname = split_name(profile, cruzid)
+
             # Add the user as a staff member
             server.add_staff(cruzid, firstname, lastname, uid)
 
@@ -92,7 +126,7 @@ def update():
         staff_done.append(cruzid)
 
         # Log the staff member's information
-        logger.info(f"staff: {firstname} {lastname} ({cruzid})")
+        logger.info(f"staff: {cruzid}")
 
     # Log that the staff list has been updated
     logger.info("staff list updated")
@@ -100,39 +134,28 @@ def update():
     # get number of modules in the course
     num_modules = len(list(course.get_modules()))
 
-    # Get all students in the course (paginated list)
-    students = course.get_users(
-        enrollment_type=["student"], enrollment_state=["active"]
+    # Get all students in the course (as a list - see above)
+    students = list(
+        course.get_users(enrollment_type=["student"], enrollment_state=["active"])
     )
 
     # Empty list for all students cruzids
     students_done = []
 
-    # length of students list
-    students_len = 0
-    for _ in students:
-        students_len += 1
-
     # Iterate through all students (as User objects)
     for i, s in enumerate(students):
-        logger.debug(f"Starting student {str(s)} ({i}/{students_len})")
+        logger.debug(f"Starting student {str(s)} ({i}/{len(students)})")
 
-        # Get the user's profile
-        profile = s.get_profile()
-
-        # If the user does not have a login_id or is not a ucsc.edu email, skip
-        if "login_id" not in profile or "ucsc.edu" not in profile["login_id"]:
+        # Resolve the user's identity, skipping anyone Canvas cannot key
+        who, profile = resolve(s)
+        if who is None:
             continue
 
-        # Get the user's cruzid
-        cruzid = profile["login_id"].split("@")[0]
+        cruzid = who.cruzid
 
         # If the user has already been processed or is a staff member, skip
         if cruzid in students_done or cruzid in staff_done:
             continue
-
-        # Get the user's first and last name
-        lastname, firstname = tuple(profile["sortable_name"].split(", ", 1))
 
         # If the user is not already a student in the db, add them
         if not server.is_student(cruzid):
@@ -143,6 +166,9 @@ def update():
                 # Get the staff member's UID
                 uid = server.get_uid(cruzid)
 
+            # Get the user's first and last name
+            firstname, lastname = split_name(profile, cruzid)
+
             # Add the user as a student
             server.add_student(cruzid, firstname, lastname, uid)
 
@@ -150,7 +176,7 @@ def update():
         students_done.append(cruzid)
 
         # Log the student's information
-        logger.info(f"student: {firstname} {lastname} ({cruzid})")
+        logger.info(f"student: {cruzid}")
 
         # List of completed modules for this student
         completed_modules = []
@@ -170,7 +196,9 @@ def update():
     # Log that the student list has been updated
     logger.info("student list updated")
 
-    # Clamp the staff and student lists to only include users that are in the course
+    # Clamp the staff and student lists to only include users that are in the
+    # course. Both lists hold normalized (lowercase) cruzids, matching what the
+    # database stores - a case mismatch here would delete real users.
     server.clamp_staff(staff_done)
     server.clamp_students(students_done)
 

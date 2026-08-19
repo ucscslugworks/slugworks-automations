@@ -835,3 +835,127 @@ user=youruser
 redirect_stderr=true
 stdout_logfile=/var/log/bambu_manager.log
 ```
+
+---
+
+# Walkthrough Check-Offs
+
+Canvas automation for the maker-space safety walkthroughs. Students complete an
+in-person walkthrough or machine training, staff record it, and these tools push
+the 1-point completion into Canvas. The access-control sync
+(`src/server/canvas.py`) then reads that module completion and unlocks lab
+access, so the two halves meet in Canvas.
+
+## Commands
+
+```
+./checkoff <command>          # or: python -m src.checkoff <command>
+```
+
+| Command | What it does |
+| --- | --- |
+| `grade` | Read the staff Google Form responses and grade the check-off assignment |
+| `staff` | Refresh the cached staff list from Canvas enrollments |
+| `transfer` | Copy completions from last year's assignments to this year's |
+| `report` | Export a CSV of who completed what, inside a date window |
+| `assignments` | List a course's assignments and their IDs |
+| `modules` | List a course's modules and the assignments inside them |
+
+## Configuration
+
+Everything lives in `common/canvas.json`, the same file the access-control sync
+already reads for `auth_token`. Copy `common.example/canvas.json` and fill it in.
+The check-off settings sit in their own `checkoff`, `sheet`, `transfer`, and
+`report` sections, so adding them does not disturb the sync.
+
+`CANVAS_TOKEN`, `CANVAS_URL`, and `CHECKOFF_CONFIG` override the token, API URL,
+and config path.
+
+Google Sheets credentials go in `common/` alongside the rest:
+
+- `common/checkoff_credentials.json` — OAuth client from the Google Cloud console
+- `common/checkoff_token.json` — cached user token, written on first run
+
+The first `grade` run prints a `http://localhost:8080` URL to authorize; open it
+on your own machine, forwarding the port if you are over SSH.
+
+## Identity matching
+
+All Canvas identity resolution lives in `src/canvas_util.py` and is shared by the
+check-off tools and the access-control sync, so both agree on who someone is.
+
+A CruzID is derived by falling back through the keys Canvas may be missing:
+
+1. a `login_id` at `ucsc.edu`
+2. a bare `login_id` with no domain
+3. a `ucsc.edu` email
+4. `sis_user_id` — **only when it does not look like a student number**
+
+That last guard matters: UCSC student numbers are all digits, so a numeric
+`sis_user_id` is a student number rather than a CruzID and is refused
+(`looks_like_cruzid`). Letting one through would insert a number as a CruzID and
+key someone's door access off it.
+
+For cross-course work, `transfer` matches people by Canvas user id, then
+`login_id`, then `sis_user_id`, and the per-pair log records which key matched
+how many people.
+
+Note that `sis_user_id` is only returned by Canvas when the API token has
+permission to read SIS data. Without it the field is simply absent and the
+fallback never fires — nothing breaks, it just does not help.
+
+## grade
+
+The response sheet is both the queue and the audit log. Columns are
+`timestamp | submitter email | CruzIDs | status`; rows with an empty status are
+processed and the result written back, so the next run skips them. The CruzID
+cell is free text and may hold several IDs separated by commas, spaces,
+semicolons, or newlines.
+
+Only staff may submit. The allow-list comes from the access-control database
+(`server.is_staff`) when it is reachable, since `src/server/canvas.py` already
+keeps it current; otherwise it falls back to a Canvas query cached in
+`common/staff.txt`. Force a source with `--staff-source db|canvas|file`.
+
+```bash
+./checkoff grade --dry-run    # report only, sheet untouched
+./checkoff grade
+```
+
+Per-student outcomes: `Done`, `Already done`, `Staff`, `User not found`, or
+`Error (…)` with the Canvas message. Everything is also written to the `checkoff`
+logger, so it lands in `$LOGS_DIR/checkoff/` with the rest of the system's logs.
+
+## transfer
+
+Canvas issues new course and assignment IDs each offering, so completions have to
+be carried across.
+
+**Transfers are dry-run by default; `--apply` is what actually writes grades.**
+
+```bash
+./checkoff transfer                            # preview the configured pairs
+./checkoff transfer --apply                    # write them
+./checkoff transfer --pair 606455:747459 --apply
+./checkoff transfer --pairs-csv pairs.csv
+./checkoff transfer --interactive              # pick modules, match by name
+```
+
+Pairs come from `--pair` and `--pairs-csv` when given, otherwise
+`transfer.pairs` in the config. Each pair writes a log and the run writes a
+`summary.csv`, both under `log_dir`. Failures are almost always a student missing
+from the target assignment's "Assign to" list.
+
+## report
+
+```bash
+./checkoff report                                      # config windows
+./checkoff report --course 87464 --start 2025-09-19 --end 2025-11-03
+./checkoff report --course 87464 --start … --end … --modules soldering sewing
+```
+
+Scans the explicit assignment IDs in `report.courses[].assignments` when present,
+otherwise every assignment in a module whose name matches `report.module_terms`.
+A submission counts as complete if it has a score above zero or is graded, and
+its `graded_at` (falling back to `submitted_at`, then `updated_at`) must land in
+the window.

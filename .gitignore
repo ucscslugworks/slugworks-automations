@@ -174,4 +174,8 @@ logs/
 # Sensitive credentials - never commit
 common/
 common.tar
+
+# ...but the template config is safe and should be tracked
+!common.example/
+!common.example/canvas.json
 *.tar
