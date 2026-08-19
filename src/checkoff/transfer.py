@@ -191,6 +191,20 @@ def _collect_source(assignment, canvas) -> Dict[str, dict]:
     return out
 
 
+def _collect_target_scores(assignment) -> Dict[int, Optional[float]]:
+    """Current scores on the target assignment, keyed by user id.
+
+    One paginated call, so a repeated run can tell what is already correct
+    without making a request per user.
+    """
+    scores: Dict[int, Optional[float]] = {}
+    for sub in assignment.get_submissions():
+        user_id = getattr(sub, "user_id", None)
+        if user_id is not None:
+            scores[user_id] = canvas_util.to_float(getattr(sub, "score", None))
+    return scores
+
+
 def copy_pair(
     cfg, canvas, src_course, tgt_course, tgt_maps, pair: Pair, dry_run: bool
 ) -> dict:
@@ -198,6 +212,7 @@ def copy_pair(
     options = cfg.section("transfer")
     write_zeros = bool(options.get("write_zeros_for_incomplete", False))
     copy_comments = bool(options.get("copy_comments", False))
+    force_regrade = bool(options.get("force_regrade", False))
 
     src = canvas_util.resolve_assignment(src_course, pair[0])
     tgt = canvas_util.resolve_assignment(tgt_course, pair[1])
@@ -208,9 +223,11 @@ def copy_pair(
     ]
     print(f"\nCollecting completions from '{src.name}' ({src.id})...")
     source_rows = _collect_source(src, canvas)
+    target_scores = {} if force_regrade else _collect_target_scores(tgt)
 
     planned: List[Tuple[int, str, float, str]] = []
     missing: List[str] = []
+    unchanged = 0
     matched_by = {"id": 0, "login_id": 0, "sis_user_id": 0}
 
     for data in source_rows.values():
@@ -225,6 +242,13 @@ def copy_pair(
             continue
 
         matched_by[key] += 1
+
+        # Already correct in the target - skip it. Re-posting an identical
+        # grade moves graded_at, which the report's date window reads.
+        if not force_regrade and target_scores.get(target_user) == score:
+            unchanged += 1
+            continue
+
         planned.append(
             (target_user, who.cruzid or who.login_id, score, data["comment"])
         )
@@ -234,6 +258,7 @@ def copy_pair(
             **matched_by
         )
     )
+    log_lines.append(f"Already correct in target (skipped): {unchanged}")
     log_lines.append(f"Planned updates (count): {len(planned)}")
     if missing:
         log_lines.append(
@@ -252,6 +277,7 @@ def copy_pair(
         "matched_by_login": matched_by["login_id"],
         "matched_by_sis": matched_by["sis_user_id"],
         "missing": len(missing),
+        "unchanged": unchanged,
         "ok": 0,
         "fail": 0,
         "dry_run": dry_run,
@@ -327,6 +353,7 @@ def write_summary(cfg: Config, results: List[dict]) -> str:
         "matched_by_login",
         "matched_by_sis",
         "missing",
+        "unchanged",
         "ok",
         "fail",
         "dry_run",

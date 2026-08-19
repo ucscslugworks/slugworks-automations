@@ -904,6 +904,56 @@ Note that `sis_user_id` is only returned by Canvas when the API token has
 permission to read SIS data. Without it the field is simply absent and the
 fallback never fires — nothing breaks, it just does not help.
 
+## Scheduled runs
+
+`./start_bambu` starts the check-off scheduler alongside the Bambu manager, and
+`./stop_bambu` stops both. It runs as its own process rather than inside the
+manager loop, because a Canvas roster scan takes far longer than the manager's
+10-second cycle and would stall print matching. It writes `pid_checkoff` and
+watches the same `common/SPECIAL_BAMBU_STOP` flag the manager does, so it also
+exits on its own within a cycle if the pid file goes missing.
+
+| Job | Interval | What it does |
+| --- | --- | --- |
+| `grade` | hourly | New form responses to Canvas grades |
+| `transfer` | hourly | Carry completions between course offerings |
+| `staff` | daily | Refresh the staff allow-list |
+| `digest` | weekly | Email a summary of everything that changed |
+
+Intervals, the report day and hour, and the default recipient are in
+`src/constants.py` under `CHECKOFF_*`. The recipient can be overridden per
+deployment with `schedule.report_recipient` in `common/canvas.json`, and
+`schedule.transfer_apply: false` makes the hourly transfer a dry run.
+
+The weekly report goes out through `src/bambu_printers/gmail.py` — the same
+sender the print notifications use, from the same `slugwork@ucsc.edu` address.
+It lists who was newly checked off and by whom, anything that needs attention
+(unknown CruzIDs, Canvas errors), what the transfers moved, staff added or
+removed, and any job failures.
+
+Scheduler state lives in `checkoff_schedule.json` at the repository root: the
+last run time of each job and the events the weekly report has not yet sent. A
+restart therefore does not re-fire every job or lose the week's accumulated
+changes, and the week is only cleared once the email has actually gone out.
+
+A job that throws is logged, recorded for the report, and retried on the next
+cycle — one failing job never stops the others or the loop.
+
+### About the hourly transfer
+
+`transfer` skips anyone whose target grade is already correct, using one
+paginated read of the target assignment rather than a request per student. This
+matters for running it hourly: re-posting an identical grade would move Canvas's
+`graded_at`, and the `report` command's date window reads that field, so an
+unguarded hourly transfer would eventually make every student look like they
+completed everything in the current week. Set `transfer.force_regrade: true` to
+post regardless, which is only useful for a one-off repair.
+
+Even with the skip, each hourly pass still reads every source submission and the
+full target roster. If the API volume becomes a problem, raise
+`CHECKOFF_TRANSFER_INTERVAL` — transfers are normally a start-of-year migration,
+so daily is usually plenty.
+
 ## grade
 
 The response sheet is both the queue and the audit log. Columns are

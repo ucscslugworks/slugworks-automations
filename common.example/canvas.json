@@ -38,7 +38,8 @@
         606455,
         747459
       ]
-    ]
+    ],
+    "force_regrade": false
   },
   "report": {
     "module_terms": [
@@ -84,5 +85,9 @@
         ]
       }
     ]
+  },
+  "schedule": {
+    "transfer_apply": true,
+    "report_recipient": "chartier@ucsc.edu"
   }
 }

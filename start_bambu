@@ -6,6 +6,7 @@ cd "$(dirname "$(readlink -f "$0")")"
 
 # Files
 PID_FILE="pid_bambu_printers"
+CHECKOFF_PID_FILE="pid_checkoff"
 STOP_FILE="common/SPECIAL_BAMBU_STOP"
 
 # Activate venv
@@ -19,8 +20,22 @@ python -m src.bambu_printers.manager &
 MANAGER_PID=$!
 echo "$MANAGER_PID" > "$PID_FILE"
 
+# Start the walkthrough check-off scheduler alongside it. It runs in its own
+# process because a Canvas roster scan takes much longer than the manager's
+# cycle and would otherwise stall print matching. It writes its own pid file.
+python -m src.checkoff.scheduler &
+CHECKOFF_PID=$!
+
 # Give the process a moment to initialize, then verify it's still running
 sleep 10
+if ps -p "$CHECKOFF_PID" > /dev/null; then
+    echo "checkoff scheduler started (pid=$CHECKOFF_PID)"
+else
+    # Not fatal: printing must keep working even if check-offs cannot run.
+    echo "checkoff scheduler failed to start - see the checkoff log"
+    if [ -f "$CHECKOFF_PID_FILE" ]; then rm -f "$CHECKOFF_PID_FILE"; fi
+fi
+
 if ps -p "$MANAGER_PID" > /dev/null; then
     echo "bambu_printers started (pid=$MANAGER_PID)"
     # Optional health check like detect_bambu_restart (fresh log within 5 minutes)

@@ -78,8 +78,12 @@ def check_off_one(
         return ERROR, f"{type(e).__name__}: {e}"
 
 
-def run(cfg: Config, dry_run: bool = False, staff_source: str = "auto") -> int:
-    """Process every unhandled row. Returns the number of rows touched."""
+def run(cfg: Config, dry_run: bool = False, staff_source: str = "auto") -> dict:
+    """Process every unhandled row.
+
+    Returns {"rows": int, "results": [...]} where each result records one
+    student's outcome, which the weekly digest summarises.
+    """
     spreadsheet_id = cfg.require("sheet", "spreadsheet_id")
     cell_range = cfg.section("sheet").get("range", "Form Responses 1!A2:D")
     assignment_id = cfg.require("checkoff", "assignment_id")
@@ -94,9 +98,10 @@ def run(cfg: Config, dry_run: bool = False, staff_source: str = "auto") -> int:
 
     service = sheets.get_service(cfg)
     values = sheets.read_range(service, spreadsheet_id, cell_range, SHEET_WIDTH)
+    summary = {"rows": 0, "results": []}
     if not values:
         print("No form responses found.")
-        return 0
+        return summary
 
     changed = 0
     for row in values:
@@ -123,18 +128,28 @@ def run(cfg: Config, dry_run: bool = False, staff_source: str = "auto") -> int:
             print(f"  {who}: {label}")
             logger.info("%s -> %s (by %s)", who, label, submitter)
             notes.append(f"{who}: {label}")
+            summary["results"].append(
+                {
+                    "cruzid": who,
+                    "status": status,
+                    "label": label,
+                    "submitter": submitter,
+                }
+            )
         row[3] = "\n".join(notes)
         changed += 1
 
+    summary["rows"] = changed
+
     if not changed:
         print("Nothing new to check off.")
-        return 0
+        return summary
 
     if dry_run:
         print(f"Dry run: {changed} row(s) would be updated; sheet left untouched.")
-        return changed
+        return summary
 
     sheets.write_range(service, spreadsheet_id, cell_range, values)
     print(f"Updated {changed} row(s) in the response sheet.")
     logger.info("Updated %d row(s) in the response sheet", changed)
-    return changed
+    return summary

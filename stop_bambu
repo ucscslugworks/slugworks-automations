@@ -4,6 +4,7 @@ set -e
 cd "$(dirname "$(readlink -f "$0")")"
 
 PID_FILE="pid_bambu_printers"
+CHECKOFF_PID_FILE="pid_checkoff"
 STOP_FILE="common/SPECIAL_BAMBU_STOP"
 
 # Signal manager to stop via STOP_FILE (some code paths may read this)
@@ -30,6 +31,29 @@ if [ -f "$PID_FILE" ]; then
 		fi
 	fi
 	rm -f "$PID_FILE"
+fi
+
+# Stop the check-off scheduler the same way. It also watches STOP_FILE, so it
+# will exit on its own within one cycle even if the pid file is missing.
+if [ -f "$CHECKOFF_PID_FILE" ]; then
+	CHECKOFF_PID="$(cat "$CHECKOFF_PID_FILE" || true)"
+	if [ -n "$CHECKOFF_PID" ]; then
+		echo "Stopping checkoff scheduler (pid=$CHECKOFF_PID)"
+		if kill -TERM "$CHECKOFF_PID" 2>/dev/null; then
+			for i in {1..10}; do
+				if ps -p "$CHECKOFF_PID" > /dev/null; then
+					sleep 1
+				else
+					break
+				fi
+			done
+			if ps -p "$CHECKOFF_PID" > /dev/null; then
+				echo "Scheduler still running; sending SIGKILL"
+				kill -KILL "$CHECKOFF_PID" 2>/dev/null || true
+			fi
+		fi
+	fi
+	rm -f "$CHECKOFF_PID_FILE"
 fi
 
 echo "bambu_printers stop requested"
