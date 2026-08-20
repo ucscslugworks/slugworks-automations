@@ -1149,8 +1149,28 @@ the physical card by default: a staff member who types their CruzID gets an
 ordinary student session. Set `"admin_requires_card": false` to allow a typed
 CruzID into admin as well.
 
-Sign-in needs the roster: with no `common/checkout_roster.json`, the app falls
-back to accepting a typed CruzID plus a typed name, and nobody counts as staff.
+A CruzID is the only thing sign-in ever asks for. When the roster is present it
+supplies the person's name too; when it is not, the CruzID stands in as the name
+rather than making anyone type one.
+
+Card readers hand over the whole magstripe track, sentinels and all — a swipe
+arrives as `;189734362=25121010…?` (track 2) or `%B189734362^SLUG/SAMMY^…?`
+(track 1). `identity.clean_swipe` strips that framing down to the card number
+before any lookup, so the reader needs no particular configuration.
+
+The number on the card is not quite the number Canvas holds: a UCSC student
+number is 7 digits, and the card appends a two-digit issuing number (bumped when
+a card is reissued) plus a trailing digit. So the resolver falls back to matching
+the **leading 7 digits** (`identity.SIS_DIGITS`), which also means a replacement
+card works without rebuilding the roster. That truncation is the last thing
+tried: an exact match on a whole CruzID, SIS number or Canvas id always wins
+over a guess made by throwing digits away.
+
+**Card sign-in needs the roster.** With no `common/checkout_roster.json` a card
+number cannot be turned into anybody, so the sign-in screen says as much up
+front and only a typed CruzID works — and since nothing can be carded, nobody
+counts as staff either. Run `./checkout roster` (or restart `./start_bambu`) to
+turn card sign-in on.
 
 ## Configuration (`common/checkout.json`)
 

@@ -132,7 +132,7 @@ def create_app(cfg=None):
     @app.route("/api/login", methods=["POST"])
     def api_login():
         data = request.get_json(force=True, silent=True) or {}
-        who, error = gate.sign_in(data.get("swipe"), data.get("name"))
+        who, error = gate.sign_in(data.get("swipe"))
         if error:
             return jsonify(ok=False, error=error), 400
         return jsonify(ok=True, user=who, timeout_seconds=gate.timeout)

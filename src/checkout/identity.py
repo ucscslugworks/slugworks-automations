@@ -35,9 +35,44 @@ DEFAULT_MAX_AGE = 24 * 60 * 60  # one day
 # fallback: canvas.json's checkoff.staff_roles wins when it is set.
 STAFF_ROLES = ["teacher", "ta", "designer"]
 
+# A UCSC student number is 7 digits. The card carries more: a two-digit issuing
+# number (bumped when a card is reissued) and a trailing digit, none of which
+# Canvas knows about. The student number is the leading 7.
+SIS_DIGITS = 7
+
 
 def _digits(value):
     return re.sub(r"\D", "", value or "")
+
+
+def clean_swipe(value):
+    """Strip magstripe framing, leaving the card number or the typed CruzID.
+
+    Readers hand over the whole track the way ISO-7813 writes it, sentinels and
+    all: track 2 arrives as ";<number>=<expiry etc>?" and track 1 as
+    "%B<number>^SLUG/SAMMY^...?". Only the first field is the card number, and
+    none of the punctuation is part of it -- without this a swipe reaches the
+    lookups as ";1897343627" and matches nothing.
+
+    A typed CruzID has none of that framing and passes through untouched.
+    """
+    value = str(value or "").strip()
+    if not value:
+        return ""
+    if value.startswith("%"):
+        # The % sentinel is followed by a format-code letter ("B" for a
+        # financial card), which is framing rather than part of the number.
+        value = value[1:]
+        if value[:1].isalpha():
+            value = value[1:]
+    value = value.lstrip(";")
+    # The end sentinel and anything after it (LRC, a reader's newline) is noise.
+    value = re.split(r"[?\r\n]", value, maxsplit=1)[0]
+    # Field separators: whichever track this is, the number comes first.
+    for separator in ("=", "^"):
+        if separator in value:
+            value = value.split(separator, 1)[0]
+    return value.strip()
 
 
 def _matched(record, via):
@@ -186,9 +221,7 @@ class Resolver:
         evidence than a CruzID anyone could type ("cruzid").
         """
         self._reload_if_changed()
-        if not swipe:
-            return None
-        value = str(swipe).strip()
+        value = clean_swipe(swipe)
         if not value:
             return None
 
@@ -208,7 +241,19 @@ class Resolver:
             if stripped and stripped in self._by_sis_digits:
                 return _matched(self._by_sis_digits[stripped], "sis")
 
-        # Canvas user id as a last resort.
+        # Canvas user id, before any truncation: an exact match on a whole
+        # number must always beat a guess made by throwing digits away.
         if value in self._by_canvas:
             return _matched(self._by_canvas[value], "canvas")
+
+        # Last resort, and the usual one for a swipe: drop the issuing number
+        # the card carries and the roster does not, and match the student
+        # number itself.
+        if digits and len(digits) > SIS_DIGITS:
+            head = digits[:SIS_DIGITS]
+            if head in self._by_sis:
+                return _matched(self._by_sis[head], "sis")
+            stripped_head = head.lstrip("0")
+            if stripped_head and stripped_head in self._by_sis_digits:
+                return _matched(self._by_sis_digits[stripped_head], "sis")
         return None

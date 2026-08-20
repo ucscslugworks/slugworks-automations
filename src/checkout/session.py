@@ -28,6 +28,7 @@ from flask import session as flask_session
 
 from src import canvas_util, log, staff_cache
 from src.checkoff.config import COMMON
+from src.checkout import identity
 
 logger = log.setup_logs("checkout", log.INFO)
 
@@ -115,34 +116,49 @@ class Gatekeeper:
 
     # ---- signing in / out ------------------------------------------------
 
-    def sign_in(self, swipe, name=None):
+    def sign_in(self, swipe):
         """Start a session from a swiped card or a typed CruzID.
 
         Returns (user, error): exactly one of the two is set. `user` carries
         `via`, which records whether the card itself was presented.
+
+        A CruzID is all we ever ask for. When the roster is there it also gives
+        us the person's name, and when it is not we use the CruzID as the name
+        rather than making someone type one in.
         """
-        value = str(swipe or "").strip()
+        value = identity.clean_swipe(swipe)
         if not value:
             return None, "Swipe your ID card or type your CruzID."
+        # A card gives us digits and nothing else, which is what separates
+        # "this card is unknown" from "that is not a CruzID".
+        swiped = value.isdigit()
 
         if self.resolver.available:
             match = self.resolver.resolve(value)
             if not match:
+                if swiped:
+                    return None, (
+                        "That card is not in the roster. Type your CruzID instead, "
+                        "or ask staff to refresh the roster."
+                    )
                 return None, (
-                    "Not recognized. Check the CruzID, swipe again, or ask staff "
-                    "-- the roster may need a refresh."
+                    "No one with that CruzID is enrolled. Check the spelling, or "
+                    "ask staff to refresh the roster."
                 )
             cruzid, person, via = match["cruzid"], match["name"], match["via"]
         else:
-            # No roster cache to check against, so take the CruzID at its word
-            # and ask for a name. `./checkout roster` turns this branch off.
+            # No roster, so a card number cannot be turned into anybody: only a
+            # typed CruzID works until `./checkout roster` has been run.
+            if swiped:
+                return None, (
+                    "Card sign-in is not set up on this station yet -- type your "
+                    "CruzID instead. (Staff: run ./checkout roster.)"
+                )
             cruzid = canvas_util.norm(value)
             if not canvas_util.looks_like_cruzid(cruzid):
                 return None, "That doesn't look like a CruzID (try e.g. sslug)."
-            person = str(name or "").strip()
-            if not person:
-                return None, "Enter your name as well."
-            via = "typed"
+            # No roster to look a real name up in; the CruzID names them fine.
+            person, via = cruzid, "typed"
 
         flask_session.clear()
         flask_session["who"] = {"cruzid": cruzid, "name": person, "via": via}

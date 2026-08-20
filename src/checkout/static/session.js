@@ -70,9 +70,10 @@ function paintTimer() {
 function showSignin(message) {
   const box = S("#signin");
   box.classList.remove("hidden");
-  S("#signinNameField").classList.toggle("hidden", MDSession.swipeEnabled);
   S("#signinInput").value = "";
-  S("#signinName").value = "";
+  // Say so up front when a swipe cannot possibly work, rather than letting
+  // someone swipe and bounce off an error.
+  S("#signinHint").classList.toggle("hidden", MDSession.swipeEnabled);
   const msg = S("#signinMsg");
   msg.className = "signin-msg" + (message ? " err" : "");
   msg.textContent = message || "";
@@ -109,7 +110,6 @@ function forgetUser(message) {
 
 async function signIn() {
   const value = S("#signinInput").value.trim();
-  const name = S("#signinName").value.trim();
   const msg = S("#signinMsg");
   if (!value) { S("#signinInput").focus(); return; }
   msg.className = "signin-msg info";
@@ -118,7 +118,7 @@ async function signIn() {
     const d = await api("/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ swipe: value, name }),
+      body: JSON.stringify({ swipe: value }),
     });
     setUser(d.user);
   } catch (e) {
@@ -179,15 +179,13 @@ function initSession() {
   S("#signinBtn").onclick = signIn;
   S("#signOutBtn").onclick = signOut;
   // Card readers are keyboards: they type the number and press Enter.
-  ["#signinInput", "#signinName"].forEach((sel) =>
-    S(sel).addEventListener("keydown", (e) => {
-      if (e.key === "Enter") { e.preventDefault(); signIn(); }
-    })
-  );
+  S("#signinInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); signIn(); }
+  });
   // Keep the caret in the card box so a swipe lands there wherever they click.
   document.addEventListener("keydown", (e) => {
     if (S("#signin").classList.contains("hidden")) return;
-    if (e.target === S("#signinInput") || e.target === S("#signinName")) return;
+    if (e.target === S("#signinInput")) return;
     S("#signinInput").focus();
   });
   // A laptop lid closed for a minute must not look like an active session.

@@ -50,16 +50,15 @@
       <div class="signin-icon">💳</div>
       <h1>Swipe in to start</h1>
       <p class="signin-lead">Swipe your student ID card, or type your CruzID and press Enter.
-        Everything you check out is recorded under that name.</p>
+        Everything you check out is recorded under that CruzID.</p>
       <label class="signin-field">
         <span>ID card or CruzID</span>
         <input id="signinInput" type="text" autocomplete="off" autocapitalize="off"
                spellcheck="false" placeholder="Swipe now, or type e.g. sslug" />
       </label>
-      <label class="signin-field hidden" id="signinNameField">
-        <span>Your name</span>
-        <input id="signinName" type="text" autocomplete="off" placeholder="Sammy Slug" />
-      </label>
+      <!-- Shown when no roster has been built, so a card cannot resolve yet. -->
+      <p class="signin-hint hidden" id="signinHint">💳 Card sign-in isn't set up on this
+        station yet — please type your CruzID.</p>
       <button class="signin-go" id="signinBtn">Sign in</button>
       <p class="signin-msg" id="signinMsg"></p>
       <p class="signin-foot">The station signs you out after {{ session_timeout }} seconds of inactivity.</p>

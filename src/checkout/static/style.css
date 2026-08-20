@@ -209,6 +209,7 @@ tr.overdue td { background: #fff7f7; }
 .signin-field input:focus { border-color: var(--orange); }
 .signin-go { width: 100%; background: var(--orange); color: #fff; border: 0; border-radius: 4px; padding: 13px; font-size: 16px; font-weight: 800; }
 .signin-go:hover { background: var(--orange-dark); }
+.signin-hint { background: #fff6ee; border: 1px solid #ffd9b8; border-radius: 6px; padding: 9px 11px; font-size: 12.5px; line-height: 1.45; color: #8a4b00; margin: 0 0 12px; text-align: left; }
 .signin-msg { font-size: 13px; margin: 12px 0 0; min-height: 1em; }
 .signin-msg.err { color: var(--red); }
 .signin-msg.ok { color: var(--green); }
