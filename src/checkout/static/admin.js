@@ -1,4 +1,6 @@
 // Inventory admin — add/edit tools & keys, view active checkouts.
+// Staff only: /admin and every /api/admin/* route check that server-side, and
+// signing in here as anyone else bounces back to the catalog (see session.js).
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -8,14 +10,6 @@ function toast(msg, kind = "") {
   t.textContent = msg;
   t.className = "toast " + kind;
   setTimeout(() => (t.className = "toast hidden"), 2600);
-}
-
-async function api(url, opts) {
-  const res = await fetch(url, opts);
-  let d = {};
-  try { d = await res.json(); } catch {}
-  if (!res.ok) throw new Error(d.error || `Request failed (${res.status})`);
-  return d;
 }
 
 function availClass(a, total) {
@@ -198,6 +192,12 @@ function init() {
   $("#itemReset").onclick = () => { $("#itemForm").reset(); $("#itemForm").item_id.value = ""; };
   $("#keyReset").onclick = () => { $("#keyForm").reset(); $("#keyForm").key_id.value = ""; };
   $("#consumableReset").onclick = () => { $("#consumableForm").reset(); $("#consumableForm").consumable_id.value = ""; };
-  refresh().catch((e) => toast(e.message, "err"));
+
+  MDSession.requireStaff = true;
+  MDSession.on("signin", () => refresh().catch((e) => toast(e.message, "err")));
+  MDSession.on("signout", () =>
+    document.querySelectorAll("table tbody").forEach((b) => (b.innerHTML = ""))
+  );
+  if (MDSession.user) refresh().catch((e) => toast(e.message, "err"));
 }
 document.addEventListener("DOMContentLoaded", init);

@@ -22,7 +22,7 @@ import requests
 from authlib.integrations.flask_client import OAuth
 from flask import Flask, render_template, request, jsonify, send_file, redirect, session
 
-from src import constants, log
+from src import constants, log, staff_cache
 from src.bambu_printers import bambu_db, bambu_account
 
 logger = log.setup_logs("dashboard", additional_handlers=[("bambu", log.INFO)])
@@ -456,6 +456,7 @@ class Dashboard:
         def api_users():
             try:
                 exemptions, bans = self.load_policy_lists()
+                staff = staff_cache.read()
 
                 # Get current limits column name
                 from datetime import datetime
@@ -488,6 +489,9 @@ class Dashboard:
                         "current_limit": current_limit,
                         "usage": usage,
                         "exempt": cruzid in exemptions,
+                        # exempt because they are staff, not because someone
+                        # ticked the box: the checkbox cannot take this away
+                        "staff": cruzid in staff,
                         "banned": cruzid in bans,
                     })
                 return jsonify(users)
@@ -699,6 +703,10 @@ class Dashboard:
                             exemptions.update([str(x) for x in data])
                 except Exception:
                     pass
+
+        # staff are exempt by standing, from the nightly common/staff.txt
+        # refresh - same rule the manager enforces (see its load_policy_lists).
+        exemptions.update(staff_cache.read())
 
         ban_path = os.path.join(base_dir, "ban.json")
         if os.path.exists(ban_path):

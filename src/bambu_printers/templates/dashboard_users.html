@@ -116,7 +116,9 @@ function renderUsers(users) {
         const bannedChecked = user.banned ? 'checked' : '';
         
         let remainingCell = user.current_limit;
-        if (user.exempt) {
+        if (user.staff) {
+            remainingCell = '<span class="badge bg-success">EXEMPT (STAFF)</span>';
+        } else if (user.exempt) {
             remainingCell = '<span class="badge bg-success">EXEMPT</span>';
         } else if (user.banned) {
             remainingCell = '<span class="badge bg-danger">BANNED</span>';
@@ -127,7 +129,7 @@ function renderUsers(users) {
                 <td>${user.cruzid}</td>
                 <td>${remainingCell}</td>
                 <td>${user.usage}</td>
-                <td><input type="checkbox" ${exemptChecked} onchange="updateUser('${user.cruzid}', 'exempt', this.checked)"></td>
+                <td><input type="checkbox" ${exemptChecked} ${user.staff ? 'disabled title="Exempt while on the staff list"' : ''} onchange="updateUser('${user.cruzid}', 'exempt', this.checked)"></td>
                 <td><input type="checkbox" ${bannedChecked} onchange="updateUser('${user.cruzid}', 'ban', this.checked)"></td>
                 <td>
                     <button class="btn btn-sm btn-primary" onclick="updateUser('${user.cruzid}', 'limit', 1000)">+1kg</button>

@@ -5,6 +5,7 @@ Commands:
     bootstrap   create tabs + seed dummy makerspace data in the sheet
     auth        (re)authorize Google Sheets access (copy-paste, no browser)
     roster      build the CruzID<->SIS-ID map from Canvas (for ID-card swipe)
+    staff       refresh the staff list from Canvas (who may use inventory admin)
 """
 
 import argparse
@@ -35,6 +36,14 @@ def build_parser():
 
     p = sub.add_parser(
         "roster", help="build the CruzID<->SIS map from Canvas (for card swipe)"
+    )
+    p.add_argument(
+        "--canvas-config",
+        help="path to canvas.json (default common/canvas.json, as gradecheck uses)",
+    )
+
+    p = sub.add_parser(
+        "staff", help="refresh who counts as staff (gates the inventory admin)"
     )
     p.add_argument(
         "--canvas-config",
@@ -74,6 +83,19 @@ def main(argv=None):
             print(
                 f"Built CruzID<->SIS roster from Canvas course {canvas_cfg.course_id}: "
                 f"{len(students)} students -> {identity.ROSTER_PATH}"
+            )
+        elif args.command == "staff":
+            # Same common/staff.txt the check-off tools use: one staff list per
+            # repo. Without it nobody is staff and the admin pages stay shut.
+            from src.checkoff import config as canvas_config_module
+            from src.checkoff import staff as staff_module
+            from src.checkout import session as session_module
+
+            canvas_cfg = canvas_config_module.load(args.canvas_config)
+            members = staff_module.refresh(canvas_cfg)
+            print(
+                f"Staff from Canvas course {canvas_cfg.course_id}: "
+                f"{len(members)} -> {session_module.STAFF_PATH}"
             )
     except config_module.ConfigError as e:
         print(f"Error: {e}", file=sys.stderr)

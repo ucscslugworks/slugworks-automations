@@ -47,10 +47,12 @@
     <!-- my checkouts -->
     <div id="view-checkouts" class="view hidden">
       <div class="lookup">
-        <label>Show checkouts for CruzID
+        <span class="lookup-who">Checkouts for <strong id="myCheckoutsWho">you</strong></span>
+        <!-- Staff run the returns desk, so only they get to look anyone else up. -->
+        <label class="staff-only hidden">Look up CruzID (blank = everyone)
           <input id="lookupCruzid" type="text" placeholder="e.g. sslug" />
         </label>
-        <button id="lookupBtn">Look up</button>
+        <button id="lookupBtn" class="staff-only hidden">Look up</button>
         <label class="chk"><input type="checkbox" id="activeOnly" checked /> active only</label>
       </div>
       <div id="checkoutList" class="checkout-list"></div>
@@ -67,15 +69,10 @@
   </div>
   <div class="drawer-body" id="cartBody"></div>
   <div class="drawer-foot">
-    <div class="swipe hidden" id="swipeBox">
-      <label>💳 Swipe your ID card
-        <input id="swipe" type="text" autocomplete="off" placeholder="Swipe card or scan, or type CruzID + Enter" />
-      </label>
-      <p class="swipe-msg" id="swipeMsg"></p>
-    </div>
+    <!-- No name/CruzID boxes: you identified yourself when you swiped in. -->
     <div class="who">
-      <label>Your name<input id="personName" type="text" placeholder="Sammy Slug" /></label>
-      <label>CruzID<input id="cruzid" type="text" placeholder="sslug" /></label>
+      <span class="who-icon">👤</span>
+      <span class="who-text">Checking out as <strong id="cartWho">…</strong></span>
     </div>
 
     <label class="ack">

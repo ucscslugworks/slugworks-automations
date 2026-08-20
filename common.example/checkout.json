@@ -2,6 +2,8 @@
   "spreadsheet_id": "",
   "makerspace_name": "Your Makerspace",
   "default_checkout_days": 7,
+  "session_timeout_seconds": 30,
+  "admin_requires_card": true,
   "tabs": {
     "items": "Items",
     "keys": "Keys",

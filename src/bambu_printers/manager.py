@@ -8,7 +8,7 @@ from datetime import datetime
 
 import pytz
 
-from src import constants, log
+from src import constants, log, staff_cache
 from src.bambu_printers import (
     bambu_account,
     bambu_db,
@@ -139,6 +139,13 @@ def load_policy_lists():
                             exemptions.extend([str(x) for x in data])
                 except Exception:
                     logger.warning(f"manager: Failed to read {fname}")
+
+        # staff are exempt for as long as they are staff. common/staff.txt is
+        # refreshed from Canvas nightly by the check-off scheduler, so joining
+        # or leaving staff grants or revokes this without anyone editing a
+        # file - and without touching the two hand-kept lists above, which stay
+        # the place to exempt someone who is not staff.
+        exemptions.extend(staff_cache.read())
 
         # bans - ban.json if present
         bans = []

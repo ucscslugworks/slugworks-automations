@@ -20,8 +20,17 @@
       {% block search %}{% endblock %}
       <nav class="topnav">
         <a href="{{ url_for('index') }}">Checkout</a>
-        <a href="{{ url_for('admin') }}">Inventory Admin</a>
+        <!-- Shown once the session says you are staff; /admin checks again server-side. -->
+        <a href="{{ url_for('admin') }}" id="adminLink" class="hidden">Inventory Admin</a>
       </nav>
+      <div class="whoami hidden" id="whoami">
+        <span class="whoami-who">
+          <strong id="whoamiName"></strong>
+          <small id="whoamiId"></small>
+        </span>
+        <span class="whoami-timer" id="whoamiTimer" title="signs out when this runs down"></span>
+        <button class="whoami-out" id="signOutBtn">Sign out</button>
+      </div>
     </div>
     {% block subbar %}{% endblock %}
   </header>
@@ -34,6 +43,31 @@
     <span>{{ makerspace_name }} — item &amp; room-key checkout. Dummy demo data.</span>
   </footer>
 
+  <!-- Sign-in gate. Covers the page until someone identifies themselves, and
+       comes straight back after {{ session_timeout }}s of inactivity. -->
+  <div class="signin" id="signin">
+    <div class="signin-box">
+      <div class="signin-icon">💳</div>
+      <h1>Swipe in to start</h1>
+      <p class="signin-lead">Swipe your student ID card, or type your CruzID and press Enter.
+        Everything you check out is recorded under that name.</p>
+      <label class="signin-field">
+        <span>ID card or CruzID</span>
+        <input id="signinInput" type="text" autocomplete="off" autocapitalize="off"
+               spellcheck="false" placeholder="Swipe now, or type e.g. sslug" />
+      </label>
+      <label class="signin-field hidden" id="signinNameField">
+        <span>Your name</span>
+        <input id="signinName" type="text" autocomplete="off" placeholder="Sammy Slug" />
+      </label>
+      <button class="signin-go" id="signinBtn">Sign in</button>
+      <p class="signin-msg" id="signinMsg"></p>
+      <p class="signin-foot">The station signs you out after {{ session_timeout }} seconds of inactivity.</p>
+    </div>
+  </div>
+
+  <script>window.MD_TIMEOUT = {{ session_timeout }};</script>
+  <script src="{{ url_for('static', filename='session.js') }}"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

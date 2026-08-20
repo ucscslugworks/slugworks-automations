@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Staff only — {{ makerspace_name }}{% endblock %}
+
+{% block content %}
+<div class="denied">
+  <div class="denied-icon">🔒</div>
+  <h1>Inventory admin is staff only</h1>
+  <p>You are signed in as <strong>{{ who.name }}</strong> ({{ who.cruzid }}), who is not
+    on the staff list for this space.</p>
+  {% if gate.admin_requires_card and who.via != 'sis' %}
+  <p class="muted">If you <em>are</em> staff: admin needs your physical ID card. Sign out and
+    swipe it instead of typing your CruzID.</p>
+  {% else %}
+  <p class="muted">If this is wrong, staff can refresh the list with <code>./checkout staff</code>.</p>
+  {% endif %}
+  <a class="denied-back" href="{{ url_for('index') }}">← Back to checkout</a>
+</div>
+{% endblock %}

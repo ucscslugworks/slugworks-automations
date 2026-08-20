@@ -402,12 +402,18 @@ class SheetStore:
         self._append_row(self.tabs["checkouts"], CHECKOUT_HEADERS, taken)
         return taken
 
-    def return_checkout(self, checkout_id):
-        """Mark a checkout returned and restore available_qty."""
+    def return_checkout(self, checkout_id, owner_cruzid=None):
+        """Mark a checkout returned and restore available_qty.
+
+        `owner_cruzid` limits the return to that person's own checkouts, which
+        is how the web app keeps one student from returning another's tools.
+        """
         _, rows = self._read_tab(self.tabs["checkouts"])
         record = next((r for r in rows if r.get("checkout_id") == checkout_id), None)
         if record is None:
             raise LookupError(f"No checkout {checkout_id}.")
+        if owner_cruzid and record.get("cruzid", "").lower() != owner_cruzid.lower():
+            raise ValueError("That checkout is not yours. Ask staff to return it.")
         if record.get("kind") == "consumable":
             raise ValueError("Single-use consumables cannot be returned.")
         if record.get("status") == "returned":

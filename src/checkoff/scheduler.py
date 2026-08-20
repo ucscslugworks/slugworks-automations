@@ -9,7 +9,15 @@ Schedule (intervals live in src/constants.py):
     grade      hourly - form responses to Canvas grades
     transfer   hourly - carry completions between course offerings
     staff      daily  - refresh the staff allow-list
+    roster     daily  - refresh the checkout station's ID-card map
     digest     weekly - email a summary of everything that changed
+
+The two daily jobs are what the makerspace checkout station runs on: the staff
+list decides who reaches its inventory admin pages (and, in the Bambu manager,
+who is exempt from print limits), and the roster is what turns a swiped ID card
+into a name. Both are just Canvas snapshots, so they go stale as people enroll
+and leave, and both are only ever read from their caches by the things that
+depend on them.
 
 State is kept in checkoff_schedule.json at the repository root so a restart
 does not re-fire every job or lose the week's accumulated events.
@@ -26,6 +34,7 @@ from src import constants, log
 from src.checkoff import digest, grade, staff, transfer
 from src.checkoff.config import ROOT, Config, ConfigError
 from src.checkoff.config import load as load_config
+from src.checkout import identity as checkout_identity
 
 logger = log.setup_logs("checkoff", log.INFO)
 
@@ -149,6 +158,34 @@ def run_staff(cfg: Config, state: dict) -> None:
         logger.info("scheduler: staff added=%s removed=%s", added, removed)
 
 
+def run_roster(cfg: Config, state: dict) -> None:
+    """Rebuild the CruzID <-> ID-card map the checkout station signs people in with."""
+    before = checkout_identity.roster_cruzids()
+
+    people = checkout_identity.build_roster(cfg)
+    after = {p["cruzid"] for p in people}
+
+    # No baseline on the first run, so report the size rather than listing the
+    # whole course as newly added.
+    if not before:
+        added, removed = [], []
+    else:
+        added, removed = sorted(after - before), sorted(before - after)
+    record(
+        state,
+        {
+            "job": "roster",
+            "count": len(after),
+            "added": added,
+            "removed": removed,
+        },
+    )
+    if added or removed:
+        logger.info(
+            "scheduler: roster +%d -%d (now %d)", len(added), len(removed), len(after)
+        )
+
+
 def run_digest(cfg: Config, state: dict) -> None:
     now = time.time()
     state["last"]["digest_attempt"] = now
@@ -165,6 +202,7 @@ JOBS = (
     ("grade", constants.CHECKOFF_GRADE_INTERVAL, run_grade),
     ("transfer", constants.CHECKOFF_TRANSFER_INTERVAL, run_transfer),
     ("staff", constants.CHECKOFF_STAFF_INTERVAL, run_staff),
+    ("roster", constants.CHECKOFF_ROSTER_INTERVAL, run_roster),
 )
 
 

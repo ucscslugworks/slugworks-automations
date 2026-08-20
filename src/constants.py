@@ -46,6 +46,7 @@ CHECKOFF_DELAY = 60  # scheduler loop time (in seconds)
 CHECKOFF_GRADE_INTERVAL = 60 * 60  # form responses -> Canvas grades (in seconds)
 CHECKOFF_TRANSFER_INTERVAL = 60 * 60  # cross-course grade transfer (in seconds)
 CHECKOFF_STAFF_INTERVAL = 24 * 60 * 60  # staff list refresh (in seconds)
+CHECKOFF_ROSTER_INTERVAL = 24 * 60 * 60  # checkout ID-card roster refresh (in seconds)
 CHECKOFF_REPORT_WEEKDAY = 4  # weekly report day (Monday = 0, so 4 is Friday)
 CHECKOFF_REPORT_HOUR = 17  # hour of day to send the weekly report
 CHECKOFF_REPORT_RECIPIENT = "chartier@ucsc.edu"

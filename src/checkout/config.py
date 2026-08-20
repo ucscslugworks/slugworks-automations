@@ -56,6 +56,16 @@ class Config:
     def makerspace_name(self) -> str:
         return str(self.data.get("makerspace_name", "Makerspace"))
 
+    @property
+    def session_timeout_seconds(self) -> int:
+        """Idle seconds before the station signs the current person out."""
+        return int(self.data.get("session_timeout_seconds", 30))
+
+    @property
+    def admin_requires_card(self) -> bool:
+        """Whether inventory admin needs a swiped card, not just a staff CruzID."""
+        return bool(self.data.get("admin_requires_card", True))
+
     # --- interface used by src.checkoff.sheets.get_service / authorize -------
 
     def section(self, name: str) -> dict:

@@ -10,15 +10,15 @@ are the same.
 """
 
 import os
-import time
 from typing import List, Optional
 
-from src import canvas_util, log
+from src import canvas_util, log, staff_cache
 from src.checkoff.config import Config
 
 logger = log.setup_logs("checkoff", log.INFO)
 
-CACHE_FILE = "staff.txt"
+# The file this module writes and everyone else reads (src/staff_cache.py).
+CACHE_FILE = staff_cache.FILENAME
 DEFAULT_ROLES = ["teacher", "ta", "designer"]
 DEFAULT_MAX_AGE = 24 * 60 * 60  # refresh the cache once a day
 
@@ -99,20 +99,14 @@ def write_cache(cfg: Config, members: List[str]) -> str:
 
 def read_cache(cfg: Config) -> Optional[StaffList]:
     path = cfg.common_path(CACHE_FILE)
-    if not os.path.exists(path):
-        return None
-    with open(path, "r", encoding="utf-8") as f:
-        members = [line.strip().lower() for line in f if line.strip()]
+    members = sorted(staff_cache.read(path))
     if not members:
         return None
     return StaffList(f"cache {path}", members)
 
 
 def cache_age(cfg: Config) -> Optional[float]:
-    path = cfg.common_path(CACHE_FILE)
-    if not os.path.exists(path):
-        return None
-    return time.time() - os.path.getmtime(path)
+    return staff_cache.age(cfg.common_path(CACHE_FILE))
 
 
 def load(cfg: Config, prefer: str = "auto") -> StaffList:

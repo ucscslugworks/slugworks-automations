@@ -108,6 +108,28 @@ def _staff_section(events: List[dict]) -> List[str]:
     return lines
 
 
+def _roster_section(events: List[dict]) -> List[str]:
+    """The checkout station's ID-card map: stale means cards stop resolving."""
+    runs = [e for e in events if e["job"] == "roster"]
+    if not runs:
+        return ["CHECKOUT ROSTER", "  No refresh ran this week.", ""]
+
+    added = {c for e in runs for c in e.get("added", [])}
+    removed = {c for e in runs for c in e.get("removed", [])}
+
+    lines = [
+        "CHECKOUT ROSTER",
+        f"  Refreshed {len(runs)} time(s); {runs[-1].get('count', 0)} people can swipe in.",
+    ]
+    # Names, not lists: a course roster churns by the dozen and nobody reads it.
+    if added or removed:
+        lines.append(f"  {len(added)} added, {len(removed)} removed.")
+    else:
+        lines.append("  No changes.")
+    lines.append("")
+    return lines
+
+
 def _error_section(events: List[dict]) -> List[str]:
     errors = [e for e in events if e["job"] == "error"]
     if not errors:
@@ -127,6 +149,7 @@ def build(events: List[dict], start: float, end: float) -> Tuple[str, str]:
     body += _grade_section(events)
     body += _transfer_section(events)
     body += _staff_section(events)
+    body += _roster_section(events)
     body += _error_section(events)
     body += [
         "This report covers only what the scheduler changed; full detail is in",

@@ -1,5 +1,7 @@
 // Makerspace Depot — catalog, cart, checkout, returns.
-// Cart persists in localStorage; no external calls beyond this app's own API.
+// Who you are comes from the session started in session.js; nothing here asks
+// for a name or CruzID again. The cart lives in localStorage so a reload does
+// not lose it, and is emptied at sign-out so the next person starts clean.
 
 const state = {
   items: [],
@@ -9,7 +11,6 @@ const state = {
   activeCat: "",
   view: "catalog",
   search: "",
-  swipeEnabled: false,
   cart: loadCart(), // {ref_id: {kind, ref_id, name, icon, qty, available, days}}
 };
 
@@ -18,6 +19,11 @@ function loadCart() {
   catch { return {}; }
 }
 function saveCart() { localStorage.setItem("md_cart", JSON.stringify(state.cart)); }
+function clearCart() {
+  state.cart = {};
+  localStorage.removeItem("md_cart");
+  localStorage.removeItem("md_cart_owner");
+}
 
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, html) => {
@@ -35,14 +41,6 @@ function toast(msg, kind = "") {
   setTimeout(() => (t.className = "toast hidden"), 2600);
 }
 
-async function api(url, opts) {
-  const res = await fetch(url, opts);
-  let data = {};
-  try { data = await res.json(); } catch {}
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
-  return data;
-}
-
 // ---- load catalog ----
 async function loadCatalog() {
   try {
@@ -51,8 +49,6 @@ async function loadCatalog() {
     state.keys = d.keys;
     state.consumables = d.consumables || [];
     state.categories = d.categories;
-    state.swipeEnabled = !!d.swipe_enabled;
-    $("#swipeBox").classList.toggle("hidden", !state.swipeEnabled);
     renderCats();
     render();
   } catch (e) {
@@ -230,17 +226,15 @@ function openCart() { $("#cartScrim").classList.remove("hidden"); $("#cartDrawer
 function closeCart() { $("#cartScrim").classList.add("hidden"); $("#cartDrawer").classList.add("hidden"); }
 
 function validateCheckout() {
-  const ready = cartLines().length > 0 && $("#ack").checked &&
-    $("#personName").value.trim() && $("#cruzid").value.trim();
+  const ready = cartLines().length > 0 && $("#ack").checked && !!MDSession.user;
   $("#doCheckout").disabled = !ready;
 }
 
 async function doCheckout() {
   const msg = $("#cartMsg");
   msg.className = "cart-msg";
+  // No name or CruzID here on purpose: the server takes them from the session.
   const payload = {
-    person_name: $("#personName").value.trim(),
-    cruzid: $("#cruzid").value.trim(),
     acknowledged: $("#ack").checked,
     lines: cartLines().map((l) => ({ kind: l.kind, ref_id: l.ref_id, qty: l.qty })),
   };
@@ -275,7 +269,9 @@ async function doCheckout() {
 // ---- my checkouts ----
 async function loadCheckouts() {
   const list = $("#checkoutList");
-  const cruzid = $("#lookupCruzid").value.trim();
+  // Non-staff always get their own; the server ignores the parameter for them.
+  const staff = MDSession.user && MDSession.user.is_staff;
+  const cruzid = staff ? $("#lookupCruzid").value.trim() : "";
   const activeOnly = $("#activeOnly").checked;
   const params = new URLSearchParams();
   if (cruzid) params.set("cruzid", cruzid);
@@ -325,34 +321,32 @@ function checkoutRow(c) {
   return row;
 }
 
-// ---- wire up ----
-// ---- ID card swipe -> autofill CruzID + name ----
-async function resolveSwipe() {
-  const raw = $("#swipe").value.trim();
-  const msg = $("#swipeMsg");
-  if (!raw) return;
-  msg.className = "swipe-msg info";
-  msg.textContent = "Looking up…";
-  try {
-    const d = await api("/api/resolve?swipe=" + encodeURIComponent(raw));
-    if (d.ok) {
-      $("#personName").value = d.name || "";
-      $("#cruzid").value = d.cruzid || "";
-      localStorage.setItem("md_name", $("#personName").value);
-      localStorage.setItem("md_cruzid", $("#cruzid").value);
-      msg.className = "swipe-msg ok";
-      msg.textContent = `✅ ${d.name} (${d.cruzid}) — check the agreement to finish.`;
-      $("#swipe").value = "";
-      validateCheckout();
-      $("#ack").focus();
-    }
-  } catch (e) {
-    msg.className = "swipe-msg err";
-    msg.textContent = e.message;
-    $("#swipe").select();
-  }
+// ---- session ----
+// The cart belongs to the person who is signed in, so it goes away with them.
+function onSignIn(user) {
+  // A cart that outlived its session (a crash, a killed browser) belongs to
+  // whoever filled it, not to whoever swipes in next.
+  if (localStorage.getItem("md_cart_owner") !== user.cruzid) clearCart();
+  localStorage.setItem("md_cart_owner", user.cruzid);
+  $("#cartWho").textContent = `${user.name} (${user.cruzid})`;
+  $("#myCheckoutsWho").textContent = user.is_staff ? "you (staff)" : "you";
+  loadCatalog();
+  if (state.view === "checkouts") loadCheckouts();
+  validateCheckout();
 }
 
+function onSignOut() {
+  clearCart();
+  closeCart();
+  $("#ack").checked = false;
+  $("#cartMsg").textContent = "";
+  $("#checkoutList").innerHTML = "";
+  state.view = "catalog";
+  render();
+  renderCart();
+}
+
+// ---- wire up ----
 function init() {
   document.querySelectorAll(".tab").forEach((t) => {
     t.onclick = () => { state.view = t.dataset.view; render(); if (state.view === "checkouts") loadCheckouts(); };
@@ -361,25 +355,19 @@ function init() {
   $("#closeCart").onclick = closeCart;
   $("#cartScrim").onclick = closeCart;
   $("#doCheckout").onclick = doCheckout;
-  ["#ack", "#personName", "#cruzid"].forEach((s) => {
-    $(s).addEventListener("input", validateCheckout);
-    $(s).addEventListener("change", validateCheckout);
-  });
+  ["input", "change"].forEach((ev) => $("#ack").addEventListener(ev, validateCheckout));
   $("#search").addEventListener("input", (e) => { state.search = e.target.value; if (state.view !== "checkouts") render(); });
   $("#lookupBtn").onclick = loadCheckouts;
   $("#activeOnly").onchange = loadCheckouts;
   $("#lookupCruzid").addEventListener("keydown", (e) => { if (e.key === "Enter") loadCheckouts(); });
 
-  // ID-card swipe: readers act as keyboards that type the number + Enter.
-  $("#swipe").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); resolveSwipe(); } });
-  $("#openCart").addEventListener("click", () => { if (state.swipeEnabled) setTimeout(() => $("#swipe").focus(), 50); });
+  // Left over from when the cart asked for a name; nothing reads them now.
+  localStorage.removeItem("md_name");
+  localStorage.removeItem("md_cruzid");
 
-  // prefill who-fields from last time
-  $("#personName").value = localStorage.getItem("md_name") || "";
-  $("#cruzid").value = localStorage.getItem("md_cruzid") || "";
-  $("#personName").addEventListener("change", (e) => localStorage.setItem("md_name", e.target.value));
-  $("#cruzid").addEventListener("change", (e) => localStorage.setItem("md_cruzid", e.target.value));
-
-  loadCatalog();
+  // Nothing loads until someone has swiped in; the API would refuse anyway.
+  MDSession.on("signin", onSignIn);
+  MDSession.on("signout", onSignOut);
+  if (MDSession.user) onSignIn(MDSession.user);
 }
 document.addEventListener("DOMContentLoaded", init);

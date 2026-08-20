@@ -118,7 +118,8 @@ This system provides automated management for Bambu Lab 3D printers with the fol
      - Exempted users: No per-print weight limit
      - Calculates remaining quota from usage history
      - Checks if current print fits within quota
-   - **Exemption Logic**: Users in `bambu_limit_exempt.json` bypass standard limits
+   - **Exemption Logic**: Users in `bambu_limit_exempt.json`, `exemption.json`, or
+     the daily staff list (`common/staff.txt`) bypass standard limits
 
 6. **Print Execution Decision**
    - **If Approved**: 
@@ -558,6 +559,12 @@ Users who cannot submit prints:
 
 Both files are optional. If not present, no exemptions/bans are applied.
 
+**Staff are exempt automatically.** Everyone in `common/staff.txt` — refreshed
+daily from Canvas by the check-off scheduler, see
+[The two daily Canvas snapshots](#the-two-daily-canvas-snapshots) — is treated as
+exempt on top of whatever these files list, so staff neither need an entry here
+nor keep one after they leave. Use the files above for anyone who is not staff.
+
 ### Logging Configuration
 
 Logs are written to the repository root:
@@ -945,6 +952,7 @@ exits on its own within a cycle if the pid file goes missing.
 | `grade` | hourly | New form responses to Canvas grades |
 | `transfer` | hourly | Carry completions between course offerings |
 | `staff` | daily | Refresh the staff allow-list |
+| `roster` | daily | Refresh the checkout station's ID-card map |
 | `digest` | weekly | Email a summary of everything that changed |
 
 Intervals, the report day and hour, and the default recipient are in
@@ -956,7 +964,7 @@ The weekly report goes out through `src/bambu_printers/gmail.py` — the same
 sender the print notifications use, from the same `slugwork@ucsc.edu` address.
 It lists who was newly checked off and by whom, anything that needs attention
 (unknown CruzIDs, Canvas errors), what the transfers moved, staff added or
-removed, and any job failures.
+removed, how the checkout roster grew or shrank, and any job failures.
 
 Scheduler state lives in `checkoff_schedule.json` at the repository root: the
 last run time of each job and the events the weekly report has not yet sent. A
@@ -965,6 +973,31 @@ changes, and the week is only cleared once the email has actually gone out.
 
 A job that throws is logged, recorded for the report, and retried on the next
 cycle — one failing job never stops the others or the loop.
+
+### The two daily Canvas snapshots
+
+`staff` and `roster` are what the [Makerspace Checkout](#makerspace-checkout)
+station runs on, and they are only ever read from their caches by the things
+that depend on them — no part of the web app or the print manager talks to
+Canvas itself.
+
+- `staff` writes `common/staff.txt`: who may reach the checkout station's
+  inventory admin pages, and who is exempt from Bambu print limits.
+- `roster` writes `common/checkout_roster.json`: the CruzID ↔ SIS-number map
+  that turns a swiped ID card into a name. It covers students *and* staff.
+
+Both fail closed. A stale roster means a newly enrolled student cannot swipe in
+until the next refresh (they can still type their CruzID); a missing staff list
+means nobody is staff at all.
+
+**Staff are exempt from Bambu print limits for as long as they are staff.**
+`src/bambu_printers/manager.py` unions `common/staff.txt` into the exemption
+list it reads from `bambu_limit_exempt.json` and `exemption.json`, so joining or
+leaving staff grants or revokes the exemption within a day without anyone
+editing a file. The two hand-kept lists are untouched by this and remain the
+place to exempt someone who is not staff. On the users dashboard a staff
+exemption shows as `EXEMPT (STAFF)` with its checkbox disabled, because
+un-ticking it could not have taken the exemption away.
 
 ### About the hourly transfer
 
@@ -1071,7 +1104,53 @@ It reuses the repo's shared modules: `src/log.py` for logging and
 ./checkout bootstrap           # create tabs + seed dummy inventory in the sheet
 ./checkout bootstrap --force   # overwrite existing sheet data with fresh dummies
 ./checkout auth                # (re)authorize Google Sheets (copy-paste flow)
+./checkout roster              # build the CruzID<->ID-card map from Canvas
+./checkout staff               # refresh who may use the inventory admin pages
 ```
+
+Both caches are **refreshed daily by the check-off scheduler** that `./start_bambu`
+already runs (see [Scheduled runs](#scheduled-runs)), so these two commands are
+only for seeding a new machine or forcing a refresh after an enrollment change
+you do not want to wait a day for. Both read `common/canvas.json` — the same
+Canvas token and course the check-off tools use — and both are safe to re-run.
+
+The roster deliberately includes the course's teachers, TAs and designers as
+well as its students: a TA's card has to resolve like anyone else's or they
+could not sign in at the station at all, let alone reach `/admin`.
+
+## Signing in
+
+The station is a shared machine, so it asks **once per visit** who is using it
+and then stops asking. Walk up, swipe your student ID (the reader types the
+number and presses Enter) or type your CruzID, and every tool, key and supply
+you take from then on is recorded under that name — the cart has no name or
+CruzID boxes at all. After **30 seconds without interaction** the session ends,
+the cart is emptied and the sign-in screen comes back, so the next person can
+never check something out under the last person's name.
+
+The page counts down and puts the screen back on its own, but that is only
+convenience: `src/checkout/session.py` enforces the same window server-side, and
+every API route refuses a signed-out browser. The name and CruzID written to the
+sheet come from the session, never from the request body.
+
+Two rules follow from who you are:
+
+- **Students** see and return only their own checkouts.
+- **Staff** — anyone in `common/staff.txt`, the daily-refreshed list built from
+  the Canvas course's teacher/TA/designer enrollments — additionally get
+  the `/admin` inventory pages, can look up anyone's checkouts, and can return
+  anything at the desk. Everyone else gets a 403 from `/admin` and every
+  `/api/admin/*` route, and never sees the nav link. **No staff list means no
+  staff**: if `common/staff.txt` is missing, admin is shut to everybody rather
+  than open to anybody.
+
+Because a typed CruzID is a guess and a swiped card is not, admin also requires
+the physical card by default: a staff member who types their CruzID gets an
+ordinary student session. Set `"admin_requires_card": false` to allow a typed
+CruzID into admin as well.
+
+Sign-in needs the roster: with no `common/checkout_roster.json`, the app falls
+back to accepting a typed CruzID plus a typed name, and nobody counts as staff.
 
 ## Configuration (`common/checkout.json`)
 
@@ -1080,6 +1159,8 @@ It reuses the repo's shared modules: `src/log.py` for logging and
   "spreadsheet_id": "1bba7Outuw…",        // backing inventory spreadsheet
   "makerspace_name": "Slugworks Makerspace",
   "default_checkout_days": 7,
+  "session_timeout_seconds": 30,           // idle seconds before sign-out
+  "admin_requires_card": true,             // admin needs a swipe, not a typed CruzID
   "tabs": { "items": "Items", "keys": "Keys",
             "consumables": "Consumables", "checkouts": "Checkouts" },
   "sheet": {                               // read by src/checkoff/sheets.py
@@ -1107,6 +1188,7 @@ re-authorizes it with the browserless copy-paste flow.
 `available_qty` decrements on checkout and is restored on return; `stock_qty`
 decrements on take and is not restored. The `/admin` page adds/edits inventory
 and shows/returns everything currently out, with overdue and low-stock flags.
+It is staff-only — see [Signing in](#signing-in).
 
 ## Notes
 
@@ -1117,4 +1199,12 @@ and shows/returns everything currently out, with overdue and low-stock flags.
   a few seconds. Hand-editable cells with non-numeric junk are parsed tolerantly
   rather than crashing.
 - Logs go to `$LOGS_DIR/checkout` (default `/data/logs` on the Pi; falls back to
-  a repo-local `logs/` dir on a dev machine).
+  a repo-local `logs/` dir on a dev machine). Sign-ins, sign-outs and refused
+  admin attempts are logged with the CruzID that tried.
+- `common/checkout_roster.json` maps CruzIDs to SIS student numbers and
+  `common/checkout_session_key` signs the session cookie. Both live in the
+  gitignored `common/`; the key is generated on first run and kept so a restart
+  does not sign the room out mid-transaction.
+- The session cookie is not marked `Secure`, since the app serves plain HTTP on
+  the LAN. If you put it behind HTTPS, set `SESSION_COOKIE_SECURE` in
+  `create_app`.
