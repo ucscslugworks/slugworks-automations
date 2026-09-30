@@ -88,6 +88,7 @@
   },
   "schedule": {
     "transfer_apply": true,
+    "transfer_email": false,
     "report_recipient": "chartier@ucsc.edu"
   }
 }

@@ -959,6 +959,9 @@ Intervals, the report day and hour, and the default recipient are in
 `src/constants.py` under `CHECKOFF_*`. The recipient can be overridden per
 deployment with `schedule.report_recipient` in `common/canvas.json`, and
 `schedule.transfer_apply: false` makes the hourly transfer a dry run.
+`schedule.transfer_email: true` also emails the recipient after every
+transfer run that wrote grades, listing each student copied or failed — handy
+while watching a migration, too noisy to leave on.
 
 The weekly report goes out through `src/bambu_printers/gmail.py` — the same
 sender the print notifications use, from the same `slugwork@ucsc.edu` address.

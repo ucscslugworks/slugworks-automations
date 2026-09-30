@@ -171,7 +171,37 @@ def build(events: List[dict], start: float, end: float) -> Tuple[str, str]:
     return subject, "\n".join(body)
 
 
-def send(cfg: Config, subject: str, body: str) -> bool:
+def build_transfer(results: List[dict]) -> Tuple[str, str]:
+    """Render one scheduled transfer run, student by student. Returns (subject, body)."""
+    written = [r for r in results if r.get("ok") or r.get("fail")]
+    copied = sum(r["ok"] for r in written)
+    failed = sum(r["fail"] for r in written)
+
+    body = ["Grade transfer run", f"{datetime.now():%a %d %b %Y %H:%M}", ""]
+    for r in written:
+        body.append(
+            f"{r['source_assignment']} -> {r['target_assignment']}: "
+            f"{r['ok']} copied, {r['fail']} failed"
+        )
+        for line in r.get("changes", []):
+            body.append("  " + line.replace("\t", "  "))
+        body.append("")
+    body += [
+        "Set schedule.transfer_email to false in common/canvas.json to stop",
+        "these per-run emails; the weekly report still covers transfers.",
+        "",
+        "Thank you,",
+        "slugwork",
+    ]
+
+    subject = f"Grade transfer: {copied} copied"
+    if failed:
+        subject += f", {failed} failed"
+
+    return subject, "\n".join(body)
+
+
+def send(cfg: Config, subject: str, body: str, what: str = "weekly report") -> bool:
     """Send the report with the repository's existing Gmail sender."""
     recipient = cfg.section("schedule").get("report_recipient")
     if not recipient:
@@ -189,12 +219,12 @@ def send(cfg: Config, subject: str, body: str) -> bool:
             recipient, notifications.SENDER, subject, body, None, None
         )
     except Exception as e:
-        logger.error("digest: could not send weekly report: %s", e)
+        logger.error("digest: could not send %s: %s", what, e)
         return False
 
     if result is None:
-        logger.error("digest: weekly report to %s was not sent", recipient)
+        logger.error("digest: %s to %s was not sent", what, recipient)
         return False
 
-    logger.info("digest: sent weekly report to %s", recipient)
+    logger.info("digest: sent %s to %s", what, recipient)
     return True

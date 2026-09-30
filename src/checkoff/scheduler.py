@@ -128,8 +128,18 @@ def run_transfer(cfg: Config, state: dict) -> None:
 
     results = transfer.run(cfg, pairs, dry_run=dry_run)
     # Only worth reporting when something actually moved.
-    if any(r.get("ok") or r.get("fail") for r in results):
-        record(state, {"job": "transfer", "pairs": results})
+    if not any(r.get("ok") or r.get("fail") for r in results):
+        return
+
+    if options.get("transfer_email", False):
+        subject, body = digest.build_transfer(results)
+        digest.send(cfg, subject, body, what="transfer report")
+
+    # The per-student lines only go in that email; keep them out of the state
+    # file, which holds a week of events.
+    for r in results:
+        r.pop("changes", None)
+    record(state, {"job": "transfer", "pairs": results})
 
 
 def run_staff(cfg: Config, state: dict) -> None:

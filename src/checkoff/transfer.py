@@ -319,6 +319,9 @@ def copy_pair(
             "Failures usually mean the student is not in the target assignment's 'Assign to' list."
         )
 
+    # Per-student lines, for the scheduler's per-run email.
+    result["changes"] = lines
+
     log_lines.append("Applied updates (cruzid, score, status):")
     log_lines.extend(lines)
     _write_log(log_path, log_lines)
