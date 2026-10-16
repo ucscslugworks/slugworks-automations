@@ -243,8 +243,8 @@ def is_complete(sub, threshold: float = 1.0) -> bool:
     """
     for attr in ("entered_score", "score", "grade"):
         score = to_float(getattr(sub, attr, None))
-        if score is not None and score >= threshold:
-            return True
+        if score is not None:
+            return score >= threshold
     return getattr(sub, "workflow_state", None) == "graded"
 
 
