@@ -6,6 +6,7 @@ sis_user_id -- see src/canvas_util.match_user.
 """
 
 import csv
+import math
 import os
 from typing import Dict, List, Optional, Tuple
 
