@@ -671,7 +671,8 @@ def reap_stuck_prints(
         # not running and well past its end time - archive as succeeded (weight stays debited)
         if c_print[7] < timestamp - STUCK_PRINT_GRACE_SECONDS:
             logger.warning(f"manager: Reaping stuck print {c_print[0]} on {c_print[3]}")
-            db.archive_print(c_print[0], constants.PRINT_SUCCEEDED)
+            if db.archive_print(c_print[0], constants.PRINT_SUCCEEDED):
+                notifications.notify_recovered(db, c_print[2], c_print[4])
 
 
 def update_status_sheet(
@@ -802,6 +803,7 @@ def manager():
         while True:
             try:
                 logger.info("manager: Running main loop")
+                notifications.send_pending()
 
                 # loop timestamp - ensure consistent time comparisons for all operations in this loop
                 timestamp = int(time.time())

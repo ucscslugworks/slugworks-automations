@@ -79,7 +79,10 @@ def gmail_send_message(
         create_message = {"raw": encoded_message}
         # pylint: disable=E1101
         send_message = (
-            service.users().messages().send(userId="me", body=create_message).execute()
+            service.users()
+            .messages()
+            .send(userId="me", body=create_message)
+            .execute(num_retries=3)
         )
         logger.info(f'gmail: Message ID: {send_message["id"]}')
     except Exception:
