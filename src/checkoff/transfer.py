@@ -6,6 +6,7 @@ sis_user_id -- see src/canvas_util.match_user.
 """
 
 import csv
+import math
 import os
 from typing import Dict, List, Optional, Tuple
 
@@ -217,6 +218,17 @@ def copy_pair(
     src = canvas_util.resolve_assignment(src_course, pair[0])
     tgt = canvas_util.resolve_assignment(tgt_course, pair[1])
 
+    # give full credits instead of just 1 point
+    completed_score = canvas_util.to_float(getattr(tgt, "points_possible", None))
+    if (
+        completed_score is None
+        or not math.isfinite(completed_score)
+        or completed_score <= 0
+    ):
+        raise ValueError(
+            f"Target assignment {tgt.id} must have a positive, finite points_possible."
+        )
+
     log_lines = [
         f"Source assignment: {src.name} ({src.id}) in course {src_course.id}",
         f"Target assignment: {tgt.name} ({tgt.id}) in course {tgt_course.id}",
@@ -231,7 +243,7 @@ def copy_pair(
     matched_by = {"id": 0, "login_id": 0, "sis_user_id": 0}
 
     for data in source_rows.values():
-        score = 1.0 if data["complete"] else (0.0 if write_zeros else None)
+        score = completed_score if data["complete"] else (0.0 if write_zeros else None)
         if score is None:
             continue
 
