@@ -183,7 +183,7 @@ class Printer:
                 percent_complete=self.percent_complete,
                 time_remaining=self.time_remaining,
                 start_time=self.start_time,
-                end_time=self.start_time + self.time_remaining,
+                end_time=self.get_end_time(),
                 active_spool=self.active_spool,
                 spool_state=self.spool_state,
                 colors=",".join(self.colors),
@@ -210,7 +210,10 @@ class Printer:
         return self.gcode_state
 
     def get_end_time(self):
-        return self.start_time + self.time_remaining
+        # time_remaining counts from the last report, not from the start - start +
+        # remaining shrank back to the start time as the print ran, so the reaper
+        # archived every print over ~15 min the moment it stopped, with no email
+        return self.last_update + self.time_remaining
 
     def stop_thread(self):
         self.printer.quit()
