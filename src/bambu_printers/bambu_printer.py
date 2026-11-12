@@ -94,6 +94,10 @@ class Printer:
         self.active_spool = -1
         self.spool_state = ""
         self.colors = []
+        # set by the manager from the status sheet's Maintenance tab - blocks every
+        # automatic cancel. the dashboard runs in its own process and never sets it,
+        # so staff can still cancel by hand
+        self.maintenance = False
 
         self.printer.on_update = self.on_update
         self.printer.start_session()
@@ -193,6 +197,9 @@ class Printer:
             self.logger.error(f"update_db: {self.name} - {traceback.format_exc()}")
 
     def cancel(self):
+        if self.maintenance:
+            self.logger.warning(f"cancel: {self.name} - in maintenance mode, not canceling")
+            return
         self.printer.stop_printing()
         self.db.update_printer(self.name, status=constants.PRINTER_IDLE)
         self.logger.warning(f"cancel: {self.name}")

@@ -18,6 +18,12 @@ PRIVATE_SHEET_ID = "1znYsriJMDjESa3nekrVcSBXVW93RLQNJD3YdqRYtN_A"
 PRIVATE_SHEET_NAME = "Sheet1"
 PUBLIC_SHEET_ID = "1C077MsPnLSphsJT4Q6BA3k3cA0ctSSW_a9yFHQpn2Sk"
 PUBLIC_SHEET_NAME = "Sheet1"
+# private rows written by update(): name, status, last update, cruzid, state,
+# percent, start, remaining, end, weight, tool, bed, light + one per filament slot
+PRIVATE_COLUMN_COUNT = 13 + constants.FILAMENT_COUNT
+# staff tick this column to stop automatic cancels on that printer - it's just
+# right of what update() writes, so the manager never overwrites it
+MAINTENANCE_COLUMN = chr(ord("A") + PRIVATE_COLUMN_COUNT)
 
 STATUS_SHEET_OBJECT = None
 STATUS_SHEET_STARTED = False
@@ -167,6 +173,115 @@ class StatusSheet:
             exit(1)
 
         self.latest_row = 1
+        self.maintenance_ready = False
+
+    def setup_maintenance_column(self, printer_names: list[str]):
+        # header + a checkbox per printer row in the Maintenance column. update()
+        # writes the printers sorted by name, so if the set of printers changed
+        # since the last run the rows have shifted - move the ticks to match
+        names = sorted(printer_names)
+        sheets = (
+            self.g_sheets.get(spreadsheetId=PRIVATE_SHEET_ID, fields="sheets.properties")
+            .execute()
+            .get("sheets", [])
+        )
+        sheet_id = next(
+            s["properties"]["sheetId"]
+            for s in sheets
+            if s["properties"]["title"] == PRIVATE_SHEET_NAME
+        )
+
+        rows = (
+            self.g_sheets.values()
+            .get(
+                spreadsheetId=PRIVATE_SHEET_ID,
+                range=f"{PRIVATE_SHEET_NAME}!A1:{MAINTENANCE_COLUMN}",
+            )
+            .execute()
+            .get("values", [])
+        )
+        header = rows[0] if rows else []
+        old_names = [row[0] if row else "" for row in rows[1:]]
+        ticked = {
+            row[0]
+            for row in rows[1:]
+            if len(row) > PRIVATE_COLUMN_COUNT
+            and str(row[PRIVATE_COLUMN_COUNT]).strip().upper() == "TRUE"
+        }
+
+        if len(header) <= PRIVATE_COLUMN_COUNT or not header[PRIVATE_COLUMN_COUNT]:
+            self.g_sheets.values().update(
+                spreadsheetId=PRIVATE_SHEET_ID,
+                range=f"{PRIVATE_SHEET_NAME}!{MAINTENANCE_COLUMN}1",
+                valueInputOption="RAW",
+                body={"values": [["Maintenance"]]},
+            ).execute()
+
+        if old_names[: len(names)] != names:
+            # rows moved - rewrite the ticks in the new order (and clear leftover
+            # rows from removed printers). only done when they moved, so a box
+            # staff tick at the same moment isn't overwritten on a normal start
+            values = [[name in ticked] for name in names]
+            values += [[""]] * max(0, len(old_names) - len(names))
+            self.g_sheets.values().update(
+                spreadsheetId=PRIVATE_SHEET_ID,
+                range=f"{PRIVATE_SHEET_NAME}!{MAINTENANCE_COLUMN}2:{MAINTENANCE_COLUMN}{len(values) + 1}",
+                valueInputOption="USER_ENTERED",
+                body={"values": values},
+            ).execute()
+            self.logger.info(
+                f"setup_maintenance_column: Printer rows changed, moved ticks for {sorted(ticked)}"
+            )
+
+        self.g_sheets.batchUpdate(
+            spreadsheetId=PRIVATE_SHEET_ID,
+            body={
+                "requests": [
+                    {
+                        "setDataValidation": {
+                            "range": {
+                                "sheetId": sheet_id,
+                                "startRowIndex": 1,
+                                "endRowIndex": 1 + len(names),
+                                "startColumnIndex": PRIVATE_COLUMN_COUNT,
+                                "endColumnIndex": PRIVATE_COLUMN_COUNT + 1,
+                            },
+                            "rule": {"condition": {"type": "BOOLEAN"}, "strict": True},
+                        }
+                    }
+                ]
+            },
+        ).execute()
+
+    def get_maintenance_printers(self, printer_names: list[str]):
+        # names of the printers ticked in the Maintenance column, or None if it
+        # couldn't be read (the manager then keeps the last known flags)
+        try:
+            if not self.maintenance_ready:
+                self.setup_maintenance_column(printer_names)
+                self.maintenance_ready = True
+
+            names = sorted(printer_names)
+            rows = (
+                self.g_sheets.values()
+                .get(
+                    spreadsheetId=PRIVATE_SHEET_ID,
+                    range=f"{PRIVATE_SHEET_NAME}!{MAINTENANCE_COLUMN}2:{MAINTENANCE_COLUMN}{len(names) + 1}",
+                )
+                .execute()
+                .get("values", [])
+            )
+            # match by row position, the order update() writes - not column A,
+            # which still has the old names for one loop after the rows move.
+            # checkboxes read back as "TRUE"/"FALSE"
+            return {
+                name
+                for name, row in zip(names, rows)
+                if row and str(row[0]).strip().upper() == "TRUE"
+            }
+        except Exception:
+            self.logger.error(f"get_maintenance_printers: {traceback.format_exc()}")
+            return None
 
     def update(self, printer_data: dict):
         """
@@ -337,6 +452,13 @@ class StatusSheet:
 
             private_table.sort(key=lambda x: x[0])
             public_table.sort(key=lambda x: x[0])
+
+            if len(private_table[0]) != PRIVATE_COLUMN_COUNT:
+                # a wider row would write over the Maintenance checkboxes
+                self.logger.error(
+                    f"update: private rows are {len(private_table[0])} columns, expected "
+                    f"{PRIVATE_COLUMN_COUNT} - update PRIVATE_COLUMN_COUNT"
+                )
 
             # update private sheet
             self.g_sheets.values().update(

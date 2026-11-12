@@ -258,6 +258,9 @@ def check_unauthorized_prints(
     # cancel prints started directly from the printer screen to dodge the cloud
     # pipeline - printer is running but its job ID has no tracked cloud task.
     for name, printer in printers.items():
+        if printer.maintenance:
+            # staff are working on it - test prints from the screen are expected
+            continue
         if printer.last_update < timestamp - 60:
             continue
         if printer.get_status() not in (
@@ -694,6 +697,25 @@ def reap_stuck_prints(
                 notifications.notify_recovered(db, c_print[2], c_print[4])
 
 
+def update_maintenance(
+    printers: dict[str, bambu_printer.Printer],
+    ss: status_sheet.StatusSheet,
+):
+    # printers ticked on the status sheet's Maintenance tab get no automatic cancels
+    maintenance = ss.get_maintenance_printers(list(printers))
+    if maintenance is None:
+        # couldn't read the tab - keep the last known flags rather than suddenly
+        # canceling on a printer staff are working on
+        return
+    for name, printer in printers.items():
+        on = name in maintenance
+        if on != printer.maintenance:
+            logger.warning(
+                f"manager: {name} {'entered' if on else 'left'} maintenance mode"
+            )
+        printer.maintenance = on
+
+
 def update_status_sheet(
     db: bambu_db.BambuDB,
     printers: dict[str, bambu_printer.Printer],
@@ -834,6 +856,10 @@ def manager():
                 # get the latest prints from the account
                 logger.info("manager: Checking for new prints")
                 cloud_ok = get_new_prints(account, db)
+
+                # read the Maintenance tab before anything that can cancel
+                logger.info("manager: Checking maintenance mode")
+                update_maintenance(printers, ss)
 
                 # during the startup grace period skip anything that can cancel or
                 # expire a print, until the in-memory printer state repopulates
